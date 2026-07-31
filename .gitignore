@@ -1,15 +1,11 @@
-# Visual Studio
+# Visual Studio / Rider / VS Code
 .vs/
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
-
-# JetBrains Rider
 .idea/
 *.sln.iml
-
-# Visual Studio Code
 .vscode/
 
 # .NET build output
