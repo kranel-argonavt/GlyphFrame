@@ -1,0 +1,61 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# Visual Studio Code
+.vscode/
+
+# .NET build output
+[Bb]in/
+[Oo]bj/
+[Aa]rtifacts/
+publish/
+dist/
+releases/
+
+# Tests and coverage
+[Tt]est[Rr]esults/
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# User-specific and local configuration
+*.rsuser
+*.userprefs
+*.DotSettings.user
+launchSettings.local.json
+
+# Logs
+*.log
+[Ll]ogs/
+
+# Temporary and working media
+*.tmp
+*.temp
+*.partial
+*.part
+[Tt]emp/
+[Tt]mp/
+temp-media/
+working-media/
+
+# Future portable publish artifacts
+GlyphFrame-win-x64/
+GlyphFrame-*-portable/
+*.nupkg
+*.snupkg
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
