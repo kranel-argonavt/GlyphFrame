@@ -34,7 +34,7 @@ public partial class App : Application
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton(ApplicationInfo.Phase2);
+        services.AddSingleton(ApplicationInfo.Phase3);
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
     }

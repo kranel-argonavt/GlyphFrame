@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 2 — Repository and Solution. The solution, project boundaries, dependency injection startup, minimal WPF shell, and automated-test foundation are in place. The complete interface and media-processing features begin in later phases.
+Phase 3 — UI Skeleton. The complete WPF editor shell, reusable dark visual resources, binding-driven image/video/export presentation states, and safe placeholder commands are in place. Media input, preview generation, and export are not yet implemented.
 
 ## Platform and target framework
 
@@ -23,7 +23,7 @@ Phase 2 — Repository and Solution. The solution, project boundaries, dependenc
 - Microsoft.Extensions.DependencyInjection
 - xUnit
 
-SkiaSharp, OpenCvSharp, FFmpeg, and ffprobe are planned for later phases and are intentionally not included in Phase 2.
+SkiaSharp, OpenCvSharp, FFmpeg, and ffprobe are planned for later phases and are intentionally not included in Phase 3.
 
 ## Solution structure
 
@@ -72,7 +72,6 @@ dotnet test GlyphFrame.sln
 
 ## Upcoming phases
 
-- Phase 3 builds the approved WPF UI skeleton and visual system.
 - Phases 4–6 add settings, media input, and the image symbolization pipeline.
 - Phases 7–11 add bundled FFmpeg tooling, video processing, audio, progress, and cancellation.
 - Later phases cover error handling, UI polish, comprehensive testing, and portable packaging.

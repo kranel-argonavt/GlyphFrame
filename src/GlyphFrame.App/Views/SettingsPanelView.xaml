@@ -1,0 +1,271 @@
+<UserControl x:Class="GlyphFrame.App.Views.SettingsPanelView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="False">
+    <StackPanel>
+        <Border Margin="0,0,0,10"
+                IsEnabled="{Binding AreSettingsEnabled}"
+                Style="{StaticResource CardStyle}">
+            <StackPanel>
+                <StackPanel Margin="0,0,0,14" Orientation="Horizontal">
+                    <Border Style="{StaticResource SectionIconStyle}">
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource AccentHoverBrush}"
+                                   Text="▣" />
+                    </Border>
+                    <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Input" />
+                </StackPanel>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="82" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource LabelTextStyle}" Text="{Binding InputLabel}" />
+                    <Border Grid.Column="1"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource ReadOnlySurfaceStyle}"
+                            ToolTip="Selected media path">
+                        <TextBlock VerticalAlignment="Center"
+                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                   Text="{Binding SelectedFilePath}" />
+                    </Border>
+                    <Button Grid.Column="2"
+                            MinWidth="78"
+                            Command="{Binding BrowseMediaCommand}"
+                            Content="Browse" />
+                </Grid>
+
+                <Border Margin="0,10,0,0"
+                        Padding="12,10"
+                        Background="{StaticResource PreviewBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource ControlCornerRadius}">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Browse or drag &amp; drop media" />
+                        <TextBlock Margin="0,4,0,0"
+                                   Style="{StaticResource MutedTextStyle}"
+                                   Text="Drop handling will be enabled in Phase 5" />
+                    </StackPanel>
+                </Border>
+                <TextBlock Margin="0,9,0,0"
+                           Style="{StaticResource MutedTextStyle}"
+                           Text="Images: PNG, JPG, JPEG, WebP, BMP   •   Video: MP4, MOV, MKV, AVI"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <Border Margin="0,0,0,10"
+                IsEnabled="{Binding AreSettingsEnabled}"
+                Style="{StaticResource CardStyle}">
+            <StackPanel>
+                <StackPanel Margin="0,0,0,14" Orientation="Horizontal">
+                    <Border Style="{StaticResource SectionIconStyle}">
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource AccentHoverBrush}"
+                                   Text="✣" />
+                    </Border>
+                    <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Characters" />
+                </StackPanel>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="82" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource LabelTextStyle}" Text="Preset" />
+                    <ComboBox Grid.Column="1"
+                              DisplayMemberPath="Name"
+                              ItemsSource="{Binding Presets}"
+                              SelectedItem="{Binding SelectedPreset}" />
+                </Grid>
+
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="82" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource LabelTextStyle}" Text="Ramp" />
+                    <StackPanel Grid.Column="1">
+                        <Border Style="{StaticResource ReadOnlySurfaceStyle}">
+                            <TextBlock Style="{StaticResource MonospaceTextStyle}"
+                                       Text="{Binding CharacterRamp}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding CharacterRamp}" />
+                        </Border>
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock HorizontalAlignment="Left" Style="{StaticResource MutedTextStyle}" Text="darkest" />
+                            <TextBlock HorizontalAlignment="Center" Style="{StaticResource MutedTextStyle}" Text="──────────" />
+                            <TextBlock HorizontalAlignment="Right" Style="{StaticResource MutedTextStyle}" Text="lightest" />
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Margin="0,0,0,10"
+                IsEnabled="{Binding AreSettingsEnabled}"
+                Style="{StaticResource CardStyle}">
+            <StackPanel>
+                <StackPanel Margin="0,0,0,14" Orientation="Horizontal">
+                    <Border Style="{StaticResource SectionIconStyle}">
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource AccentHoverBrush}"
+                                   Text="✦" />
+                    </Border>
+                    <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Render" />
+                </StackPanel>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="82" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource LabelTextStyle}" Text="Font Family" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding FontFamilies}"
+                              SelectedItem="{Binding SelectedFont}" />
+                </Grid>
+
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="82" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource LabelTextStyle}" Text="Font Size" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding FontSizes}"
+                              SelectedItem="{Binding SelectedFontSize}" />
+                </Grid>
+
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="82" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource LabelTextStyle}" Text="Resolution" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding OutputResolutions}"
+                              SelectedItem="{Binding SelectedOutputResolution}" />
+                </Grid>
+
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="82" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource LabelTextStyle}" Text="Color Mode" />
+                    <ComboBox Grid.Column="1"
+                              IsEnabled="False"
+                              ItemsSource="{Binding ColorModes}"
+                              SelectedIndex="0" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Margin="0,0,0,10"
+                IsEnabled="{Binding AreSettingsEnabled}"
+                Style="{StaticResource CardStyle}"
+                Visibility="{Binding IsVideoSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+                <StackPanel Margin="0,0,0,14" Orientation="Horizontal">
+                    <Border Style="{StaticResource SectionIconStyle}">
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource AccentHoverBrush}"
+                                   Text="◖" />
+                    </Border>
+                    <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Audio" />
+                </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <RadioButton Grid.Column="0"
+                                 Margin="0,0,5,0"
+                                 Content="Keep Audio"
+                                 GroupName="AudioMode"
+                                 IsChecked="{Binding IsKeepAudioSelected}"
+                                 Style="{StaticResource SegmentRadioButtonStyle}" />
+                    <RadioButton Grid.Column="1"
+                                 Margin="5,0,0,0"
+                                 Content="Remove Audio"
+                                 GroupName="AudioMode"
+                                 IsChecked="{Binding IsRemoveAudioSelected}"
+                                 Style="{StaticResource SegmentRadioButtonStyle}" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border IsEnabled="{Binding AreSettingsEnabled}"
+                Style="{StaticResource CardStyle}">
+            <StackPanel>
+                <StackPanel Margin="0,0,0,14" Orientation="Horizontal">
+                    <Border Style="{StaticResource SectionIconStyle}">
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource AccentHoverBrush}"
+                                   Text="□" />
+                    </Border>
+                    <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Output" />
+                </StackPanel>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="82" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource LabelTextStyle}" Text="Output File" />
+                    <Border Grid.Column="1"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource ReadOnlySurfaceStyle}"
+                            ToolTip="Output file path">
+                        <TextBlock VerticalAlignment="Center"
+                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                   Text="{Binding OutputPathText}" />
+                    </Border>
+                    <Button Grid.Column="2"
+                            MinWidth="78"
+                            Command="{Binding BrowseOutputCommand}"
+                            Content="Browse" />
+                </Grid>
+
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="82" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource LabelTextStyle}" Text="Format" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding ImageOutputFormats}"
+                              SelectedItem="{Binding SelectedImageOutputFormat}"
+                              Visibility="{Binding IsImageSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Border Grid.Column="1"
+                            Style="{StaticResource ReadOnlySurfaceStyle}"
+                            Visibility="{Binding IsVideoSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock VerticalAlignment="Center" Text="MP4" />
+                    </Border>
+                    <Border Grid.Column="1"
+                            Style="{StaticResource ReadOnlySurfaceStyle}"
+                            Visibility="{Binding IsNoMediaSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock VerticalAlignment="Center"
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   Text="Select media" />
+                    </Border>
+                </Grid>
+
+                <Button Margin="82,12,0,0"
+                        Command="{Binding ExportCommand}"
+                        Content="{Binding ExportActionLabel}"
+                        Style="{StaticResource PrimaryButtonStyle}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>
