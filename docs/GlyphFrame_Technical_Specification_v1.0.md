@@ -496,21 +496,19 @@ The approved reference controls the composition, proportions, information densit
 Authoritative visual artifacts:
 
 ```text
-docs/mockups/GlyphFrame_Design_Reference.png
-docs/mockups/GlyphFrame_Final_Mockup.html
+docs/design_reference/GlyphFrame_Design_Reference.png
 ```
 
 Reference rules:
 
-- `GlyphFrame_Design_Reference.png` is the approved source for layout, visual hierarchy, spacing, and desktop-tool density.
-- `GlyphFrame_Final_Mockup.html` is the GlyphFrame-branded implementation reference for Phase 3.
+- `GlyphFrame_Design_Reference.png` is the approved GlyphFrame-branded implementation reference for Phase 3, including layout, visual hierarchy, spacing, and desktop-tool density.
 - The application name in the native title bar is `GlyphFrame`.
 - The product header title is `Video & Image to Symbol Converter`.
 - The product header subtitle is `Transform videos and images into beautiful symbol art`.
 - The preset quick selector remains in the upper-right product header area.
 - The preview and export-progress areas form the left column.
 - Input, Characters, Render, Audio, and Output form the stacked right column.
-- The loaded-video/exporting state shown in the final mockup is the primary desktop reference state.
+- The loaded-video/exporting state shown in the design reference is the primary desktop reference state.
 - Image mode uses the same shell and spacing while applying the conditional rules in section 8.2.
 - Later implementation may improve accessibility and DPI behavior, but must preserve the approved hierarchy and recognizable composition.
 
@@ -1220,7 +1218,7 @@ Result:
 
 ```text
 Final GlyphFrame Technical Specification v1.0
-Final UI mockup
+Final UI design reference
 Acceptance criteria
 Updated project naming
 ```
@@ -1231,7 +1229,7 @@ Tasks:
 - Use `GlyphFrame` everywhere.
 - Add image requirements.
 - Add UI specification.
-- Save final mockup.
+- Save the final UI design reference.
 - Record acceptance criteria.
 
 ### Phase 2 - Repository and Solution
@@ -1373,7 +1371,7 @@ Tasks:
 - About dialog.
 - DPI scaling.
 - Resizing.
-- Final comparison with mockup.
+- Final comparison with the design reference.
 
 ### Phase 14 - Testing
 
@@ -1419,7 +1417,7 @@ MVP is accepted when all criteria below are met.
 
 - App name is `GlyphFrame` everywhere in the UI.
 - No UI text uses a previous project name.
-- Main UI visibly matches `GlyphFrame_Design_Reference.png` and `GlyphFrame_Final_Mockup.html` in hierarchy, proportions, spacing, and control placement.
+- Main UI visibly matches `GlyphFrame_Design_Reference.png` in hierarchy, proportions, spacing, and control placement.
 - Native-style title bar shows the GlyphFrame mark, `GlyphFrame`, and window controls.
 - Product header shows `Video & Image to Symbol Converter`, its description, and the upper-right preset selector.
 - Left column contains the preview panel and the export status panel.
@@ -1510,6 +1508,6 @@ MVP is accepted when all criteria below are met.
 ### 22.11 Documentation
 
 - `GlyphFrame Technical Specification v1.0` exists.
-- Design reference.
+- `docs/design_reference/GlyphFrame_Design_Reference.png` exists.
 - Acceptance criteria are included.
 - Project name is updated to `GlyphFrame` in all project-created documentation.
