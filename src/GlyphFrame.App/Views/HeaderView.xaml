@@ -13,14 +13,14 @@
                 Height="54"
                 Margin="0,0,14,0"
                 VerticalAlignment="Center"
-                Background="{StaticResource AccentSubtleBrush}"
-                BorderBrush="{StaticResource AccentBrush}"
+                Background="{DynamicResource AccentSubtleBrush}"
+                BorderBrush="{DynamicResource AccentBrush}"
                 BorderThickness="1"
                 CornerRadius="8">
             <Grid>
                 <Border Width="28"
                         Height="28"
-                        Background="{StaticResource AccentBrush}"
+                        Background="{DynamicResource AccentBrush}"
                         CornerRadius="6" />
                 <TextBlock HorizontalAlignment="Center"
                            VerticalAlignment="Center"
@@ -35,7 +35,7 @@
             <TextBlock Margin="0,0,0,3"
                        FontSize="10"
                        FontWeight="SemiBold"
-                       Foreground="{StaticResource AccentHoverBrush}"
+                       Foreground="{DynamicResource AccentHoverBrush}"
                        Text="GLYPHFRAME" />
             <TextBlock Style="{StaticResource ProductTitleTextStyle}"
                        Text="Video &amp; Image to Symbol Converter" />

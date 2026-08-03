@@ -11,7 +11,7 @@
                     <Border Style="{StaticResource SectionIconStyle}">
                         <TextBlock HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="{StaticResource AccentHoverBrush}"
+                                   Foreground="{DynamicResource AccentHoverBrush}"
                                    Text="▣" />
                     </Border>
                     <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Input" />
@@ -66,7 +66,7 @@
                     <Border Style="{StaticResource SectionIconStyle}">
                         <TextBlock HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="{StaticResource AccentHoverBrush}"
+                                   Foreground="{DynamicResource AccentHoverBrush}"
                                    Text="✣" />
                     </Border>
                     <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Characters" />
@@ -115,7 +115,7 @@
                     <Border Style="{StaticResource SectionIconStyle}">
                         <TextBlock HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="{StaticResource AccentHoverBrush}"
+                                   Foreground="{DynamicResource AccentHoverBrush}"
                                    Text="✦" />
                     </Border>
                     <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Render" />
@@ -177,7 +177,7 @@
                     <Border Style="{StaticResource SectionIconStyle}">
                         <TextBlock HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="{StaticResource AccentHoverBrush}"
+                                   Foreground="{DynamicResource AccentHoverBrush}"
                                    Text="◖" />
                     </Border>
                     <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Audio" />
@@ -210,7 +210,7 @@
                     <Border Style="{StaticResource SectionIconStyle}">
                         <TextBlock HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="{StaticResource AccentHoverBrush}"
+                                   Foreground="{DynamicResource AccentHoverBrush}"
                                    Text="□" />
                     </Border>
                     <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Output" />

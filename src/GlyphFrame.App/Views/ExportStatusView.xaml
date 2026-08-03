@@ -17,7 +17,7 @@
                          Stroke="{StaticResource BorderBrush}"
                          StrokeThickness="7" />
                 <Ellipse Margin="5"
-                         Stroke="{StaticResource AccentBrush}"
+                         Stroke="{DynamicResource AccentBrush}"
                          StrokeDashArray="5,2"
                          StrokeThickness="5" />
                 <TextBlock HorizontalAlignment="Center"

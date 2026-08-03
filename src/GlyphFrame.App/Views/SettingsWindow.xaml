@@ -1,0 +1,248 @@
+<Window x:Class="GlyphFrame.App.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="GlyphFrame Settings"
+        Icon="{StaticResource GlyphFrameWindowIcon}"
+        Width="720"
+        Height="760"
+        MinWidth="620"
+        MinHeight="620"
+        Background="{StaticResource MainBackgroundBrush}"
+        ResizeMode="CanResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Padding="24,20,24,16"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1">
+            <StackPanel>
+                <TextBlock FontSize="20"
+                           FontWeight="SemiBold"
+                           Text="Settings" />
+                <TextBlock Margin="0,5,0,0"
+                           Style="{StaticResource SecondaryTextStyle}"
+                           Text="Local appearance and editor defaults"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      Padding="24,18,18,18"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0,0,6,0">
+                <Border Margin="0,0,0,12" Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <StackPanel Margin="0,0,0,16" Orientation="Horizontal">
+                            <Border Style="{StaticResource SectionIconStyle}">
+                                <Path Data="M 12,2 L 13.5,7.5 L 19,9 L 13.5,10.5 L 12,16 L 10.5,10.5 L 5,9 L 10.5,7.5 Z M 19,15 L 20,18 L 23,19 L 20,20 L 19,23 L 18,20 L 15,19 L 18,18 Z"
+                                      Style="{StaticResource SectionIconGlyphStyle}" />
+                            </Border>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Appearance" />
+                                <TextBlock Margin="0,3,0,0"
+                                           Style="{StaticResource MutedTextStyle}"
+                                           Text="The approved dark theme remains active for every accent." />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource LabelTextStyle}" Text="Accent preset" />
+                            <ComboBox Grid.Column="1"
+                                      DisplayMemberPath="DisplayName"
+                                      ItemsSource="{Binding AccentPresets}"
+                                      SelectedValue="{Binding SelectedAccentPreset}"
+                                      SelectedValuePath="Value"
+                                      ToolTip="Select one of the six approved accents" />
+                            <Border Grid.Column="2"
+                                    Width="36"
+                                    Height="36"
+                                    Margin="10,0,0,0"
+                                    Background="{Binding AccentPreviewColor}"
+                                    BorderBrush="{StaticResource PrimaryTextBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="18"
+                                    ToolTip="Current accent preview" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Margin="0,0,0,12" Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <StackPanel Margin="0,0,0,16" Orientation="Horizontal">
+                            <Border Style="{StaticResource SectionIconStyle}">
+                                <Path Data="M 3,5 H 9 V 3 H 13 V 5 H 21 V 7 H 13 V 9 H 9 V 7 H 3 Z M 3,11 H 15 V 9 H 19 V 11 H 21 V 13 H 19 V 15 H 15 V 13 H 3 Z M 3,17 H 6 V 15 H 10 V 17 H 21 V 19 H 10 V 21 H 6 V 19 H 3 Z"
+                                      Style="{StaticResource SectionIconGlyphStyle}" />
+                            </Border>
+                            <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Defaults" />
+                        </StackPanel>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Style="{StaticResource LabelTextStyle}" Text="Character preset" />
+                            <ComboBox Grid.Column="1"
+                                      DisplayMemberPath="Name"
+                                      ItemsSource="{Binding CharacterPresets}"
+                                      SelectedItem="{Binding SelectedCharacterPreset}" />
+
+                            <TextBlock Grid.Row="1" Margin="0,10,0,0" Style="{StaticResource LabelTextStyle}" Text="Font family" />
+                            <ComboBox Grid.Row="1"
+                                      Grid.Column="1"
+                                      Margin="0,10,0,0"
+                                      ItemsSource="{Binding FontFamilies}"
+                                      SelectedItem="{Binding SelectedFontFamily}" />
+
+                            <TextBlock Grid.Row="2" Margin="0,10,0,0" Style="{StaticResource LabelTextStyle}" Text="Font size" />
+                            <ComboBox Grid.Row="2"
+                                      Grid.Column="1"
+                                      Margin="0,10,0,0"
+                                      ItemsSource="{Binding FontSizes}"
+                                      SelectedItem="{Binding SelectedFontSize}" />
+
+                            <TextBlock Grid.Row="3" Margin="0,10,0,0" Style="{StaticResource LabelTextStyle}" Text="Output resolution" />
+                            <ComboBox Grid.Row="3"
+                                      Grid.Column="1"
+                                      Margin="0,10,0,0"
+                                      DisplayMemberPath="DisplayName"
+                                      ItemsSource="{Binding OutputResolutions}"
+                                      SelectedValue="{Binding SelectedOutputResolution}"
+                                      SelectedValuePath="Value" />
+
+                            <TextBlock Grid.Row="4" Margin="0,10,0,0" Style="{StaticResource LabelTextStyle}" Text="Image export format" />
+                            <ComboBox Grid.Row="4"
+                                      Grid.Column="1"
+                                      Margin="0,10,0,0"
+                                      DisplayMemberPath="DisplayName"
+                                      ItemsSource="{Binding ImageExportFormats}"
+                                      SelectedValue="{Binding SelectedImageExportFormat}"
+                                      SelectedValuePath="Value" />
+
+                            <TextBlock Grid.Row="5" Margin="0,10,0,0" Style="{StaticResource LabelTextStyle}" Text="Video audio mode" />
+                            <ComboBox Grid.Row="5"
+                                      Grid.Column="1"
+                                      Margin="0,10,0,0"
+                                      DisplayMemberPath="DisplayName"
+                                      ItemsSource="{Binding AudioModes}"
+                                      SelectedValue="{Binding SelectedVideoAudioMode}"
+                                      SelectedValuePath="Value" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <StackPanel Margin="0,0,0,16" Orientation="Horizontal">
+                            <Border Style="{StaticResource SectionIconStyle}">
+                                <Path Data="F 0 M 3,5 H 9 L 11,7 H 21 V 19 H 3 Z M 5,9 V 17 H 19 V 9 Z"
+                                      Style="{StaticResource SectionIconGlyphStyle}" />
+                            </Border>
+                            <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Application" />
+                        </StackPanel>
+
+                        <TextBlock Style="{StaticResource LabelTextStyle}" Text="Application-data location" />
+                        <Border Margin="0,6,0,12" Style="{StaticResource ReadOnlySurfaceStyle}">
+                            <TextBlock Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="{Binding ApplicationDataDirectory}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding ApplicationDataDirectory}" />
+                        </Border>
+
+                        <TextBlock Style="{StaticResource LabelTextStyle}" Text="Logs-folder location" />
+                        <Grid Margin="0,6,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Margin="0,0,10,0" Style="{StaticResource ReadOnlySurfaceStyle}">
+                                <TextBlock Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="{Binding LogsDirectory}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding LogsDirectory}" />
+                            </Border>
+                            <Button Grid.Column="1"
+                                    MinWidth="128"
+                                    Command="{Binding OpenLogsFolderCommand}"
+                                    Content="Open Logs Folder" />
+                        </Grid>
+
+                        <TextBlock Style="{StaticResource LabelTextStyle}" Text="FFmpeg status" />
+                        <Border Margin="0,6,0,14" Style="{StaticResource ReadOnlySurfaceStyle}">
+                            <TextBlock Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="{Binding FfmpegStatus}"
+                                       TextWrapping="Wrap" />
+                        </Border>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center"
+                                       Style="{StaticResource MutedTextStyle}"
+                                       Text="Reset changes preferences only; logs and media remain untouched."
+                                       TextWrapping="Wrap" />
+                            <Button Grid.Column="1"
+                                    Margin="12,0,0,0"
+                                    Command="{Binding ResetCommand}"
+                                    Content="Reset Settings"
+                                    Style="{StaticResource DangerButtonStyle}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="2"
+                Padding="24,14"
+                Background="{StaticResource CardBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Margin="0,0,18,0"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource SecondaryTextBrush}"
+                           Text="{Binding StatusMessage}"
+                           TextWrapping="Wrap" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button MinWidth="92"
+                            Command="{Binding CancelCommand}"
+                            Content="Cancel"
+                            IsCancel="True" />
+                    <Button MinWidth="116"
+                            Margin="10,0,0,0"
+                            Command="{Binding SaveCommand}"
+                            Content="Save &amp; Close"
+                            IsDefault="True"
+                            Style="{StaticResource PrimaryButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

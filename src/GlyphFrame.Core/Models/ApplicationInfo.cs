@@ -11,4 +11,9 @@ public sealed record ApplicationInfo(string Name, string Description, string Sta
         "GlyphFrame",
         "Video & Image to Symbol Converter",
         "Phase 3 - UI Skeleton");
+
+    public static ApplicationInfo Phase4 { get; } = new(
+        "GlyphFrame",
+        "Video & Image to Symbol Converter",
+        "Phase 4 - Settings Infrastructure");
 }

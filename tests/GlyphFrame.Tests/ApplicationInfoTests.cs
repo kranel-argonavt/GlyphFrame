@@ -23,4 +23,14 @@ public sealed class ApplicationInfoTests
         Assert.Equal("Video & Image to Symbol Converter", applicationInfo.Description);
         Assert.Equal("Phase 3 - UI Skeleton", applicationInfo.Status);
     }
+
+    [Fact]
+    public void Phase4_ProvidesExpectedApplicationIdentityAndStatus()
+    {
+        ApplicationInfo applicationInfo = ApplicationInfo.Phase4;
+
+        Assert.Equal("GlyphFrame", applicationInfo.Name);
+        Assert.Equal("Video & Image to Symbol Converter", applicationInfo.Description);
+        Assert.Equal("Phase 4 - Settings Infrastructure", applicationInfo.Status);
+    }
 }

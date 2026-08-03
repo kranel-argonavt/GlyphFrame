@@ -1,6 +1,11 @@
 using System.Windows;
+using GlyphFrame.App.Services;
 using GlyphFrame.App.ViewModels;
+using GlyphFrame.Core.Interfaces;
 using GlyphFrame.Core.Models;
+using GlyphFrame.Infrastructure.Paths;
+using GlyphFrame.Infrastructure.Settings;
+using GlyphFrame.Infrastructure.Shell;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace GlyphFrame.App;
@@ -9,7 +14,7 @@ public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -21,6 +26,10 @@ public partial class App : Application
             ValidateOnBuild = true,
             ValidateScopes = true
         });
+
+        IApplicationSettingsManager settingsManager =
+            _serviceProvider.GetRequiredService<IApplicationSettingsManager>();
+        await settingsManager.InitializeAsync();
 
         MainWindow = _serviceProvider.GetRequiredService<MainWindow>();
         MainWindow.Show();
@@ -34,7 +43,15 @@ public partial class App : Application
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton(ApplicationInfo.Phase3);
+        services.AddSingleton(ApplicationInfo.Phase4);
+        services.AddSingleton<IApplicationPaths, ApplicationPaths>();
+        services.AddSingleton<ISettingsService, JsonSettingsService>();
+        services.AddSingleton<IFolderLauncher, WindowsFolderLauncher>();
+        services.AddSingleton<IAccentThemeService, AccentThemeService>();
+        services.AddSingleton<IApplicationSettingsManager, ApplicationSettingsManager>();
+        services.AddSingleton<IUserDialogService, UserDialogService>();
+        services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton<ISettingsDialogService, SettingsDialogService>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
     }

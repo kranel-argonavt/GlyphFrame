@@ -33,6 +33,7 @@
                 <Button Margin="2,0,0,0"
                         Command="{Binding SettingsCommand}"
                         Content="Settings"
+                        IsEnabled="{Binding AreSettingsEnabled}"
                         Style="{StaticResource TextButtonStyle}"
                         ToolTip="Open settings" />
             </StackPanel>

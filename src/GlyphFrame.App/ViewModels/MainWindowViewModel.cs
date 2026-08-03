@@ -1,12 +1,16 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GlyphFrame.App.Services;
 using GlyphFrame.Core.Enums;
 using GlyphFrame.Core.Models;
+using GlyphFrame.Core.Settings;
 
 namespace GlyphFrame.App.ViewModels;
 
 public sealed class MainWindowViewModel : ObservableObject
 {
+    private readonly IApplicationSettingsManager _settingsManager;
+    private readonly ISettingsDialogService _settingsDialogService;
     private readonly RelayCommand _browseMediaCommand;
     private readonly RelayCommand _browseOutputCommand;
     private readonly RelayCommand _previewCommand;
@@ -27,11 +31,23 @@ public sealed class MainWindowViewModel : ObservableObject
     private double _timelinePosition;
     private double _exportProgress;
 
-    public MainWindowViewModel(ApplicationInfo applicationInfo)
+    public MainWindowViewModel(
+        ApplicationInfo applicationInfo,
+        IApplicationSettingsManager settingsManager,
+        ISettingsDialogService settingsDialogService)
     {
         ArgumentNullException.ThrowIfNull(applicationInfo);
+        _settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
+        _settingsDialogService = settingsDialogService ?? throw new ArgumentNullException(nameof(settingsDialogService));
 
         ApplicationInfo = applicationInfo;
+        ApplyApplicationSettings(_settingsManager.Current);
+        _settingsManager.SettingsChanged += OnSettingsChanged;
+
+        if (!string.IsNullOrWhiteSpace(_settingsManager.StartupStatusMessage))
+        {
+            _statusMessage = _settingsManager.StartupStatusMessage;
+        }
 
         _browseMediaCommand = new RelayCommand(
             () => StatusMessage = "Media browsing will be implemented in Phase 5.",
@@ -40,10 +56,10 @@ public sealed class MainWindowViewModel : ObservableObject
             () => StatusMessage = "Output selection will be implemented with export functionality.",
             () => IsMediaSelected && !IsExportActive);
         _previewCommand = new RelayCommand(
-            () => StatusMessage = "Symbolized preview generation is not implemented in Phase 3.",
+            () => StatusMessage = "Symbolized preview generation is not implemented in Phase 4.",
             () => CanUseMediaActions);
         _exportCommand = new RelayCommand(
-            () => StatusMessage = "Media export is not implemented in Phase 3.",
+            () => StatusMessage = "Media export is not implemented in Phase 4.",
             () => CanUseMediaActions);
         _cancelExportCommand = new RelayCommand(CancelPresentationExport, () => IsExportActive);
         _selectOriginalCommand = new RelayCommand(
@@ -58,23 +74,22 @@ public sealed class MainWindowViewModel : ObservableObject
             () => IsMediaSelected && !IsExportActive);
         AboutCommand = new RelayCommand(
             () => StatusMessage = "GlyphFrame v1.0.0 - local media processing with no telemetry.");
-        SettingsCommand = new RelayCommand(
-            () => StatusMessage = "Application settings will be implemented in Phase 4.");
+        SettingsCommand = new RelayCommand(() => _settingsDialogService.Show());
     }
 
     public ApplicationInfo ApplicationInfo { get; }
 
     public IReadOnlyList<CharacterPresetOption> Presets => CharacterPresetOption.BuiltIn;
 
-    public IReadOnlyList<string> FontFamilies { get; } =
-        ["Cascadia Mono", "Consolas", "Courier New", "Lucida Console"];
+    public IReadOnlyList<string> FontFamilies => AppSettingsCatalog.FontFamilies;
 
-    public IReadOnlyList<int> FontSizes { get; } = [9, 10, 12];
+    public IReadOnlyList<int> FontSizes => AppSettingsCatalog.FontSizes;
 
     public IReadOnlyList<string> OutputResolutions { get; } =
-        ["Same as source", "720p", "1080p"];
+        AppSettingsCatalog.OutputResolutions.Select(option => option.DisplayName).ToArray();
 
-    public IReadOnlyList<string> ImageOutputFormats { get; } = ["PNG", "JPG/JPEG"];
+    public IReadOnlyList<string> ImageOutputFormats { get; } =
+        AppSettingsCatalog.ImageExportFormats.Select(option => option.DisplayName).ToArray();
 
     public IReadOnlyList<string> ColorModes { get; } = ["Original Colors"];
 
@@ -360,5 +375,22 @@ public sealed class MainWindowViewModel : ObservableObject
         _selectOriginalCommand.NotifyCanExecuteChanged();
         _selectSymbolizedCommand.NotifyCanExecuteChanged();
         FullscreenCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        ApplyApplicationSettings(settings);
+        StatusMessage = "Settings saved and applied to the current editor.";
+    }
+
+    private void ApplyApplicationSettings(AppSettings settings)
+    {
+        SelectedPreset = CharacterPresetOption.BuiltIn.First(
+            option => option.Kind == settings.DefaultCharacterPreset);
+        SelectedFont = settings.DefaultFontFamily;
+        SelectedFontSize = settings.DefaultFontSize;
+        SelectedOutputResolution = AppSettingsCatalog.GetDisplayName(settings.DefaultOutputResolution);
+        SelectedImageOutputFormat = AppSettingsCatalog.GetDisplayName(settings.DefaultImageExportFormat);
+        SelectedAudioMode = settings.DefaultVideoAudioMode;
     }
 }
