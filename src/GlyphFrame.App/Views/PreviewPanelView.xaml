@@ -1,6 +1,7 @@
 <UserControl x:Class="GlyphFrame.App.Views.PreviewPanelView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:GlyphFrame.App.Behaviors"
              MinHeight="420"
              Focusable="False">
     <Border Style="{StaticResource PreviewCardStyle}">
@@ -40,12 +41,25 @@
             </Grid>
 
             <Border Grid.Row="1"
-                    Background="{StaticResource PreviewBackgroundBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="0,1">
+                    behaviors:MediaDropBehavior.Command="{Binding DropMediaCommand}"
+                    behaviors:MediaDropBehavior.IsEnabled="True">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="{StaticResource PreviewBackgroundBrush}" />
+                        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+                        <Setter Property="BorderThickness" Value="0,1" />
+                        <Style.Triggers>
+                            <Trigger Property="behaviors:MediaDropBehavior.IsDragOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Viewbox Stretch="Uniform">
-                    <Grid Width="960" Height="540" Background="{StaticResource PreviewBackgroundBrush}">
-                        <Grid Visibility="{Binding IsNoMediaSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid Width="960" Height="540" Background="Transparent">
+                        <Grid Visibility="{Binding ShowEmptyPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <StackPanel Width="520"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center"
@@ -82,13 +96,58 @@
                             </StackPanel>
                         </Grid>
 
-                        <Grid Visibility="{Binding IsMediaSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid Visibility="{Binding ShowLoadingPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel Width="520"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        TextBlock.TextAlignment="Center">
+                                <TextBlock FontSize="22"
+                                           FontWeight="SemiBold"
+                                           Text="{Binding SelectedFileName}" />
+                                <TextBlock Margin="0,12,0,0"
+                                           FontSize="15"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="Reading local media metadata..." />
+                                <ProgressBar Width="260"
+                                             Height="5"
+                                             Margin="0,22,0,0"
+                                             IsIndeterminate="True" />
+                                <TextBlock Margin="0,14,0,0"
+                                           Style="{StaticResource MutedTextStyle}"
+                                           Text="No media is uploaded or copied" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Visibility="{Binding ShowErrorPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel Width="540"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        TextBlock.TextAlignment="Center">
+                                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Media could not be loaded" />
+                                <TextBlock Margin="0,12,0,0"
+                                           FontSize="15"
+                                           Foreground="{StaticResource ErrorBrush}"
+                                           Text="{Binding InputStatusMessage}"
+                                           TextWrapping="Wrap" />
+                                <Button Width="154"
+                                        Height="40"
+                                        Margin="0,20,0,0"
+                                        Command="{Binding BrowseMediaCommand}"
+                                        Content="Choose Another"
+                                        Style="{StaticResource PrimaryButtonStyle}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Visibility="{Binding ShowMediaPlaceholder, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" TextBlock.TextAlignment="Center">
-                                <TextBlock FontSize="30" FontWeight="SemiBold" Text="Preview surface" />
+                                <TextBlock FontSize="30" FontWeight="SemiBold" Text="Original media selected" />
                                 <TextBlock Margin="0,12,0,0"
                                            FontSize="18"
                                            Foreground="{StaticResource SecondaryTextBrush}"
-                                           Text="Media pixels will render here in a later phase" />
+                                           Text="Pixel and frame previews are intentionally deferred" />
+                                <TextBlock Margin="0,10,0,0"
+                                           Style="{StaticResource MutedTextStyle}"
+                                           Text="{Binding InputMetadataSummary}" />
                             </StackPanel>
                         </Grid>
                     </Grid>

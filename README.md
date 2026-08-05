@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 4 — Settings Infrastructure. GlyphFrame now has strongly typed local preferences, safe JSON persistence and recovery, six live accent presets, and a dark settings dialog for editing, saving, cancelling, and resetting defaults. Media input, metadata extraction, preview generation, processing, and export are not yet implemented.
+Phase 5 — Media Input. GlyphFrame now supports local Browse Media and drag-and-drop workflows, deterministic image/video detection, friendly validation, asynchronous metadata loading, image orientation metadata, and binding-driven image/video/error states. Pixel preview, symbolization, processing, and export are not yet implemented.
 
 ## Platform and target framework
 
@@ -22,9 +22,10 @@ Phase 4 — Settings Infrastructure. GlyphFrame now has strongly typed local pre
 - MVVM with CommunityToolkit.Mvvm
 - Microsoft.Extensions.DependencyInjection
 - System.Text.Json
+- MetadataExtractor 2.9.3 for managed image, MP4, MOV, and AVI metadata
 - xUnit
 
-SkiaSharp, OpenCvSharp, FFmpeg, and ffprobe are planned for later phases and are intentionally not included in Phase 4. The settings screen reports FFmpeg validation as not yet available rather than fabricating a status.
+MetadataExtractor is an Apache-2.0 package used only by `GlyphFrame.Infrastructure` for header metadata; it is not used to decode preview pixels or video frames. MKV metadata is read by a bounded internal EBML header reader that skips media clusters. SkiaSharp, OpenCvSharp, FFmpeg, and ffprobe are planned for later phases and remain intentionally absent. The settings screen reports FFmpeg validation as not yet available rather than fabricating a status.
 
 ## Solution structure
 
@@ -35,7 +36,7 @@ GlyphFrame/
 │   ├── GlyphFrame.App/             WPF UI, MVVM, and composition root
 │   ├── GlyphFrame.Core/            Domain models and platform-independent logic
 │   ├── GlyphFrame.Rendering/       Future symbolization and rendering logic
-│   └── GlyphFrame.Infrastructure/  Local paths and JSON settings; future media and logging
+│   └── GlyphFrame.Infrastructure/  Local settings, paths, validation, and metadata readers
 ├── tests/
 │   └── GlyphFrame.Tests/           Automated tests
 └── docs/                            Specification and design reference
@@ -80,6 +81,19 @@ The logs directory is prepared for later logging work; Phase 4 does not create f
 
 Settings are written through a temporary file before replacing `settings.json`. Missing and partial settings use approved defaults, invalid values are normalized, and malformed JSON is preserved as `settings.invalid.json` (or the next numbered name) before recovery.
 
+## Media input
+
+Browse Media and the two drag-and-drop surfaces use the same validation and metadata pipeline. GlyphFrame accepts exactly one existing, readable file with one of these extensions, matched case-insensitively:
+
+- Images: PNG, JPG/JPEG, WebP, BMP
+- Videos: MP4, MOV, MKV, AVI
+
+Image metadata includes the full path, filename, format, file size, source dimensions, EXIF orientation when present, and display-oriented dimensions. Phase 5 preserves orientation metadata but does not rotate or render image pixels; orientation-normalized decoding starts in Phase 6.
+
+Video metadata includes the container, file size, resolution and duration, plus FPS, frame count, codecs, audio presence, and sample rate when the container exposes them reliably. MKV Info and Tracks elements are read without entering media clusters. Before bundled ffprobe arrives in Phase 7, optional video fields may truthfully appear as `Unknown`; no value is invented from an unreliable estimate.
+
+Metadata loading is asynchronous, a newer selection cancels and supersedes an older one, and a failed replacement retains the previous valid selection. Selected media paths are transient and are never added to `settings.json`.
+
 ## Documentation
 
 - [GlyphFrame Technical Specification v1.0](docs/GlyphFrame_Technical_Specification_v1.0.md)
@@ -87,10 +101,10 @@ Settings are written through a temporary file before replacing `settings.json`. 
 
 ## Upcoming phases
 
-- Phases 5–6 add media input and the image symbolization pipeline.
+- Phase 6 adds image decoding, orientation normalization, symbolization, preview, and image export.
 - Phases 7–11 add bundled FFmpeg tooling, video processing, audio, progress, and cancellation.
 - Later phases cover error handling, UI polish, comprehensive testing, and portable packaging.
 
 ## Privacy
 
-GlyphFrame is local-only software. It does not upload media and includes no telemetry or analytics. Settings remain on the current device under the user-local application-data directory; media paths and media content are not stored in preferences.
+GlyphFrame is local-only software. It does not upload media and includes no telemetry or analytics. Media input is opened read-only and is never copied, renamed, modified, or deleted. Settings remain on the current device under the user-local application-data directory; media paths and media content are not stored in preferences.

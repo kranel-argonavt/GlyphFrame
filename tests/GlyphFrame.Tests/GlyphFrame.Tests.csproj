@@ -25,4 +25,8 @@
     <ProjectReference Include="..\..\src\GlyphFrame.Rendering\GlyphFrame.Rendering.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
