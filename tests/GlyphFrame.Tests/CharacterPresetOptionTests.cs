@@ -15,6 +15,7 @@ public sealed class CharacterPresetOptionTests
             preset => Assert.Equal(CharacterPresetKind.Blocks, preset.Kind));
 
         Assert.Equal(CharacterPresetKind.DetailedAscii, CharacterPresetOption.Default.Kind);
-        Assert.Equal("░▒▓█", CharacterPresetOption.BuiltIn[2].Characters);
+        Assert.Equal(" ░▒▓█", CharacterPresetOption.BuiltIn[2].Characters);
+        Assert.True(CharacterPresetOption.BuiltIn[2].IsUnicode);
     }
 }

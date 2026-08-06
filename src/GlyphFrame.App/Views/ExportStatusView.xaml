@@ -42,8 +42,9 @@
                            Text="{Binding ExportProgressText}" />
                 <ProgressBar Grid.Row="2"
                              Margin="0,10,0,0"
+                             IsIndeterminate="True"
                              Maximum="100"
-                             Value="{Binding ExportProgress}" />
+                             Value="{Binding ExportProgress, Mode=OneWay}" />
                 <StackPanel Grid.Row="3" Margin="0,9,0,0" Orientation="Horizontal">
                     <TextBlock Style="{StaticResource MutedTextStyle}" Text="{Binding ElapsedText}" />
                     <TextBlock Margin="24,0,0,0" Style="{StaticResource MutedTextStyle}" Text="{Binding RemainingText}" />

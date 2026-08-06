@@ -59,6 +59,26 @@
                 </Border.Style>
                 <Viewbox Stretch="Uniform">
                     <Grid Width="960" Height="540" Background="Transparent">
+                        <Image Margin="12"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               Source="{Binding CurrentPreviewImageSource}"
+                               Stretch="Uniform"
+                               Visibility="{Binding ShowImagePreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                        <Border Margin="18"
+                                Padding="12,7"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Bottom"
+                                Background="#CC151820"
+                                BorderBrush="{DynamicResource AccentBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Visibility="{Binding IsSymbolizedPreviewSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="{Binding PreviewStaleMessage}"
+                                       TextAlignment="Center" />
+                        </Border>
+
                         <Grid Visibility="{Binding ShowEmptyPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <StackPanel Width="520"
                                         HorizontalAlignment="Center"
@@ -144,12 +164,35 @@
                                 <TextBlock Margin="0,12,0,0"
                                            FontSize="18"
                                            Foreground="{StaticResource SecondaryTextBrush}"
-                                           Text="Pixel and frame previews are intentionally deferred" />
+                                           Text="Video frame preview begins in Phase 8" />
                                 <TextBlock Margin="0,10,0,0"
                                            Style="{StaticResource MutedTextStyle}"
                                            Text="{Binding InputMetadataSummary}" />
                             </StackPanel>
                         </Grid>
+
+                        <Border Background="#D90D0F14"
+                                Visibility="{Binding IsExportActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel Width="520"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        TextBlock.TextAlignment="Center">
+                                <TextBlock FontSize="24"
+                                           FontWeight="SemiBold"
+                                           Text="{Binding ExportOperationTitle}" />
+                                <TextBlock Margin="0,12,0,0"
+                                           FontSize="15"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="{Binding ExportProgressText}" />
+                                <ProgressBar Width="280"
+                                             Height="5"
+                                             Margin="0,22,0,0"
+                                             IsIndeterminate="True" />
+                                <TextBlock Margin="0,14,0,0"
+                                           Style="{StaticResource MutedTextStyle}"
+                                           Text="Processing remains local on this computer" />
+                            </StackPanel>
+                        </Border>
                     </Grid>
                 </Viewbox>
             </Border>
@@ -217,6 +260,10 @@
                         <TextBlock Margin="0,3,0,0"
                                    Style="{StaticResource MutedTextStyle}"
                                    Text="{Binding MetadataSecondaryText}" />
+                        <TextBlock Margin="0,3,0,0"
+                                   Foreground="{StaticResource WarningBrush}"
+                                   Text="Same as source is above 1080p; preview and export remain available."
+                                   Visibility="{Binding ShowResolutionWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
                     <Button Grid.Column="1"
                             MinWidth="188"

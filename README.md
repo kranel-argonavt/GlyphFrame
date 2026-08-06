@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 5 — Media Input. GlyphFrame now supports local Browse Media and drag-and-drop workflows, deterministic image/video detection, friendly validation, asynchronous metadata loading, image orientation metadata, and binding-driven image/video/error states. Pixel preview, symbolization, processing, and export are not yet implemented.
+Phase 6 — Image Pipeline. GlyphFrame now supports local image decoding, orientation-normalized original previews, automatic symbol-grid calculation, colored SkiaSharp symbol rendering, symbolized previews, and PNG/JPEG export. Video selection remains metadata-only until the later video phases.
 
 ## Platform and target framework
 
@@ -23,9 +23,10 @@ Phase 5 — Media Input. GlyphFrame now supports local Browse Media and drag-and
 - Microsoft.Extensions.DependencyInjection
 - System.Text.Json
 - MetadataExtractor 2.9.3 for managed image, MP4, MOV, and AVI metadata
+- SkiaSharp 4.150.1 with matching Win32 native assets for image decoding, glyph measurement, symbol rendering, and image encoding
 - xUnit
 
-MetadataExtractor is an Apache-2.0 package used only by `GlyphFrame.Infrastructure` for header metadata; it is not used to decode preview pixels or video frames. MKV metadata is read by a bounded internal EBML header reader that skips media clusters. SkiaSharp, OpenCvSharp, FFmpeg, and ffprobe are planned for later phases and remain intentionally absent. The settings screen reports FFmpeg validation as not yet available rather than fabricating a status.
+MetadataExtractor is an Apache-2.0 package used only by `GlyphFrame.Infrastructure` for header metadata; it is not used to decode preview pixels or video frames. MKV metadata is read by a bounded internal EBML header reader that skips media clusters. SkiaSharp and its Windows native assets are MIT-licensed and isolated to `GlyphFrame.Rendering`. OpenCvSharp, FFmpeg, and ffprobe remain intentionally absent. The settings screen reports FFmpeg validation as not yet available rather than fabricating a status.
 
 ## Solution structure
 
@@ -35,7 +36,7 @@ GlyphFrame/
 ├── src/
 │   ├── GlyphFrame.App/             WPF UI, MVVM, and composition root
 │   ├── GlyphFrame.Core/            Domain models and platform-independent logic
-│   ├── GlyphFrame.Rendering/       Future symbolization and rendering logic
+│   ├── GlyphFrame.Rendering/       Image decoding, symbolization, Skia rendering, and image export
 │   └── GlyphFrame.Infrastructure/  Local settings, paths, validation, and metadata readers
 ├── tests/
 │   └── GlyphFrame.Tests/           Automated tests
@@ -88,11 +89,34 @@ Browse Media and the two drag-and-drop surfaces use the same validation and meta
 - Images: PNG, JPG/JPEG, WebP, BMP
 - Videos: MP4, MOV, MKV, AVI
 
-Image metadata includes the full path, filename, format, file size, source dimensions, EXIF orientation when present, and display-oriented dimensions. Phase 5 preserves orientation metadata but does not rotate or render image pixels; orientation-normalized decoding starts in Phase 6.
+Image metadata includes the full path, filename, format, file size, source dimensions, EXIF orientation when present, and display-oriented dimensions. Phase 6 decodes the source pixels and applies the recorded orientation exactly once before preview, resolution calculation, symbolization, and export.
 
 Video metadata includes the container, file size, resolution and duration, plus FPS, frame count, codecs, audio presence, and sample rate when the container exposes them reliably. MKV Info and Tracks elements are read without entering media clusters. Before bundled ffprobe arrives in Phase 7, optional video fields may truthfully appear as `Unknown`; no value is invented from an unreliable estimate.
 
 Metadata loading is asynchronous, a newer selection cancels and supersedes an older one, and a failed replacement retains the previous valid selection. Selected media paths are transient and are never added to `settings.json`.
+
+## Image pipeline
+
+The complete local image workflow supports PNG, JPG/JPEG, WebP, and BMP input:
+
+```text
+Select or drop image
+→ decode and normalize orientation
+→ show the original preview
+→ resolve output dimensions
+→ measure the selected font with SkiaSharp
+→ calculate the automatic symbol grid
+→ sample visible cell colors and Rec. 709 luminance
+→ map luminance to the selected character ramp
+→ render colored glyphs on the GlyphFrame dark background
+→ preview or export the symbolized image
+```
+
+Built-in character presets are Simple ASCII, Detailed ASCII, and Unicode Blocks. Supported fonts are Cascadia Mono, Consolas, Courier New, and Lucida Console at sizes 9, 10, and 12. Missing fonts fall back safely, and the output modes are Same as source, 720p, and 1080p while preserving the normalized source aspect ratio.
+
+PNG is the default output format; JPG/JPEG is also supported at a centralized quality of 90. Export uses an atomic temporary-file strategy, confirms before replacing an existing file, never overwrites the input image, and removes partial files after failure or cancellation. Changing a render setting marks an existing symbolized preview as stale, and export always renders with the current settings.
+
+Transparent source pixels are composited over the opaque GlyphFrame dark background before color and luminance sampling, so preview and export use the same visible-color rule.
 
 ## Documentation
 
@@ -101,10 +125,9 @@ Metadata loading is asynchronous, a newer selection cancels and supersedes an ol
 
 ## Upcoming phases
 
-- Phase 6 adds image decoding, orientation normalization, symbolization, preview, and image export.
-- Phases 7–11 add bundled FFmpeg tooling, video processing, audio, progress, and cancellation.
+- Phases 7–11 add bundled FFmpeg tooling, video preview and processing, audio, progress, and cancellation.
 - Later phases cover error handling, UI polish, comprehensive testing, and portable packaging.
 
 ## Privacy
 
-GlyphFrame is local-only software. It does not upload media and includes no telemetry or analytics. Media input is opened read-only and is never copied, renamed, modified, or deleted. Settings remain on the current device under the user-local application-data directory; media paths and media content are not stored in preferences.
+GlyphFrame is local-only software. It does not upload media and includes no telemetry or analytics. Media input is opened read-only and is never copied, renamed, modified, or deleted. Image pixels are processed only in memory, and image export writes only to the explicitly selected destination. Settings remain on the current device under the user-local application-data directory; media paths and media content are not stored in preferences.

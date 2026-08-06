@@ -4,10 +4,15 @@ using GlyphFrame.App.ViewModels;
 using GlyphFrame.Core.Interfaces;
 using GlyphFrame.Core.Media;
 using GlyphFrame.Core.Models;
+using GlyphFrame.Core.Presets;
 using GlyphFrame.Infrastructure.Media;
 using GlyphFrame.Infrastructure.Paths;
 using GlyphFrame.Infrastructure.Settings;
 using GlyphFrame.Infrastructure.Shell;
+using GlyphFrame.Rendering.Conversion;
+using GlyphFrame.Rendering.Grid;
+using GlyphFrame.Rendering.Mapping;
+using GlyphFrame.Rendering.Skia;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace GlyphFrame.App;
@@ -45,7 +50,7 @@ public partial class App : Application
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton(ApplicationInfo.Phase5);
+        services.AddSingleton(ApplicationInfo.Phase6);
         services.AddSingleton<IApplicationPaths, ApplicationPaths>();
         services.AddSingleton<ISettingsService, JsonSettingsService>();
         services.AddSingleton<IFolderLauncher, WindowsFolderLauncher>();
@@ -53,12 +58,24 @@ public partial class App : Application
         services.AddSingleton<IImageMetadataReader, MetadataExtractorImageMetadataReader>();
         services.AddSingleton<IVideoMetadataReader, MetadataExtractorVideoMetadataReader>();
         services.AddSingleton<IMediaInputService, MediaInputService>();
+        services.AddSingleton<ICharacterPresetProvider, CharacterPresetProvider>();
+        services.AddSingleton<IImageDecoder, SkiaImageDecoder>();
+        services.AddSingleton<IOutputDimensionResolver, OutputDimensionResolver>();
+        services.AddSingleton<IGlyphMeasurer, SkiaGlyphMeasurer>();
+        services.AddSingleton<ISymbolGridCalculator, SymbolGridCalculator>();
+        services.AddSingleton<IBrightnessToSymbolMapper, BrightnessToSymbolMapper>();
+        services.AddSingleton<IFrameToSymbolConverter, FrameToSymbolConverter>();
+        services.AddSingleton<ISymbolFrameRenderer, SkiaSymbolFrameRenderer>();
+        services.AddSingleton<IImagePipelineService, ImagePipelineService>();
+        services.AddSingleton<IImageExporter, SkiaImageExporter>();
         services.AddSingleton<IAccentThemeService, AccentThemeService>();
         services.AddSingleton<IApplicationSettingsManager, ApplicationSettingsManager>();
         services.AddSingleton<IUserDialogService, UserDialogService>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<ISettingsDialogService, SettingsDialogService>();
         services.AddSingleton<IMediaFileDialogService, MediaFileDialogService>();
+        services.AddSingleton<IImageSaveDialogService, ImageSaveDialogService>();
+        services.AddSingleton<IImageSourceFactory, WpfImageSourceFactory>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
     }
