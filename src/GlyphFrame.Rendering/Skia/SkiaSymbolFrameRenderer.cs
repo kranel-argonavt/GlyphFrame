@@ -29,7 +29,7 @@ public sealed class SkiaSymbolFrameRenderer : ISymbolFrameRenderer
                 new string(frame.Cells.Span.ToArray().Select(cell => cell.Character).Distinct().ToArray()));
             using SKFont font = new(resolved.Typeface, frame.GlyphMetrics.FontSizePixels);
 
-            PixelColor background = PixelColor.SymbolBackground;
+            PixelColor background = frame.BackgroundColor;
             canvas.Clear(new SKColor(background.Red, background.Green, background.Blue, 255));
 
             Dictionary<char, GlyphDrawingInfo> glyphs = [];

@@ -5,10 +5,12 @@ namespace GlyphFrame.Core.Models;
 public sealed record ImageRenderSettings(
     string FontFamily,
     int FontSize,
-    OutputResolution OutputResolution)
+    OutputResolution OutputResolution,
+    SymbolPolarity SymbolPolarity = SymbolPolarity.LightOnDark)
 {
     public static ImageRenderSettings Default { get; } = new(
         "Cascadia Mono",
         10,
-        OutputResolution.SameAsSource);
+        OutputResolution.SameAsSource,
+        SymbolPolarity.LightOnDark);
 }

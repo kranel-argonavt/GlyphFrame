@@ -36,6 +36,7 @@ public sealed class JsonSettingsServiceTests
         Assert.Equal(SettingsLoadState.Loaded, result.State);
         Assert.Contains("\"accentPreset\": \"Cyan\"", json, StringComparison.Ordinal);
         Assert.Contains("\"defaultOutputResolution\": \"FullHd1080\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"defaultSymbolPolarity\": \"DarkOnLight\"", json, StringComparison.Ordinal);
         Assert.False(File.Exists(Path.Combine(temporaryData.Paths.ApplicationDataDirectory, "settings.json.tmp")));
     }
 
@@ -61,6 +62,7 @@ public sealed class JsonSettingsServiceTests
         Assert.Equal(CharacterPresetKind.DetailedAscii, result.Settings.DefaultCharacterPreset);
         Assert.Equal(10, result.Settings.DefaultFontSize);
         Assert.Equal(OutputResolution.SameAsSource, result.Settings.DefaultOutputResolution);
+        Assert.Equal(SymbolPolarity.LightOnDark, result.Settings.DefaultSymbolPolarity);
     }
 
     [Fact]
@@ -77,6 +79,7 @@ public sealed class JsonSettingsServiceTests
               "defaultFontFamily": "Papyrus",
               "defaultFontSize": 72,
               "defaultOutputResolution": "Hd720",
+              "defaultSymbolPolarity": "Auto",
               "defaultImageExportFormat": "Tiff",
               "defaultVideoAudioMode": "RemoveAudio"
             }
@@ -91,6 +94,7 @@ public sealed class JsonSettingsServiceTests
         Assert.Equal("Cascadia Mono", result.Settings.DefaultFontFamily);
         Assert.Equal(10, result.Settings.DefaultFontSize);
         Assert.Equal(OutputResolution.Hd720, result.Settings.DefaultOutputResolution);
+        Assert.Equal(SymbolPolarity.LightOnDark, result.Settings.DefaultSymbolPolarity);
         Assert.Equal(ImageExportFormat.Png, result.Settings.DefaultImageExportFormat);
         Assert.Equal(AudioExportMode.RemoveAudio, result.Settings.DefaultVideoAudioMode);
         Assert.True(File.Exists(temporaryData.Paths.SettingsFilePath));
@@ -164,6 +168,23 @@ public sealed class JsonSettingsServiceTests
         Assert.False(File.Exists(Path.Combine(temporaryData.Paths.ApplicationDataDirectory, "settings.json.tmp")));
     }
 
+    [Theory]
+    [InlineData(SymbolPolarity.LightOnDark)]
+    [InlineData(SymbolPolarity.DarkOnLight)]
+    public async Task SymbolPolarity_RoundTripsUsingReadableEnumName(SymbolPolarity polarity)
+    {
+        using TemporaryApplicationData temporaryData = new();
+        using JsonSettingsService service = new(temporaryData.Paths);
+        AppSettings expected = AppSettingsCatalog.Defaults with { DefaultSymbolPolarity = polarity };
+
+        await service.SaveAsync(expected);
+        SettingsLoadResult result = await service.LoadAsync();
+        string json = await File.ReadAllTextAsync(temporaryData.Paths.SettingsFilePath);
+
+        Assert.Equal(polarity, result.Settings.DefaultSymbolPolarity);
+        Assert.Contains($"\"defaultSymbolPolarity\": \"{polarity}\"", json, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task CancelledSave_DoesNotCreateSettingsOrTemporaryFiles()
     {
@@ -186,6 +207,7 @@ public sealed class JsonSettingsServiceTests
         DefaultFontFamily = "Consolas",
         DefaultFontSize = 12,
         DefaultOutputResolution = OutputResolution.FullHd1080,
+        DefaultSymbolPolarity = SymbolPolarity.DarkOnLight,
         DefaultImageExportFormat = ImageExportFormat.Jpeg,
         DefaultVideoAudioMode = AudioExportMode.RemoveAudio
     };

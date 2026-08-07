@@ -223,6 +223,7 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
         DefaultFontFamily = settings.DefaultFontFamily,
         DefaultFontSize = settings.DefaultFontSize,
         DefaultOutputResolution = settings.DefaultOutputResolution.ToString(),
+        DefaultSymbolPolarity = settings.DefaultSymbolPolarity.ToString(),
         DefaultImageExportFormat = settings.DefaultImageExportFormat.ToString(),
         DefaultVideoAudioMode = settings.DefaultVideoAudioMode.ToString()
     };
@@ -241,6 +242,10 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
         OutputResolution resolution = ParseEnum(
             persisted.DefaultOutputResolution,
             defaults.DefaultOutputResolution,
+            ref invalid);
+        SymbolPolarity polarity = ParseEnum(
+            persisted.DefaultSymbolPolarity,
+            defaults.DefaultSymbolPolarity,
             ref invalid);
         ImageExportFormat imageFormat = ParseEnum(
             persisted.DefaultImageExportFormat,
@@ -261,6 +266,7 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
             DefaultFontFamily = fontFamily,
             DefaultFontSize = fontSize,
             DefaultOutputResolution = resolution,
+            DefaultSymbolPolarity = polarity,
             DefaultImageExportFormat = imageFormat,
             DefaultVideoAudioMode = audioMode
         }, invalid);
@@ -294,6 +300,8 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
         public int? DefaultFontSize { get; init; }
 
         public string? DefaultOutputResolution { get; init; }
+
+        public string? DefaultSymbolPolarity { get; init; }
 
         public string? DefaultImageExportFormat { get; init; }
 

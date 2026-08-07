@@ -6,5 +6,6 @@ public enum ImageRenderSetting
     FontFamily,
     FontSize,
     OutputResolution,
+    SymbolPolarity,
     ApplicationDefaults
 }

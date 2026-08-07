@@ -22,6 +22,7 @@ public sealed class SettingsViewModel : ObservableObject
     private string _selectedFontFamily = AppSettingsCatalog.Defaults.DefaultFontFamily;
     private int _selectedFontSize = AppSettingsCatalog.Defaults.DefaultFontSize;
     private OutputResolution _selectedOutputResolution = AppSettingsCatalog.Defaults.DefaultOutputResolution;
+    private SymbolPolarity _selectedSymbolPolarity = AppSettingsCatalog.Defaults.DefaultSymbolPolarity;
     private ImageExportFormat _selectedImageExportFormat = AppSettingsCatalog.Defaults.DefaultImageExportFormat;
     private AudioExportMode _selectedVideoAudioMode = AppSettingsCatalog.Defaults.DefaultVideoAudioMode;
     private string _statusMessage = "Review the preferences below, then save or cancel.";
@@ -58,6 +59,8 @@ public sealed class SettingsViewModel : ObservableObject
     public IReadOnlyList<int> FontSizes => AppSettingsCatalog.FontSizes;
 
     public IReadOnlyList<SettingOption<OutputResolution>> OutputResolutions => AppSettingsCatalog.OutputResolutions;
+
+    public IReadOnlyList<SettingOption<SymbolPolarity>> SymbolPolarities => AppSettingsCatalog.SymbolPolarities;
 
     public IReadOnlyList<SettingOption<ImageExportFormat>> ImageExportFormats => AppSettingsCatalog.ImageExportFormats;
 
@@ -123,6 +126,12 @@ public sealed class SettingsViewModel : ObservableObject
     {
         get => _selectedOutputResolution;
         set => SetProperty(ref _selectedOutputResolution, value);
+    }
+
+    public SymbolPolarity SelectedSymbolPolarity
+    {
+        get => _selectedSymbolPolarity;
+        set => SetProperty(ref _selectedSymbolPolarity, value);
     }
 
     public ImageExportFormat SelectedImageExportFormat
@@ -244,6 +253,7 @@ public sealed class SettingsViewModel : ObservableObject
         DefaultFontFamily = SelectedFontFamily,
         DefaultFontSize = SelectedFontSize,
         DefaultOutputResolution = SelectedOutputResolution,
+        DefaultSymbolPolarity = SelectedSymbolPolarity,
         DefaultImageExportFormat = SelectedImageExportFormat,
         DefaultVideoAudioMode = SelectedVideoAudioMode
     };
@@ -259,6 +269,7 @@ public sealed class SettingsViewModel : ObservableObject
             SelectedFontFamily = settings.DefaultFontFamily;
             SelectedFontSize = settings.DefaultFontSize;
             SelectedOutputResolution = settings.DefaultOutputResolution;
+            SelectedSymbolPolarity = settings.DefaultSymbolPolarity;
             SelectedImageExportFormat = settings.DefaultImageExportFormat;
             SelectedVideoAudioMode = settings.DefaultVideoAudioMode;
         }

@@ -50,6 +50,7 @@ public sealed class ImageWorkflowStateTests
     [InlineData(ImageRenderSetting.FontFamily)]
     [InlineData(ImageRenderSetting.FontSize)]
     [InlineData(ImageRenderSetting.OutputResolution)]
+    [InlineData(ImageRenderSetting.SymbolPolarity)]
     public void RenderingSettingChange_MarksExistingPreviewStale(ImageRenderSetting setting)
     {
         ImageWorkflowState state = WithPreview();
@@ -95,6 +96,28 @@ public sealed class ImageWorkflowStateTests
         Assert.False(afterCurrentResult.IsPreviewStale);
         Assert.False(afterCurrentResult.RequiresRenderForExport);
         Assert.Equal(afterCurrentResult.SettingsVersion, afterCurrentResult.PreviewSettingsVersion);
+    }
+
+    [Fact]
+    public void PolarityChange_RejectsOldPolarityResultAndRequiresCurrentRenderForExport()
+    {
+        ImageWorkflowState stale = WithPreview().RenderingSettingChanged(ImageRenderSetting.SymbolPolarity);
+        long oldPolarityVersion = stale.SettingsVersion - 1;
+        ImageWorkflowState rendering = stale.BeginOperation(21);
+
+        ImageWorkflowState rejected = rendering.CompletePreview(
+            21,
+            rendering.MediaVersion,
+            oldPolarityVersion);
+        ImageWorkflowState accepted = rejected.CompletePreview(
+            21,
+            rendering.MediaVersion,
+            rendering.SettingsVersion);
+
+        Assert.Same(rendering, rejected);
+        Assert.True(rejected.RequiresRenderForExport);
+        Assert.False(accepted.RequiresRenderForExport);
+        Assert.Equal(accepted.SettingsVersion, accepted.PreviewSettingsVersion);
     }
 
     [Fact]

@@ -51,6 +51,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private string _selectedFont = "Cascadia Mono";
     private int _selectedFontSize = 10;
     private string _selectedOutputResolution = "Same as source";
+    private SymbolPolarity _selectedSymbolPolarity = SymbolPolarity.LightOnDark;
     private string _selectedImageOutputFormat = "PNG";
     private AudioExportMode _selectedAudioMode = AudioExportMode.KeepAudio;
     private PreviewMode _previewMode = PreviewMode.Original;
@@ -136,6 +137,8 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public IReadOnlyList<string> OutputResolutions { get; } =
         AppSettingsCatalog.OutputResolutions.Select(option => option.DisplayName).ToArray();
+
+    public IReadOnlyList<SettingOption<SymbolPolarity>> SymbolPolarities => AppSettingsCatalog.SymbolPolarities;
 
     public IReadOnlyList<string> ImageOutputFormats { get; } =
         AppSettingsCatalog.ImageExportFormats.Select(option => option.DisplayName).ToArray();
@@ -412,6 +415,18 @@ public sealed class MainWindowViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(ShowResolutionWarning));
                 InvalidateSymbolizedPreview(ImageRenderSetting.OutputResolution);
+            }
+        }
+    }
+
+    public SymbolPolarity SelectedSymbolPolarity
+    {
+        get => _selectedSymbolPolarity;
+        set
+        {
+            if (SetProperty(ref _selectedSymbolPolarity, value))
+            {
+                InvalidateSymbolizedPreview(ImageRenderSetting.SymbolPolarity);
             }
         }
     }
@@ -937,7 +952,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private ImageRenderSettings CaptureRenderSettings() => new(
         SelectedFont,
         SelectedFontSize,
-        ResolveOutputResolution());
+        ResolveOutputResolution(),
+        SelectedSymbolPolarity);
 
     private OutputResolution ResolveOutputResolution() =>
         AppSettingsCatalog.OutputResolutions
@@ -1062,12 +1078,14 @@ public sealed class MainWindowViewModel : ObservableObject
             || _selectedFontSize != settings.DefaultFontSize
             || !_selectedOutputResolution.Equals(
                 AppSettingsCatalog.GetDisplayName(settings.DefaultOutputResolution),
-                StringComparison.Ordinal);
+                StringComparison.Ordinal)
+            || _selectedSymbolPolarity != settings.DefaultSymbolPolarity;
 
         _selectedPreset = preset;
         _selectedFont = settings.DefaultFontFamily;
         _selectedFontSize = settings.DefaultFontSize;
         _selectedOutputResolution = AppSettingsCatalog.GetDisplayName(settings.DefaultOutputResolution);
+        _selectedSymbolPolarity = settings.DefaultSymbolPolarity;
         _selectedImageOutputFormat = AppSettingsCatalog.GetDisplayName(settings.DefaultImageExportFormat);
         _selectedAudioMode = settings.DefaultVideoAudioMode;
 
@@ -1076,6 +1094,7 @@ public sealed class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedFont));
         OnPropertyChanged(nameof(SelectedFontSize));
         OnPropertyChanged(nameof(SelectedOutputResolution));
+        OnPropertyChanged(nameof(SelectedSymbolPolarity));
         OnPropertyChanged(nameof(SelectedImageOutputFormat));
         OnPropertyChanged(nameof(SelectedAudioMode));
         OnPropertyChanged(nameof(IsKeepAudioSelected));

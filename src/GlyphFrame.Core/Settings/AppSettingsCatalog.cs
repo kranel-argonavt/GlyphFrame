@@ -31,6 +31,12 @@ public static class AppSettingsCatalog
         new(OutputResolution.FullHd1080, "1080p")
     ];
 
+    public static IReadOnlyList<SettingOption<SymbolPolarity>> SymbolPolarities { get; } =
+    [
+        new(SymbolPolarity.LightOnDark, "Light on Dark"),
+        new(SymbolPolarity.DarkOnLight, "Dark on Light")
+    ];
+
     public static IReadOnlyList<SettingOption<ImageExportFormat>> ImageExportFormats { get; } =
     [
         new(ImageExportFormat.Png, "PNG"),
@@ -48,6 +54,9 @@ public static class AppSettingsCatalog
 
     public static string GetDisplayName(OutputResolution value) =>
         OutputResolutions.First(option => option.Value == value).DisplayName;
+
+    public static string GetDisplayName(SymbolPolarity value) =>
+        SymbolPolarities.First(option => option.Value == value).DisplayName;
 
     public static string GetDisplayName(ImageExportFormat value) =>
         ImageExportFormats.First(option => option.Value == value).DisplayName;

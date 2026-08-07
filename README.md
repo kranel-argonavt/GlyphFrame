@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 6 — Image Pipeline. GlyphFrame now supports local image decoding, orientation-normalized original previews, automatic symbol-grid calculation, colored SkiaSharp symbol rendering, symbolized previews, and PNG/JPEG export. Video selection remains metadata-only until the later video phases.
+Phase 6 — Image Pipeline. GlyphFrame now supports local image decoding, orientation-normalized original previews, automatic symbol-grid calculation, two symbol polarity modes, colored SkiaSharp symbol rendering, symbolized previews, and PNG/JPEG export. Video selection remains metadata-only until the later video phases.
 
 ## Platform and target framework
 
@@ -78,7 +78,7 @@ Preferences are stored for the current Windows user under `%LocalAppData%\GlyphF
 └── logs\
 ```
 
-The logs directory is prepared for later logging work; Phase 4 does not create fabricated log entries. The persisted defaults are Detailed ASCII, Cascadia Mono at size 10, same-as-source resolution, PNG image export, and Keep Audio for video. Available accents are Violet, Purple, Blue, Cyan, Emerald, and Rose, with Violet as the default.
+The logs directory is prepared for later logging work; Phase 4 does not create fabricated log entries. The persisted defaults are Detailed ASCII, Cascadia Mono at size 10, same-as-source resolution, Light on Dark symbol polarity, PNG image export, and Keep Audio for video. Available accents are Violet, Purple, Blue, Cyan, Emerald, and Rose, with Violet as the default.
 
 Settings are written through a temporary file before replacing `settings.json`. Missing and partial settings use approved defaults, invalid values are normalized, and malformed JSON is preserved as `settings.invalid.json` (or the next numbered name) before recovery.
 
@@ -107,16 +107,18 @@ Select or drop image
 → measure the selected font with SkiaSharp
 → calculate the automatic symbol grid
 → sample visible cell colors and Rec. 709 luminance
-→ map luminance to the selected character ramp
-→ render colored glyphs on the GlyphFrame dark background
+→ map luminance to the selected character ramp and polarity
+→ render colored glyphs on the polarity's opaque background
 → preview or export the symbolized image
 ```
 
-Built-in character presets are Simple ASCII, Detailed ASCII, and Unicode Blocks. Supported fonts are Cascadia Mono, Consolas, Courier New, and Lucida Console at sizes 9, 10, and 12. Missing fonts fall back safely, and the output modes are Same as source, 720p, and 1080p while preserving the normalized source aspect ratio.
+Built-in character presets are Simple ASCII, Detailed ASCII, and Unicode Blocks. Their ramps stay ordered from sparse to dense. Supported fonts are Cascadia Mono, Consolas, Courier New, and Lucida Console at sizes 9, 10, and 12. Missing fonts fall back safely, and the output modes are Same as source, 720p, and 1080p while preserving the normalized source aspect ratio.
+
+`Light on Dark` is the default polarity: bright areas use denser symbols on the dark GlyphFrame background, making pale subjects on dark scenes remain visually bright. `Dark on Light` maps dark areas to denser symbols on a neutral near-white background for a traditional printed-ASCII appearance. Changing polarity marks the symbolized preview stale, and preview plus export always regenerate from the current polarity.
 
 PNG is the default output format; JPG/JPEG is also supported at a centralized quality of 90. Export uses an atomic temporary-file strategy, confirms before replacing an existing file, never overwrites the input image, and removes partial files after failure or cancellation. Changing a render setting marks an existing symbolized preview as stale, and export always renders with the current settings.
 
-Transparent source pixels are composited over the opaque GlyphFrame dark background before color and luminance sampling, so preview and export use the same visible-color rule.
+Transparent source pixels use straight alpha and are composited exactly once over the selected opaque polarity background before color and luminance sampling. Preview, PNG export, and JPEG export therefore use the same visible-color and background rules.
 
 ## Documentation
 

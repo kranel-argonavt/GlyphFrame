@@ -45,6 +45,7 @@ GlyphFrame does not implement its own MP4 encoder. Video encoding, audio handlin
 - Font family selection.
 - Font size selection.
 - Output resolution selection.
+- Symbol polarity selection.
 - Image export to PNG and JPG/JPEG.
 - Video export to MP4.
 - Keep Audio and Remove Audio modes for video.
@@ -65,7 +66,7 @@ GlyphFrame does not implement its own MP4 encoder. Video encoding, audio handlin
 - PNG sequence export.
 - Custom character sets.
 - Save Preset.
-- Ramp Invert.
+- Automatic polarity detection.
 - Auto-sort characters by density.
 - Intensity slider.
 - GPU acceleration.
@@ -237,6 +238,7 @@ Input bitmap/frame
 -> Resolve output resolution
 -> Measure selected glyph metrics
 -> Calculate automatic symbol grid
+-> Resolve symbol polarity and its opaque canvas background
 -> For each grid cell:
    -> Sample average color
    -> Calculate luminance
@@ -287,14 +289,31 @@ The `Blocks` preset uses Unicode characters and must be rendered with fonts that
 
 ### 6.4 Luminance Mapping
 
-Luminance is calculated per cell using the average color of the sampled area.
+Character ramps remain ordered from sparse to dense and are never reversed or duplicated. Luminance is calculated per cell from the average visible color of the sampled area using Rec. 709 coefficients.
 
-Mapping rule:
+GlyphFrame supports two explicit polarity modes:
 
-- Darker cells map to denser/darker characters.
-- Brighter cells map to lighter characters.
+```text
+Light on Dark (default)
+Black luminance -> first/sparsest character
+White luminance -> last/densest character
+index = round(luminance * (characterCount - 1) / 255)
+```
 
-Ramp inversion is not included in MVP.
+Light on Dark uses the dark GlyphFrame symbol background (`R=13, G=15, B=20`). Bright cells therefore use denser bright symbols on a dark background, while dark cells remain sparse.
+
+```text
+Dark on Light
+Black luminance -> last/densest character
+White luminance -> first/sparsest character
+index = round((255 - luminance) * (characterCount - 1) / 255)
+```
+
+Dark on Light uses a neutral near-white symbol background (`R=245, G=245, B=242`). Dark cells therefore use denser dark symbols on a light background, like traditional printed ASCII art.
+
+Input pixels use straight-alpha, unpremultiplied RGBA8888. Before averaging or luminance calculation, every source pixel is composited exactly once over the background selected by the polarity. Fully transparent RGB values do not affect visible output. The symbol canvas, preview, PNG export, and JPEG export use the same resolved opaque background.
+
+Undefined polarity values and empty character ramps are rejected. Mapping uses deterministic integer rounding and clamps the final index.
 
 ### 6.5 Color Mode
 
@@ -305,6 +324,8 @@ Original Colors
 ```
 
 Each rendered symbol uses the average source color of its cell.
+
+The symbol frame stores its resolved opaque background color so renderers do not depend on global theme state or a later settings lookup.
 
 ## 7. Render Settings
 
@@ -369,6 +390,23 @@ Portrait targets:
 
 For `Same as source`, GlyphFrame uses the normalized source resolution. If the source resolution is higher than 1080p, the app must show a warning but still allow export.
 
+### 7.4 Symbol Polarity
+
+Supported modes:
+
+```text
+Light on Dark
+Dark on Light
+```
+
+Default:
+
+```text
+Light on Dark
+```
+
+Changing polarity invalidates an existing symbolized preview because it changes both character mapping and the canvas background. Selecting the same value again does not invalidate the preview. Changing only PNG/JPEG output format does not invalidate symbol rendering.
+
 ## 8. Image Workflow
 
 ### 8.1 Image Input Flow
@@ -379,7 +417,7 @@ For `Same as source`, GlyphFrame uses the normalized source resolution. If the s
 3. App reads metadata.
 4. App displays the original image preview.
 5. App hides video-only controls.
-6. User adjusts character and render settings.
+6. User adjusts character, polarity, and render settings.
 7. User clicks Preview Symbolized Image.
 8. App generates symbolized preview.
 9. User selects output path and format.
@@ -409,6 +447,8 @@ GlyphFrame must:
 - Export symbolized JPG/JPEG.
 - Preserve aspect ratio.
 - Respect selected output resolution.
+- Respect selected symbol polarity in mapping, preview, and export.
+- Composite transparent pixels over the selected polarity background exactly once.
 - Keep UI responsive during preview and export.
 - Show friendly errors for invalid or unsupported images.
 
@@ -637,12 +677,14 @@ Characters:
 
 - Character preset dropdown.
 - Ramp preview.
+- Density labels `Sparse` and `Dense`.
 
 Render:
 
 - Font family dropdown.
 - Font size dropdown.
 - Output resolution dropdown.
+- Symbol Polarity dropdown with `Light on Dark` and `Dark on Light`.
 - Color mode display set to Original Colors.
 
 Audio:
@@ -804,8 +846,11 @@ Settings must allow default values for:
 - Font family.
 - Font size.
 - Output resolution.
+- Symbol polarity (`Light on Dark` by default).
 - Image export format.
 - Video audio mode.
+
+The polarity is stored as a readable enum name. Existing settings files without the property use `LightOnDark`; invalid values normalize to that default. Reset Settings also restores `LightOnDark` without changing unrelated defaults or transient media state.
 
 ### 12.3 Application
 
@@ -932,7 +977,7 @@ public interface ISymbolGridCalculator
 ```csharp
 public interface IBrightnessToSymbolMapper
 {
-    char Map(byte brightness, string characterSet);
+    char Map(byte luminance, string characterSet, SymbolPolarity polarity);
 }
 ```
 
@@ -1023,9 +1068,12 @@ public sealed class RenderSettings
     public string FontFamily { get; init; } = "Cascadia Mono";
     public int FontSize { get; init; } = 10;
     public OutputResolutionMode OutputResolution { get; init; } = OutputResolutionMode.SameAsSource;
+    public SymbolPolarity SymbolPolarity { get; init; } = SymbolPolarity.LightOnDark;
     public ColorMode ColorMode { get; init; } = ColorMode.OriginalColors;
 }
 ```
+
+The platform-neutral `SymbolFrame` stores the resolved opaque `BackgroundColor`. This makes preview, still-image export, and the future video pipeline deterministic without consulting mutable application settings during rendering.
 
 ### 14.5 CharacterPreset
 
@@ -1116,6 +1164,14 @@ public enum ImageExportFormat
 }
 ```
 
+```csharp
+public enum SymbolPolarity
+{
+    LightOnDark,
+    DarkOnLight
+}
+```
+
 ## 16. Privacy and Local Data
 
 GlyphFrame must follow these privacy rules:
@@ -1183,6 +1239,13 @@ Minimum test matrix:
 - 720p output.
 - 1080p output.
 - Same as source output.
+- Light on Dark endpoint, midpoint, and boundary mapping.
+- Dark on Light endpoint, midpoint, and boundary mapping.
+- Exact dark and light symbol backgrounds.
+- Straight-alpha compositing over both symbol backgrounds.
+- Polarity persistence, missing-property migration, invalid-value normalization, and reset.
+- Preview invalidation and stale async-result rejection after polarity changes.
+- PNG and JPEG export in both polarity modes.
 - Source resolution above 1080p warning.
 - Unicode file paths.
 - Output path already exists.
@@ -1270,6 +1333,7 @@ Tasks:
 - Default font.
 - Default font size.
 - Default resolution.
+- Default symbol polarity.
 - Default image format.
 - Default audio mode.
 - Logs folder.
@@ -1294,6 +1358,8 @@ Tasks:
 - Glyph measurement.
 - Automatic grid calculation.
 - Luminance mapping.
+- Light on Dark and Dark on Light polarity mapping.
+- Polarity-dependent opaque symbol backgrounds and transparent-pixel compositing.
 - SkiaSharp symbol rendering.
 - Symbolized preview.
 - PNG export.
@@ -1440,6 +1506,9 @@ MVP is accepted when all criteria below are met.
 - App hides video-only controls for images.
 - App generates symbolized image preview.
 - App preserves source aspect ratio.
+- Light on Dark is the default and maps bright cells to denser symbols on a dark background.
+- Dark on Light maps dark cells to denser symbols on a light background.
+- Transparent pixels composite exactly once over the selected symbol background.
 
 ### 22.4 Image Export
 
@@ -1447,6 +1516,8 @@ MVP is accepted when all criteria below are met.
 - User can export symbolized JPG/JPEG.
 - PNG is the default image export format.
 - Selected output resolution is respected.
+- Selected symbol polarity is respected and matches the symbolized preview.
+- PNG and JPEG outputs use the same polarity-dependent opaque background.
 - Output overwrite requires confirmation.
 - Unsupported or invalid images show friendly errors.
 
@@ -1493,6 +1564,7 @@ MVP is accepted when all criteria below are met.
 - Default character preset is persisted.
 - Default font and font size are persisted.
 - Default output resolution is persisted.
+- Default symbol polarity is persisted, safely defaults when missing, and is restored by Reset Settings.
 - Default image format is persisted.
 - Default audio mode is persisted.
 - Reset settings works.

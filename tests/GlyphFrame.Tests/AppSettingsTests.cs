@@ -15,6 +15,7 @@ public sealed class AppSettingsTests
         Assert.Equal("Cascadia Mono", settings.DefaultFontFamily);
         Assert.Equal(10, settings.DefaultFontSize);
         Assert.Equal(OutputResolution.SameAsSource, settings.DefaultOutputResolution);
+        Assert.Equal(SymbolPolarity.LightOnDark, settings.DefaultSymbolPolarity);
         Assert.Equal(ImageExportFormat.Png, settings.DefaultImageExportFormat);
         Assert.Equal(AudioExportMode.KeepAudio, settings.DefaultVideoAudioMode);
     }
@@ -29,6 +30,7 @@ public sealed class AppSettingsTests
             DefaultFontFamily = "Comic Sans MS",
             DefaultFontSize = 48,
             DefaultOutputResolution = OutputResolution.Hd720,
+            DefaultSymbolPolarity = (SymbolPolarity)999,
             DefaultImageExportFormat = (ImageExportFormat)999,
             DefaultVideoAudioMode = AudioExportMode.RemoveAudio
         };
@@ -41,6 +43,7 @@ public sealed class AppSettingsTests
         Assert.Equal("Cascadia Mono", result.Settings.DefaultFontFamily);
         Assert.Equal(10, result.Settings.DefaultFontSize);
         Assert.Equal(OutputResolution.Hd720, result.Settings.DefaultOutputResolution);
+        Assert.Equal(SymbolPolarity.LightOnDark, result.Settings.DefaultSymbolPolarity);
         Assert.Equal(ImageExportFormat.Png, result.Settings.DefaultImageExportFormat);
         Assert.Equal(AudioExportMode.RemoveAudio, result.Settings.DefaultVideoAudioMode);
     }
@@ -52,6 +55,7 @@ public sealed class AppSettingsTests
         Assert.Equal(4, AppSettingsCatalog.FontFamilies.Count);
         Assert.Equal([9, 10, 12], AppSettingsCatalog.FontSizes);
         Assert.Equal(3, AppSettingsCatalog.OutputResolutions.Count);
+        Assert.Equal(2, AppSettingsCatalog.SymbolPolarities.Count);
         Assert.Equal(2, AppSettingsCatalog.ImageExportFormats.Count);
         Assert.Equal(2, AppSettingsCatalog.AudioModes.Count);
     }

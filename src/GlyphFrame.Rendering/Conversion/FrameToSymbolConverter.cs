@@ -1,3 +1,4 @@
+using GlyphFrame.Core.Enums;
 using GlyphFrame.Core.Interfaces;
 using GlyphFrame.Core.Models;
 
@@ -17,6 +18,7 @@ public sealed class FrameToSymbolConverter : IFrameToSymbolConverter
         SymbolGrid grid,
         GlyphMetrics glyphMetrics,
         CharacterPresetOption preset,
+        SymbolPolarity polarity,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -27,7 +29,7 @@ public sealed class FrameToSymbolConverter : IFrameToSymbolConverter
 
         ReadOnlySpan<byte> pixels = source.RgbaPixels.Span;
         SymbolCell[] cells = new SymbolCell[grid.CellCount];
-        PixelColor background = PixelColor.SymbolBackground;
+        PixelColor background = SymbolBackgroundResolver.Resolve(polarity);
 
         for (int row = 0; row < grid.Rows; row++)
         {
@@ -69,7 +71,7 @@ public sealed class FrameToSymbolConverter : IFrameToSymbolConverter
                 byte averageGreen = checked((byte)(green / count));
                 byte averageBlue = checked((byte)(blue / count));
                 byte luminance = CalculateLuminance(averageRed, averageGreen, averageBlue);
-                char character = _symbolMapper.Map(luminance, preset.Characters);
+                char character = _symbolMapper.Map(luminance, preset.Characters, polarity);
                 cells[row * grid.Columns + column] = new SymbolCell(
                     character,
                     new PixelColor(averageRed, averageGreen, averageBlue),
@@ -78,7 +80,7 @@ public sealed class FrameToSymbolConverter : IFrameToSymbolConverter
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return new SymbolFrame(grid, glyphMetrics, cells);
+        return new SymbolFrame(grid, glyphMetrics, cells, background);
     }
 
     public static byte CalculateLuminance(byte red, byte green, byte blue) =>

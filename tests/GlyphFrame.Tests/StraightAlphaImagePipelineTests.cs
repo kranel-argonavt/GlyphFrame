@@ -10,8 +10,14 @@ namespace GlyphFrame.Tests;
 
 public sealed class StraightAlphaImagePipelineTests
 {
-    [Fact]
-    public async Task RealPng_IsDecodedAsStraightAlphaAndCompositedExactlyOnce()
+    [Theory]
+    [InlineData(SymbolPolarity.LightOnDark, 134, 7, 10)]
+    [InlineData(SymbolPolarity.DarkOnLight, 250, 122, 121)]
+    public async Task RealPng_IsDecodedAsStraightAlphaAndCompositedExactlyOnce(
+        SymbolPolarity polarity,
+        byte expectedRed,
+        byte expectedGreen,
+        byte expectedBlue)
     {
         using TemporaryMediaDirectory media = new();
         string path = Phase6TestImageFactory.CreateStraightAlphaPng(
@@ -35,10 +41,12 @@ public sealed class StraightAlphaImagePipelineTests
             decoded,
             new SymbolGrid(3, 1, new PixelDimensions(3, 1)),
             metrics,
-            preset);
+            preset,
+            polarity);
 
         Assert.Equal(new PixelColor(17, 34, 51), frame.Cells.Span[0].Color);
-        Assert.Equal(new PixelColor(134, 7, 10), frame.Cells.Span[1].Color);
-        Assert.Equal(PixelColor.SymbolBackground, frame.Cells.Span[2].Color);
+        Assert.Equal(new PixelColor(expectedRed, expectedGreen, expectedBlue), frame.Cells.Span[1].Color);
+        Assert.Equal(SymbolBackgroundResolver.Resolve(polarity), frame.Cells.Span[2].Color);
+        Assert.Equal(SymbolBackgroundResolver.Resolve(polarity), frame.BackgroundColor);
     }
 }

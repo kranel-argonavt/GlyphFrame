@@ -28,6 +28,9 @@ public static class AppSettingsNormalizer
             DefaultOutputResolution = IsSupported(settings.DefaultOutputResolution)
                 ? settings.DefaultOutputResolution
                 : defaults.DefaultOutputResolution,
+            DefaultSymbolPolarity = IsSupported(settings.DefaultSymbolPolarity)
+                ? settings.DefaultSymbolPolarity
+                : defaults.DefaultSymbolPolarity,
             DefaultImageExportFormat = IsSupported(settings.DefaultImageExportFormat)
                 ? settings.DefaultImageExportFormat
                 : defaults.DefaultImageExportFormat,
@@ -47,6 +50,9 @@ public static class AppSettingsNormalizer
 
     private static bool IsSupported(OutputResolution value) =>
         AppSettingsCatalog.OutputResolutions.Any(option => option.Value == value);
+
+    private static bool IsSupported(SymbolPolarity value) =>
+        AppSettingsCatalog.SymbolPolarities.Any(option => option.Value == value);
 
     private static bool IsSupported(ImageExportFormat value) =>
         AppSettingsCatalog.ImageExportFormats.Any(option => option.Value == value);

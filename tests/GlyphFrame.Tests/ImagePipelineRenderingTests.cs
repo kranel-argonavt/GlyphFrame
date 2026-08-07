@@ -12,6 +12,12 @@ public sealed class ImagePipelineRenderingTests
     private readonly ImagePipelineService _pipeline = CreatePipeline();
 
     [Fact]
+    public void ImageRenderSettings_DefaultUsesLightOnDarkPolarity()
+    {
+        Assert.Equal(SymbolPolarity.LightOnDark, ImageRenderSettings.Default.SymbolPolarity);
+    }
+
+    [Fact]
     public async Task RenderAsync_ProducesRequestedDimensionsAndColoredGlyphRegions()
     {
         DecodedImage source = SolidImage(160, 90, 220, 30, 30, 255);
@@ -26,22 +32,26 @@ public sealed class ImagePipelineRenderingTests
         RenderedImageAssertions.ContainsPixelsDifferentFromBackground(result.RenderedImage);
     }
 
-    [Fact]
-    public async Task RenderAsync_TransparentImageUsesOpaqueDarkBackgroundConsistently()
+    [Theory]
+    [InlineData(SymbolPolarity.LightOnDark)]
+    [InlineData(SymbolPolarity.DarkOnLight)]
+    public async Task RenderAsync_TransparentImageUsesSelectedOpaqueBackgroundConsistently(
+        SymbolPolarity polarity)
     {
         DecodedImage source = SolidImage(32, 18, 255, 0, 0, 0);
+        PixelColor expectedBackground = SymbolBackgroundResolver.Resolve(polarity);
 
         ImagePipelineResult result = await _pipeline.RenderAsync(
             source,
-            new ImageRenderSettings("Consolas", 9, OutputResolution.SameAsSource),
+            new ImageRenderSettings("Consolas", 9, OutputResolution.SameAsSource, polarity),
             new CharacterPresetOption(CharacterPresetKind.SimpleAscii, "Simple ASCII", " .#"));
 
         ReadOnlySpan<byte> pixels = result.RenderedImage.RgbaPixels.Span;
         for (int offset = 0; offset < pixels.Length; offset += 4)
         {
-            Assert.Equal(PixelColor.SymbolBackground.Red, pixels[offset]);
-            Assert.Equal(PixelColor.SymbolBackground.Green, pixels[offset + 1]);
-            Assert.Equal(PixelColor.SymbolBackground.Blue, pixels[offset + 2]);
+            Assert.Equal(expectedBackground.Red, pixels[offset]);
+            Assert.Equal(expectedBackground.Green, pixels[offset + 1]);
+            Assert.Equal(expectedBackground.Blue, pixels[offset + 2]);
             Assert.Equal((byte)255, pixels[offset + 3]);
         }
     }
@@ -109,15 +119,18 @@ public sealed class ImagePipelineRenderingTests
 
 internal static class RenderedImageAssertions
 {
-    public static void ContainsPixelsDifferentFromBackground(RenderedImage image)
+    public static void ContainsPixelsDifferentFromBackground(
+        RenderedImage image,
+        PixelColor? background = null)
     {
+        PixelColor expectedBackground = background ?? PixelColor.SymbolBackground;
         ReadOnlySpan<byte> pixels = image.RgbaPixels.Span;
         bool found = false;
         for (int offset = 0; offset < pixels.Length; offset += 4)
         {
-            if (pixels[offset] != PixelColor.SymbolBackground.Red
-                || pixels[offset + 1] != PixelColor.SymbolBackground.Green
-                || pixels[offset + 2] != PixelColor.SymbolBackground.Blue)
+            if (pixels[offset] != expectedBackground.Red
+                || pixels[offset + 1] != expectedBackground.Green
+                || pixels[offset + 2] != expectedBackground.Blue)
             {
                 found = true;
                 break;

@@ -63,6 +63,7 @@ public sealed class ImagePipelineService : IImagePipelineService
                 grid,
                 glyphMetrics,
                 preset,
+                settings.SymbolPolarity,
                 cancellationToken);
             RenderedImage rendered = _renderer.Render(symbolFrame, cancellationToken);
             return new ImagePipelineResult(rendered, grid, glyphMetrics);
@@ -74,6 +75,7 @@ public sealed class ImagePipelineService : IImagePipelineService
         if (!AppSettingsCatalog.FontFamilies.Contains(settings.FontFamily, StringComparer.OrdinalIgnoreCase)
             || !AppSettingsCatalog.FontSizes.Contains(settings.FontSize)
             || !Enum.IsDefined(settings.OutputResolution)
+            || !Enum.IsDefined(settings.SymbolPolarity)
             || string.IsNullOrEmpty(preset.Characters))
         {
             throw new ImageProcessingException(

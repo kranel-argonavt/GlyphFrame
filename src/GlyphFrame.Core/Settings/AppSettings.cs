@@ -14,6 +14,8 @@ public sealed record AppSettings
 
     public OutputResolution DefaultOutputResolution { get; init; } = OutputResolution.SameAsSource;
 
+    public SymbolPolarity DefaultSymbolPolarity { get; init; } = SymbolPolarity.LightOnDark;
+
     public ImageExportFormat DefaultImageExportFormat { get; init; } = ImageExportFormat.Png;
 
     public AudioExportMode DefaultVideoAudioMode { get; init; } = AudioExportMode.KeepAudio;
