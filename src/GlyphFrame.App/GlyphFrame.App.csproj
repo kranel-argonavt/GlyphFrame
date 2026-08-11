@@ -19,4 +19,31 @@
     <ProjectReference Include="..\GlyphFrame.Rendering\GlyphFrame.Rendering.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\..\Tools\ffmpeg\ffmpeg.exe"
+             Link="Tools\ffmpeg\ffmpeg.exe"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\Tools\ffmpeg\ffprobe.exe"
+             Link="Tools\ffmpeg\ffprobe.exe"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\Tools\ffmpeg\SHA256SUMS.txt"
+             Link="Tools\ffmpeg\SHA256SUMS.txt"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\Tools\ffmpeg\LICENSE.txt"
+             Link="Tools\ffmpeg\LICENSE.txt"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\Tools\ffmpeg\DISTRIBUTION_README.txt"
+             Link="Tools\ffmpeg\DISTRIBUTION_README.txt"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\THIRD_PARTY_NOTICES.md"
+             Link="THIRD_PARTY_NOTICES.md"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

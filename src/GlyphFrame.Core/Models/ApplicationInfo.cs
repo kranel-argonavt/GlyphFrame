@@ -26,4 +26,9 @@ public sealed record ApplicationInfo(string Name, string Description, string Sta
         "GlyphFrame",
         "Video & Image to Symbol Converter",
         "Phase 6 - Image Pipeline");
+
+    public static ApplicationInfo Phase7 { get; } = new(
+        "GlyphFrame",
+        "Video & Image to Symbol Converter",
+        "Phase 7 - Bundled FFmpeg");
 }

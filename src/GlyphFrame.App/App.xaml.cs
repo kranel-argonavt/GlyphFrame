@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using GlyphFrame.App.Services;
 using GlyphFrame.App.ViewModels;
@@ -6,6 +7,7 @@ using GlyphFrame.Core.Media;
 using GlyphFrame.Core.Models;
 using GlyphFrame.Core.Presets;
 using GlyphFrame.Infrastructure.Media;
+using GlyphFrame.Infrastructure.Ffmpeg;
 using GlyphFrame.Infrastructure.Paths;
 using GlyphFrame.Infrastructure.Settings;
 using GlyphFrame.Infrastructure.Shell;
@@ -38,6 +40,9 @@ public partial class App : Application
             _serviceProvider.GetRequiredService<IApplicationSettingsManager>();
         await settingsManager.InitializeAsync();
 
+        _ = WarmFfmpegValidationAsync(
+            _serviceProvider.GetRequiredService<IFfmpegValidationService>());
+
         MainWindow = _serviceProvider.GetRequiredService<MainWindow>();
         MainWindow.Show();
     }
@@ -50,13 +55,17 @@ public partial class App : Application
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton(ApplicationInfo.Phase6);
+        services.AddSingleton(ApplicationInfo.Phase7);
         services.AddSingleton<IApplicationPaths, ApplicationPaths>();
         services.AddSingleton<ISettingsService, JsonSettingsService>();
         services.AddSingleton<IFolderLauncher, WindowsFolderLauncher>();
         services.AddSingleton<IMediaTypeDetector, MediaTypeDetector>();
         services.AddSingleton<IImageMetadataReader, MetadataExtractorImageMetadataReader>();
-        services.AddSingleton<IVideoMetadataReader, MetadataExtractorVideoMetadataReader>();
+        services.AddSingleton<IBundledFfmpegLocator, BundledFfmpegLocator>();
+        services.AddSingleton<IProcessRunner, ProcessRunner>();
+        services.AddSingleton<IFfmpegValidationService, FfmpegValidationService>();
+        services.AddSingleton<MetadataExtractorVideoMetadataReader>();
+        services.AddSingleton<IVideoMetadataReader, FfprobeVideoMetadataReader>();
         services.AddSingleton<IMediaInputService, MediaInputService>();
         services.AddSingleton<ICharacterPresetProvider, CharacterPresetProvider>();
         services.AddSingleton<IImageDecoder, SkiaImageDecoder>();
@@ -78,5 +87,20 @@ public partial class App : Application
         services.AddSingleton<IImageSourceFactory, WpfImageSourceFactory>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
+    }
+
+    private static async Task WarmFfmpegValidationAsync(IFfmpegValidationService validationService)
+    {
+        try
+        {
+            await validationService.ValidateAsync();
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or System.ComponentModel.Win32Exception
+            or InvalidOperationException)
+        {
+            System.Diagnostics.Debug.WriteLine($"FFmpeg startup validation failed: {exception}");
+        }
     }
 }

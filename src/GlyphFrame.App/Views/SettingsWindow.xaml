@@ -199,12 +199,73 @@
                                     Content="Open Logs Folder" />
                         </Grid>
 
-                        <TextBlock Style="{StaticResource LabelTextStyle}" Text="FFmpeg status" />
-                        <Border Margin="0,6,0,14" Style="{StaticResource ReadOnlySurfaceStyle}">
-                            <TextBlock Foreground="{StaticResource SecondaryTextBrush}"
-                                       Text="{Binding FfmpegStatus}"
-                                       TextWrapping="Wrap" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource LabelTextStyle}" Text="Bundled FFmpeg tools" />
+                            <Button Grid.Column="1"
+                                    MinWidth="88"
+                                    Padding="12,5"
+                                    Command="{Binding RefreshFfmpegCommand}"
+                                    Content="Refresh"
+                                    ToolTip="Validate ffmpeg.exe and ffprobe.exe again" />
+                        </Grid>
+                        <Border Margin="0,6,0,8" Style="{StaticResource ReadOnlySurfaceStyle}">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold"
+                                           Foreground="{StaticResource PrimaryTextBrush}"
+                                           Text="{Binding FfmpegAvailability}" />
+                                <TextBlock Margin="0,4,0,0"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="{Binding FfmpegStatusMessage}"
+                                           TextWrapping="Wrap" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Style="{StaticResource MutedTextStyle}" Text="FFmpeg" />
+                                    <TextBlock Grid.Column="1"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="{Binding FfmpegVersion}" />
+                                    <TextBlock Grid.Row="1"
+                                               Margin="0,4,0,0"
+                                               Style="{StaticResource MutedTextStyle}"
+                                               Text="ffprobe" />
+                                    <TextBlock Grid.Row="1"
+                                               Grid.Column="1"
+                                               Margin="0,4,0,0"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="{Binding FfprobeVersion}" />
+                                </Grid>
+                            </StackPanel>
                         </Border>
+
+                        <TextBlock Style="{StaticResource LabelTextStyle}" Text="Bundled-tools location" />
+                        <Border Margin="0,6,0,8" Style="{StaticResource ReadOnlySurfaceStyle}">
+                            <TextBlock Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="{Binding BundledToolsDirectory}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding BundledToolsDirectory}" />
+                        </Border>
+
+                        <Expander Margin="0,0,0,14"
+                                  Header="Technical details"
+                                  Foreground="{StaticResource SecondaryTextBrush}">
+                            <Border Margin="0,6,0,0" Style="{StaticResource ReadOnlySurfaceStyle}">
+                                <TextBlock FontFamily="Cascadia Mono, Consolas"
+                                           FontSize="11"
+                                           Foreground="{StaticResource MutedTextBrush}"
+                                           Text="{Binding FfmpegTechnicalDetails}"
+                                           TextWrapping="Wrap" />
+                            </Border>
+                        </Expander>
 
                         <Grid>
                             <Grid.ColumnDefinitions>

@@ -17,6 +17,7 @@ public sealed class SettingsViewModel : ObservableObject
     private readonly IAccentThemeService _themeService;
     private readonly IFolderLauncher _folderLauncher;
     private readonly IUserDialogService _dialogService;
+    private readonly IFfmpegValidationService _ffmpegValidationService;
     private AccentPreset _selectedAccentPreset;
     private CharacterPresetOption _selectedCharacterPreset = CharacterPresetOption.Default;
     private string _selectedFontFamily = AppSettingsCatalog.Defaults.DefaultFontFamily;
@@ -28,24 +29,36 @@ public sealed class SettingsViewModel : ObservableObject
     private string _statusMessage = "Review the preferences below, then save or cancel.";
     private bool _isBusy;
     private bool _isInitializing;
+    private bool _isFfmpegChecking;
+    private string _ffmpegAvailability = "Checking";
+    private string _ffmpegStatusMessage = "Checking the bundled FFmpeg tools…";
+    private string _ffmpegVersion = "Unknown";
+    private string _ffprobeVersion = "Unknown";
+    private string _bundledToolsDirectory = "Resolving bundled tools path…";
+    private string _ffmpegTechnicalDetails = "Validation has not completed yet.";
 
     public SettingsViewModel(
         IApplicationSettingsManager settingsManager,
         IApplicationPaths paths,
         IAccentThemeService themeService,
         IFolderLauncher folderLauncher,
-        IUserDialogService dialogService)
+        IUserDialogService dialogService,
+        IFfmpegValidationService ffmpegValidationService)
     {
         _settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _themeService = themeService ?? throw new ArgumentNullException(nameof(themeService));
         _folderLauncher = folderLauncher ?? throw new ArgumentNullException(nameof(folderLauncher));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+        _ffmpegValidationService = ffmpegValidationService ?? throw new ArgumentNullException(nameof(ffmpegValidationService));
 
         SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsBusy);
         CancelCommand = new RelayCommand(Cancel, () => !IsBusy);
         ResetCommand = new AsyncRelayCommand(ResetAsync, () => !IsBusy);
         OpenLogsFolderCommand = new AsyncRelayCommand(OpenLogsFolderAsync, () => !IsBusy);
+        RefreshFfmpegCommand = new AsyncRelayCommand(
+            () => RefreshFfmpegStatusAsync(forceRefresh: true),
+            () => !IsFfmpegChecking);
     }
 
     public event EventHandler? RequestClose;
@@ -70,7 +83,53 @@ public sealed class SettingsViewModel : ObservableObject
 
     public string LogsDirectory => _paths.LogsDirectory;
 
-    public string FfmpegStatus => "FFmpeg validation is not available in Phase 4.";
+    public string FfmpegAvailability
+    {
+        get => _ffmpegAvailability;
+        private set => SetProperty(ref _ffmpegAvailability, value);
+    }
+
+    public string FfmpegStatusMessage
+    {
+        get => _ffmpegStatusMessage;
+        private set => SetProperty(ref _ffmpegStatusMessage, value);
+    }
+
+    public string FfmpegVersion
+    {
+        get => _ffmpegVersion;
+        private set => SetProperty(ref _ffmpegVersion, value);
+    }
+
+    public string FfprobeVersion
+    {
+        get => _ffprobeVersion;
+        private set => SetProperty(ref _ffprobeVersion, value);
+    }
+
+    public string BundledToolsDirectory
+    {
+        get => _bundledToolsDirectory;
+        private set => SetProperty(ref _bundledToolsDirectory, value);
+    }
+
+    public string FfmpegTechnicalDetails
+    {
+        get => _ffmpegTechnicalDetails;
+        private set => SetProperty(ref _ffmpegTechnicalDetails, value);
+    }
+
+    public bool IsFfmpegChecking
+    {
+        get => _isFfmpegChecking;
+        private set
+        {
+            if (SetProperty(ref _isFfmpegChecking, value))
+            {
+                RefreshFfmpegCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
 
     public IAsyncRelayCommand SaveCommand { get; }
 
@@ -79,6 +138,8 @@ public sealed class SettingsViewModel : ObservableObject
     public IAsyncRelayCommand ResetCommand { get; }
 
     public IAsyncRelayCommand OpenLogsFolderCommand { get; }
+
+    public IAsyncRelayCommand RefreshFfmpegCommand { get; }
 
     public AccentPreset SelectedAccentPreset
     {
@@ -168,6 +229,10 @@ public sealed class SettingsViewModel : ObservableObject
     {
         LoadDraft(_settingsManager.Current);
         StatusMessage = "Review the preferences below, then save or cancel.";
+        if (!IsFfmpegChecking)
+        {
+            _ = RefreshFfmpegStatusAsync(forceRefresh: false);
+        }
     }
 
     public void EndEdit() => _themeService.Apply(_settingsManager.Current.AccentPreset);
@@ -287,6 +352,67 @@ public sealed class SettingsViewModel : ObservableObject
         CancelCommand.NotifyCanExecuteChanged();
         ResetCommand.NotifyCanExecuteChanged();
         OpenLogsFolderCommand.NotifyCanExecuteChanged();
+    }
+
+    private async Task RefreshFfmpegStatusAsync(bool forceRefresh)
+    {
+        if (IsFfmpegChecking)
+        {
+            return;
+        }
+
+        SetFfmpegCheckingState();
+        try
+        {
+            FfmpegValidationResult result = await _ffmpegValidationService.ValidateAsync(forceRefresh);
+            FfmpegStatusPresentation presentation = FfmpegStatusPresentation.FromValidation(result);
+            FfmpegAvailability = presentation.Availability;
+            FfmpegStatusMessage = presentation.Message;
+            FfmpegVersion = presentation.FfmpegVersion;
+            FfprobeVersion = presentation.FfprobeVersion;
+            BundledToolsDirectory = presentation.ToolsDirectory;
+            FfmpegTechnicalDetails = presentation.TechnicalDetails;
+        }
+        catch (OperationCanceledException)
+        {
+            SetFfmpegUnavailableState(
+                "FFmpeg validation was cancelled. Select Refresh to try again.",
+                "Validation was cancelled before it completed.");
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or System.ComponentModel.Win32Exception
+            or InvalidOperationException)
+        {
+            SetFfmpegUnavailableState(
+                "GlyphFrame could not validate the bundled FFmpeg tools.",
+                exception.ToString());
+        }
+        finally
+        {
+            IsFfmpegChecking = false;
+        }
+    }
+
+    private void SetFfmpegCheckingState()
+    {
+        IsFfmpegChecking = true;
+        FfmpegAvailability = "Checking";
+        FfmpegStatusMessage = "Checking the bundled FFmpeg tools…";
+        FfmpegVersion = "Checking";
+        FfprobeVersion = "Checking";
+        BundledToolsDirectory = "Resolving bundled tools path…";
+        FfmpegTechnicalDetails = "Validation is in progress.";
+    }
+
+    private void SetFfmpegUnavailableState(string message, string technicalDetails)
+    {
+        FfmpegAvailability = "Unavailable";
+        FfmpegStatusMessage = message;
+        FfmpegVersion = "Unavailable";
+        FfprobeVersion = "Unavailable";
+        BundledToolsDirectory = "Unavailable";
+        FfmpegTechnicalDetails = technicalDetails;
     }
 
     private static bool IsExpectedStorageFailure(Exception exception) =>

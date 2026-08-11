@@ -1,0 +1,7 @@
+# Gyan Doshi FFmpeg 9.0 essentials_build (Windows x64 static GPLv3)
+# Distribution archive: ffmpeg-9.0-essentials_build.zip
+e6b54767a6065919048f1a098eb27211ca4e12b4348a05d88777a5855d0b6e71  ffmpeg-9.0-essentials_build.zip
+227af0691433b703ffc5725e47f7d06eefc34b4a72e7870e73d30e2cda483ecf  ffmpeg.exe
+901f0efe4793cbb0f017101e3427f816e8fbf9a407bd585f49df30f4325cfd88  ffprobe.exe
+8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903  LICENSE.txt
+eb44a453c699b7bc089dddf6b1d39b08beb8eb56180929d59218a90f7023e8dd  DISTRIBUTION_README.txt

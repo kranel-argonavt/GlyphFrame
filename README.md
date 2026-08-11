@@ -4,13 +4,14 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 6 — Image Pipeline. GlyphFrame now supports local image decoding, orientation-normalized original previews, automatic symbol-grid calculation, two symbol polarity modes, colored SkiaSharp symbol rendering, symbolized previews, and PNG/JPEG export. Video selection remains metadata-only until the later video phases.
+Phase 7 — Bundled FFmpeg. GlyphFrame now ships validated Windows x64 FFmpeg and ffprobe tools alongside the Phase 6 image pipeline. The application does not depend on a system FFmpeg installation or the system `PATH`. Video selection remains metadata-only until Phase 8.
 
 ## Platform and target framework
 
 - Supported platform: Windows 10 and Windows 11, x64
 - Application target: `net10.0-windows`
-- Library and test target: `net10.0`
+- Library and platform-neutral test target: `net10.0`
+- Windows application test target: `net10.0-windows`
 - Required development SDK: .NET 10 SDK
 
 .NET 10 was selected because it is the current active Long Term Support release and supports WPF. See the [official .NET support policy](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core).
@@ -24,22 +25,27 @@ Phase 6 — Image Pipeline. GlyphFrame now supports local image decoding, orient
 - System.Text.Json
 - MetadataExtractor 2.9.3 for managed image, MP4, MOV, and AVI metadata
 - SkiaSharp 4.150.1 with matching Win32 native assets for image decoding, glyph measurement, symbol rendering, and image encoding
+- FFmpeg and ffprobe 9.0 essentials build for reliable local video metadata probing and future video phases
 - xUnit
 
-MetadataExtractor is an Apache-2.0 package used only by `GlyphFrame.Infrastructure` for header metadata; it is not used to decode preview pixels or video frames. MKV metadata is read by a bounded internal EBML header reader that skips media clusters. SkiaSharp and its Windows native assets are MIT-licensed and isolated to `GlyphFrame.Rendering`. OpenCvSharp, FFmpeg, and ffprobe remain intentionally absent. The settings screen reports FFmpeg validation as not yet available rather than fabricating a status.
+MetadataExtractor is an Apache-2.0 package used only by `GlyphFrame.Infrastructure` for header metadata; it is not used to decode preview pixels or video frames. MKV metadata is read by a bounded internal EBML header reader that skips media clusters. SkiaSharp and its Windows native assets are MIT-licensed and isolated to `GlyphFrame.Rendering`. OpenCvSharp remains intentionally absent.
+
+The bundled FFmpeg 9.0 `essentials_build` is the Windows x64 static GPLv3 distribution from Gyan Doshi. Its exact source, build type, license, source revision, and SHA-256 checksums are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `Tools/ffmpeg/SHA256SUMS.txt`.
 
 ## Solution structure
 
 ```text
 GlyphFrame/
 ├── GlyphFrame.sln
+├── Tools/ffmpeg/                    Bundled ffmpeg.exe, ffprobe.exe, license, and checksums
 ├── src/
 │   ├── GlyphFrame.App/             WPF UI, MVVM, and composition root
 │   ├── GlyphFrame.Core/            Domain models and platform-independent logic
 │   ├── GlyphFrame.Rendering/       Image decoding, symbolization, Skia rendering, and image export
 │   └── GlyphFrame.Infrastructure/  Local settings, paths, validation, and metadata readers
 ├── tests/
-│   └── GlyphFrame.Tests/           Automated tests
+│   ├── GlyphFrame.Tests/           Platform-neutral, rendering, and infrastructure tests
+│   └── GlyphFrame.App.Tests/       Windows-targeted application/ViewModel integration tests
 └── docs/                            Specification and design reference
 ```
 
@@ -91,7 +97,7 @@ Browse Media and the two drag-and-drop surfaces use the same validation and meta
 
 Image metadata includes the full path, filename, format, file size, source dimensions, EXIF orientation when present, and display-oriented dimensions. Phase 6 decodes the source pixels and applies the recorded orientation exactly once before preview, resolution calculation, symbolization, and export.
 
-Video metadata includes the container, file size, resolution and duration, plus FPS, frame count, codecs, audio presence, and sample rate when the container exposes them reliably. MKV Info and Tracks elements are read without entering media clusters. Before bundled ffprobe arrives in Phase 7, optional video fields may truthfully appear as `Unknown`; no value is invented from an unreliable estimate.
+Video metadata includes the container, file size, resolution and duration, plus FPS, frame count, codecs, audio presence, and sample rate when ffprobe or the managed container reader can establish them reliably. The validated bundled ffprobe enriches these optional values; if it is unavailable or probing fails, GlyphFrame preserves the Phase 5 managed fallback and leaves unavailable values `Unknown` rather than inventing them. No video frames are decoded in Phase 7.
 
 Metadata loading is asynchronous, a newer selection cancels and supersedes an older one, and a failed replacement retains the previous valid selection. Selected media paths are transient and are never added to `settings.json`.
 
@@ -120,6 +126,21 @@ PNG is the default output format; JPG/JPEG is also supported at a centralized qu
 
 Transparent source pixels use straight alpha and are composited exactly once over the selected opaque polarity background before color and luminance sampling. Preview, PNG export, and JPEG export therefore use the same visible-color and background rules.
 
+## Bundled FFmpeg tools
+
+Development builds and publish output contain:
+
+```text
+Tools/ffmpeg/
+├── ffmpeg.exe
+├── ffprobe.exe
+├── DISTRIBUTION_README.txt
+├── LICENSE.txt
+└── SHA256SUMS.txt
+```
+
+GlyphFrame resolves these tools relative to the running application directory, never the current working directory. It validates each executable with `-version` asynchronously at startup and caches the result for the session. Settings → Application shows availability, separate FFmpeg and ffprobe versions, the resolved folder, technical details, and a Refresh action. Missing or invalid tools do not prevent the main window from opening. Users do not need to install FFmpeg or modify `PATH`.
+
 ## Documentation
 
 - [GlyphFrame Technical Specification v1.0](docs/GlyphFrame_Technical_Specification_v1.0.md)
@@ -127,7 +148,7 @@ Transparent source pixels use straight alpha and are composited exactly once ove
 
 ## Upcoming phases
 
-- Phases 7–11 add bundled FFmpeg tooling, video preview and processing, audio, progress, and cancellation.
+- Phases 8–11 add video preview and processing, audio, progress, and cancellation using the Phase 7 tool infrastructure.
 - Later phases cover error handling, UI polish, comprehensive testing, and portable packaging.
 
 ## Privacy

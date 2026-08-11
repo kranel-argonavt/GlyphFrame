@@ -131,6 +131,18 @@ FFmpeg license information must be included in:
 THIRD_PARTY_NOTICES.md
 ```
 
+The Phase 7 bundled distribution is Gyan Doshi's FFmpeg 9.0 Windows x64 static
+`essentials_build`. Because the build enables GPL and GPL-covered codecs, it is
+distributed under GPLv3 rather than described as an LGPL-only build. Exact binary
+and archive SHA-256 checksums, the upstream source revision, distribution source,
+and the complete license text are included with the repository and copied to build
+and publish output.
+
+GlyphFrame resolves both executables relative to the actual application directory.
+It does not use the current working directory or system `PATH` as its primary lookup.
+Each tool is validated independently with `-version`; missing, invalid, inaccessible,
+timed-out, and non-zero-exit results remain non-fatal and are presented in Settings.
+
 ## 5. Media Requirements
 
 ### 5.1 Supported Image Input Formats
@@ -1367,13 +1379,16 @@ Tasks:
 
 ### Phase 7 - Bundled FFmpeg
 
-- Add `ffmpeg.exe`.
-- Add `ffprobe.exe`.
-- Tool locator.
-- Validation.
-- Process runner.
-- Third-party notices.
-- FFmpeg status in Settings.
+- Bundle real Windows x64 `ffmpeg.exe` and `ffprobe.exe` binaries.
+- Copy tools, license, checksums, and notices to Debug, Release, and publish output.
+- Resolve tools relative to the application directory without relying on `PATH`.
+- Validate each tool asynchronously, cache session results, and support refresh.
+- Provide a reusable safe process runner with argument lists, redirected output,
+  cancellation, timeout, and process-tree termination.
+- Use validated ffprobe output to enrich optional video metadata while preserving
+  the managed Phase 5 fallback when probing is unavailable.
+- Record distribution provenance, GPLv3 licensing, source revision, and checksums.
+- Display real FFmpeg and ffprobe status, versions, path, and diagnostics in Settings.
 
 ### Phase 8 - Video Preview
 
