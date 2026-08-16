@@ -13,12 +13,13 @@ using ImageMetadata = GlyphFrame.Core.Models.ImageMetadata;
 
 namespace GlyphFrame.App.ViewModels;
 
-public sealed class MainWindowViewModel : ObservableObject
+public sealed class MainWindowViewModel : ObservableObject, IDisposable
 {
     private readonly IApplicationSettingsManager _settingsManager;
     private readonly ISettingsDialogService _settingsDialogService;
     private readonly IMediaFileDialogService _mediaFileDialogService;
     private readonly IMediaInputService _mediaInputService;
+    private readonly IVideoFrameReader _videoFrameReader;
     private readonly IImagePipelineService _imagePipelineService;
     private readonly IImageExporter _imageExporter;
     private readonly IImageSaveDialogService _imageSaveDialogService;
@@ -38,8 +39,11 @@ public sealed class MainWindowViewModel : ObservableObject
     private MediaInputState _mediaInputState = MediaInputState.Empty;
     private ImageWorkflowState _imageWorkflowState = ImageWorkflowState.Empty;
     private CancellationTokenSource? _mediaLoadCancellation;
+    private CancellationTokenSource? _videoFrameCancellation;
     private CancellationTokenSource? _imageOperationCancellation;
+    private readonly SemaphoreSlim _videoReadGate = new(1, 1);
     private long _mediaRequestId;
+    private long _videoFrameRequestId;
     private long _imageOperationId;
     private string? _pendingFilePath;
     private DecodedImage? _decodedImage;
@@ -61,8 +65,17 @@ public sealed class MainWindowViewModel : ObservableObject
     private string _activeOperationText = "Preparing local image processing";
     private string _lastGridSummary = string.Empty;
     private double _timelinePosition;
+    private double _resolvedVideoPosition;
+    private TimeSpan? _resolvedVideoTimestamp;
+    private TimeSpan? _resolvedVideoDuration;
+    private long? _resolvedVideoFrameIndex;
     private double _exportProgress;
     private bool _isImageProcessing;
+    private bool _isVideoFrameLoading;
+    private bool _suppressTimelineSeek;
+    private bool _disposed;
+    private string? _videoFrameError;
+    private string? _videoFrameTechnicalDetail;
 
     public MainWindowViewModel(
         ApplicationInfo applicationInfo,
@@ -70,6 +83,7 @@ public sealed class MainWindowViewModel : ObservableObject
         ISettingsDialogService settingsDialogService,
         IMediaFileDialogService mediaFileDialogService,
         IMediaInputService mediaInputService,
+        IVideoFrameReader videoFrameReader,
         IImagePipelineService imagePipelineService,
         IImageExporter imageExporter,
         IImageSaveDialogService imageSaveDialogService,
@@ -82,6 +96,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _settingsDialogService = settingsDialogService ?? throw new ArgumentNullException(nameof(settingsDialogService));
         _mediaFileDialogService = mediaFileDialogService ?? throw new ArgumentNullException(nameof(mediaFileDialogService));
         _mediaInputService = mediaInputService ?? throw new ArgumentNullException(nameof(mediaInputService));
+        _videoFrameReader = videoFrameReader ?? throw new ArgumentNullException(nameof(videoFrameReader));
         _imagePipelineService = imagePipelineService ?? throw new ArgumentNullException(nameof(imagePipelineService));
         _imageExporter = imageExporter ?? throw new ArgumentNullException(nameof(imageExporter));
         _imageSaveDialogService = imageSaveDialogService ?? throw new ArgumentNullException(nameof(imageSaveDialogService));
@@ -195,9 +210,32 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public bool ShowLoadingPreview => IsLoadingMedia;
 
-    public bool ShowMediaPlaceholder => IsVideoSelected && !IsLoadingMedia;
+    public bool HasVideoFrame => IsVideoSelected && _decodedImage is not null && _originalImageSource is not null;
 
-    public bool ShowImagePreview => IsImageSelected && CurrentPreviewImageSource is not null && !IsLoadingMedia;
+    public bool IsVideoFrameLoading
+    {
+        get => _isVideoFrameLoading;
+        private set => SetProperty(ref _isVideoFrameLoading, value);
+    }
+
+    public bool HasVideoFrameError => IsVideoSelected && !string.IsNullOrWhiteSpace(_videoFrameError);
+
+    public string VideoFrameStatusMessage => _videoFrameError
+        ?? (IsVideoFrameLoading ? "Loading the selected video frame locally..." : "Video frame preview is ready.");
+
+    public string? VideoFrameTechnicalDetail => _videoFrameTechnicalDetail;
+
+    public bool ShowVideoFrameLoading => IsVideoSelected && IsVideoFrameLoading;
+
+    public bool ShowVideoFrameError => IsVideoSelected && HasVideoFrameError && !IsVideoFrameLoading;
+
+    public bool ShowMediaPlaceholder => IsVideoSelected
+        && !IsLoadingMedia
+        && !HasVideoFrame
+        && !IsVideoFrameLoading
+        && !HasVideoFrameError;
+
+    public bool ShowImagePreview => IsMediaSelected && CurrentPreviewImageSource is not null && !IsLoadingMedia;
 
     public bool ShowErrorPreview => IsNoMediaSelected && HasMediaInputError;
 
@@ -219,7 +257,12 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public bool IsSymbolizedPreviewStale => HasSymbolizedPreview && _imageWorkflowState.IsPreviewStale;
 
-    public bool AreSettingsEnabled => !IsExportActive && !IsLoadingMedia;
+    public bool AreSettingsEnabled => !IsExportActive && !IsLoadingMedia && !IsVideoFrameLoading;
+
+    public bool IsVideoSeekEnabled => IsVideoSelected
+        && VideoMetadata is not null
+        && !IsLoadingMedia
+        && !IsExportActive;
 
     public bool ShowResolutionWarning => IsImageSelected
         && ImageMetadata is not null
@@ -295,7 +338,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public string FormattedDimensions => ImageMetadata is not null
         ? FormatDimensions(ImageMetadata.DisplayWidth, ImageMetadata.DisplayHeight)
-        : VideoMetadata?.Width is int width && VideoMetadata.Height is int height
+        : VideoMetadata?.DisplayWidth is int width && VideoMetadata.DisplayHeight is int height
             ? FormatDimensions(width, height)
             : "Unknown resolution";
 
@@ -330,7 +373,10 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         MediaInputStatus.Loading => "Validating and decoding the selected media locally...",
         MediaInputStatus.ImageSelected => "Image decoded locally and ready for symbolization.",
-        MediaInputStatus.VideoSelected => "Video metadata loaded. Frame preview begins in Phase 8.",
+        MediaInputStatus.VideoSelected when IsVideoFrameLoading => "Video metadata loaded. Decoding the selected preview frame...",
+        MediaInputStatus.VideoSelected when HasVideoFrameError => VideoFrameStatusMessage,
+        MediaInputStatus.VideoSelected when HasVideoFrame => "Video metadata and the current preview frame are ready.",
+        MediaInputStatus.VideoSelected => "Video metadata loaded. Choose a position to retry the frame preview.",
         MediaInputStatus.Failed => _mediaInputState.LastFailure?.UserMessage ?? "GlyphFrame could not read this media.",
         _ => "Browse or drop one supported image or video."
     };
@@ -339,12 +385,30 @@ public sealed class MainWindowViewModel : ObservableObject
         ? $"{MediaTypeText}  -  {FormattedDimensions}  -  {FormattedFileSize}"
         : InputStatusMessage;
 
-    public string TimelineText => VideoMetadata?.Duration is TimeSpan duration
-        ? $"00:00 / {FormatDuration(duration)}"
-        : "--:-- / --:--";
+    public string TimelineText
+    {
+        get
+        {
+            TimeSpan? current = IsVideoFrameLoading
+                ? ResolveTimelineTimestamp(TimelinePosition, VideoMetadata?.Duration)
+                : _resolvedVideoTimestamp
+                    ?? ResolveTimelineTimestamp(_resolvedVideoPosition, VideoMetadata?.Duration);
+            string currentText = current is TimeSpan currentTime ? FormatDuration(currentTime) : FormatNormalizedPosition(TimelinePosition);
+            string totalText = (VideoMetadata?.Duration ?? _resolvedVideoDuration) is TimeSpan duration
+                ? FormatDuration(duration)
+                : "position";
+            return $"{currentText} / {totalText}";
+        }
+    }
+
+    public string VideoFramePositionText => _resolvedVideoFrameIndex is long frameIndex
+        ? $"Frame {frameIndex + 1:N0}"
+        : $"Position {_resolvedVideoPosition:P0}";
 
     public string OutputPathText => _selectedOutputPath
-        ?? (IsImageSelected ? "Choose a PNG or JPEG destination" : "Available after image selection");
+        ?? (IsImageSelected
+            ? "Choose a PNG or JPEG destination"
+            : IsVideoSelected ? "Full video export arrives in Phase 9" : "Available after image selection");
 
     public string OutputFormatText => _mediaInputState.SelectedMediaType switch
     {
@@ -364,7 +428,9 @@ public sealed class MainWindowViewModel : ObservableObject
     public string RemainingText => string.Empty;
 
     public string PreviewStaleMessage => IsSymbolizedPreviewStale
-        ? "Settings changed - generate a new preview before export."
+        ? IsVideoSelected
+            ? "Frame position or settings changed - generate a new symbolized frame."
+            : "Settings changed - generate a new preview before export."
         : _lastGridSummary;
 
     public CharacterPresetOption SelectedPreset
@@ -517,7 +583,20 @@ public sealed class MainWindowViewModel : ObservableObject
     public double TimelinePosition
     {
         get => _timelinePosition;
-        set => SetProperty(ref _timelinePosition, value);
+        set
+        {
+            double normalized = NormalizeVideoPosition(value);
+            if (!SetProperty(ref _timelinePosition, normalized))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(TimelineText));
+            if (!_suppressTimelineSeek && IsVideoSelected && VideoMetadata is not null)
+            {
+                QueueVideoSeek(normalized);
+            }
+        }
     }
 
     public double ExportProgress
@@ -556,6 +635,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private async Task LoadMediaAsync(string path)
     {
+        CancelVideoFrameRequestCore();
         CancelImageOperationCore();
         CancellationTokenSource cancellation = new();
         CancellationTokenSource? previous = Interlocked.Exchange(ref _mediaLoadCancellation, cancellation);
@@ -596,7 +676,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         MediaInputState completed = _mediaInputState.Complete(requestId, result);
-        if (ReferenceEquals(completed, _mediaInputState))
+        if (_disposed || requestId != _mediaRequestId || ReferenceEquals(completed, _mediaInputState))
         {
             return;
         }
@@ -621,17 +701,33 @@ public sealed class MainWindowViewModel : ObservableObject
 
             if (result.MediaType == MediaSelectionKind.Image && decodedImage is not null)
             {
+                ResetVideoFramePresentation();
                 _decodedImage = decodedImage;
                 _originalImageSource = _imageSourceFactory.Create(decodedImage);
                 ClearSymbolizedPreview();
                 StatusMessage = "Image decoded locally. Original preview is ready.";
             }
-            else
+            else if (result.VideoMetadata is not null)
             {
                 _decodedImage = null;
                 _originalImageSource = null;
+                _resolvedVideoPosition = VideoPreviewDefaults.MiddlePosition;
+                _resolvedVideoTimestamp = ResolveTimelineTimestamp(
+                    VideoPreviewDefaults.MiddlePosition,
+                    result.VideoMetadata.Duration);
+                _resolvedVideoDuration = result.VideoMetadata.Duration;
+                _resolvedVideoFrameIndex = null;
+                _videoFrameError = null;
+                _videoFrameTechnicalDetail = null;
+                SetTimelinePositionSilently(VideoPreviewDefaults.MiddlePosition);
                 ClearSymbolizedPreview();
-                StatusMessage = "Video metadata loaded locally. Frame preview is not implemented yet.";
+                StatusMessage = "Video metadata loaded locally. Loading a middle preview frame...";
+                NotifyVideoFrameProperties();
+                await LoadVideoFrameAsync(
+                    result.VideoMetadata.FilePath,
+                    VideoPreviewDefaults.MiddlePosition,
+                    requestId,
+                    debounce: false);
             }
 
             NotifyImageProperties();
@@ -642,22 +738,165 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    private async Task GeneratePreviewAsync()
+    private void QueueVideoSeek(double normalizedPosition)
     {
-        if (_decodedImage is null || ImageMetadata is null)
+        if (_disposed || !IsVideoSelected || VideoMetadata is null)
         {
             return;
         }
 
-        if (!File.Exists(ImageMetadata.FilePath))
+        _ = LoadVideoFrameAsync(
+            VideoMetadata.FilePath,
+            normalizedPosition,
+            _imageWorkflowState.MediaVersion,
+            debounce: true);
+    }
+
+    private async Task LoadVideoFrameAsync(
+        string inputPath,
+        double normalizedPosition,
+        long mediaVersion,
+        bool debounce)
+    {
+        CancelImageOperationCore();
+        CancellationTokenSource cancellation = new();
+        CancellationTokenSource? previous = Interlocked.Exchange(ref _videoFrameCancellation, cancellation);
+        previous?.Cancel();
+        previous?.Dispose();
+
+        long requestId = Interlocked.Increment(ref _videoFrameRequestId);
+        _imageWorkflowState = _imageWorkflowState.SourceChanged();
+        _videoFrameError = null;
+        _videoFrameTechnicalDetail = null;
+        IsVideoFrameLoading = true;
+        PreviewMode = PreviewMode.Original;
+        StatusMessage = $"Loading video frame at {normalizedPosition:P0}...";
+        NotifyVideoFrameProperties();
+        NotifyImageProperties();
+
+        bool gateEntered = false;
+        try
         {
-            StatusMessage = "The selected image no longer exists. Choose the image again to continue.";
+            if (debounce)
+            {
+                await Task.Delay(VideoPreviewDefaults.SeekDebounceMilliseconds, cancellation.Token);
+            }
+
+            await _videoReadGate.WaitAsync(cancellation.Token);
+            gateEntered = true;
+
+            if (!IsCurrentVideoFrameRequest(requestId, mediaVersion, inputPath))
+            {
+                return;
+            }
+
+            VideoFrameReadResult result = await _videoFrameReader.ReadAsync(
+                inputPath,
+                normalizedPosition,
+                VideoMetadata,
+                cancellation.Token);
+
+            if (!IsCurrentVideoFrameRequest(requestId, mediaVersion, inputPath))
+            {
+                return;
+            }
+
+            if (result.Success && result.Frame is not null)
+            {
+                _decodedImage = result.Frame;
+                _originalImageSource = _imageSourceFactory.Create(result.Frame);
+                _imageWorkflowState = _imageWorkflowState.OriginalAvailable(mediaVersion);
+                _resolvedVideoPosition = result.ActualNormalizedPosition ?? normalizedPosition;
+                _resolvedVideoTimestamp = result.ActualTimestamp
+                    ?? ResolveTimelineTimestamp(_resolvedVideoPosition, result.Duration ?? VideoMetadata?.Duration);
+                _resolvedVideoDuration = result.Duration ?? VideoMetadata?.Duration;
+                _resolvedVideoFrameIndex = result.ActualFrameIndex;
+                _videoFrameError = null;
+                _videoFrameTechnicalDetail = null;
+                SetTimelinePositionSilently(_resolvedVideoPosition);
+                StatusMessage = $"Video frame ready at {FormatVideoPosition(_resolvedVideoTimestamp, _resolvedVideoPosition)}.";
+                NotifyImageProperties();
+            }
+            else if (result.Status != VideoFrameReadStatus.Cancelled)
+            {
+                _videoFrameError = result.UserMessage;
+                _videoFrameTechnicalDetail = result.TechnicalDetail;
+                SetTimelinePositionSilently(_resolvedVideoPosition);
+                StatusMessage = result.UserMessage;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // A superseded seek is an expected state transition and is not presented as an error.
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or InvalidOperationException)
+        {
+            if (IsCurrentVideoFrameRequest(requestId, mediaVersion, inputPath))
+            {
+                _videoFrameError = "GlyphFrame could not load this video frame.";
+                _videoFrameTechnicalDetail = exception.ToString();
+                SetTimelinePositionSilently(_resolvedVideoPosition);
+                StatusMessage = _videoFrameError;
+            }
+        }
+        catch (Exception exception)
+        {
+            if (IsCurrentVideoFrameRequest(requestId, mediaVersion, inputPath))
+            {
+                _videoFrameError = "GlyphFrame could not load this video frame.";
+                _videoFrameTechnicalDetail = exception.ToString();
+                SetTimelinePositionSilently(_resolvedVideoPosition);
+                StatusMessage = _videoFrameError;
+            }
+        }
+        finally
+        {
+            if (gateEntered)
+            {
+                _videoReadGate.Release();
+            }
+
+            if (IsCurrentVideoFrameRequest(requestId, mediaVersion, inputPath))
+            {
+                if (Interlocked.CompareExchange(ref _videoFrameCancellation, null, cancellation) == cancellation)
+                {
+                    cancellation.Dispose();
+                }
+
+                IsVideoFrameLoading = false;
+                NotifyVideoFrameProperties();
+                NotifyCommandStates();
+            }
+        }
+    }
+
+    private bool IsCurrentVideoFrameRequest(long requestId, long mediaVersion, string inputPath) =>
+        !_disposed
+        && requestId == _videoFrameRequestId
+        && mediaVersion == _imageWorkflowState.MediaVersion
+        && IsVideoSelected
+        && VideoMetadata?.FilePath.Equals(inputPath, StringComparison.OrdinalIgnoreCase) == true;
+
+    private async Task GeneratePreviewAsync()
+    {
+        if (_decodedImage is null
+            || _imageWorkflowState.CurrentIdentity is not PreviewIdentity identity)
+        {
+            return;
+        }
+
+        string? inputPath = ImageMetadata?.FilePath ?? VideoMetadata?.FilePath;
+        if (string.IsNullOrWhiteSpace(inputPath) || !File.Exists(inputPath))
+        {
+            StatusMessage = IsVideoSelected
+                ? "The selected video no longer exists. Choose the video again to continue."
+                : "The selected image no longer exists. Choose the image again to continue.";
             return;
         }
 
         DecodedImage source = _decodedImage;
-        long mediaVersion = _mediaRequestId;
-        long settingsVersion = _imageWorkflowState.SettingsVersion;
         (long operationId, CancellationToken token) = BeginImageOperation(
             "Generating preview...",
             "Measuring glyphs and rendering symbol art");
@@ -671,12 +910,12 @@ public sealed class MainWindowViewModel : ObservableObject
                 SelectedPreset,
                 token);
 
-            if (!IsCurrentImageOperation(operationId, mediaVersion, settingsVersion, source))
+            if (!IsCurrentImageOperation(operationId, identity, source))
             {
                 return;
             }
 
-            ApplyRenderedResult(result, settingsVersion);
+            ApplyRenderedResult(result, identity);
             PreviewMode = PreviewMode.Symbolized;
             ExportProgress = 100;
             StatusMessage = result.GlyphMetrics.UsedFallback
@@ -687,7 +926,7 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             if (operationId == _imageOperationId)
             {
-                StatusMessage = "Symbolized preview generation was cancelled.";
+                StatusMessage = "Symbolized preview generation was cancelled. The original preview remains available.";
             }
         }
         catch (ImageProcessingException exception)
@@ -714,7 +953,9 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private async Task ExportImageAsync()
     {
-        if (_decodedImage is null || ImageMetadata is null)
+        if (_decodedImage is null
+            || ImageMetadata is null
+            || _imageWorkflowState.CurrentIdentity is not PreviewIdentity identity)
         {
             return;
         }
@@ -761,8 +1002,6 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         DecodedImage source = _decodedImage;
-        long mediaVersion = _mediaRequestId;
-        long settingsVersion = _imageWorkflowState.SettingsVersion;
         (long operationId, CancellationToken token) = BeginImageOperation(
             "Exporting image...",
             "Rendering symbol art with the current settings");
@@ -778,12 +1017,12 @@ public sealed class MainWindowViewModel : ObservableObject
                     SelectedPreset,
                     token);
 
-                if (!IsCurrentImageOperation(operationId, mediaVersion, settingsVersion, source))
+                if (!IsCurrentImageOperation(operationId, identity, source))
                 {
                     return;
                 }
 
-                ApplyRenderedResult(result, settingsVersion);
+                ApplyRenderedResult(result, identity);
                 rendered = result.RenderedImage;
             }
             else
@@ -795,7 +1034,7 @@ public sealed class MainWindowViewModel : ObservableObject
             OnPropertyChanged(nameof(ExportProgressText));
             await _imageExporter.ExportAsync(rendered, outputPath, format, overwrite, token);
 
-            if (!IsCurrentImageOperation(operationId, mediaVersion, settingsVersion, source))
+            if (!IsCurrentImageOperation(operationId, identity, source))
             {
                 return;
             }
@@ -907,21 +1146,19 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private bool IsCurrentImageOperation(
         long operationId,
-        long mediaVersion,
-        long settingsVersion,
+        PreviewIdentity identity,
         DecodedImage source) =>
         operationId == _imageOperationId
-        && _imageWorkflowState.CanAcceptResult(operationId, mediaVersion, settingsVersion)
+        && _imageWorkflowState.CanAcceptResult(operationId, identity)
         && ReferenceEquals(source, _decodedImage);
 
-    private void ApplyRenderedResult(ImagePipelineResult result, long settingsVersion)
+    private void ApplyRenderedResult(ImagePipelineResult result, PreviewIdentity identity)
     {
         _renderedImage = result.RenderedImage;
         _symbolizedImageSource = _imageSourceFactory.Create(result.RenderedImage);
         _imageWorkflowState = _imageWorkflowState.CompletePreview(
             _imageWorkflowState.ActiveOperationId,
-            _imageWorkflowState.MediaVersion,
-            settingsVersion);
+            identity);
         _lastGridSummary = $"{result.Grid.Columns} x {result.Grid.Rows} symbols  -  {result.RenderedImage.Dimensions.Width} x {result.RenderedImage.Dimensions.Height} output";
         NotifyImageProperties();
     }
@@ -968,9 +1205,13 @@ public sealed class MainWindowViewModel : ObservableObject
         ?? ImageExportFormat.Png;
 
     private bool CanGeneratePreview() =>
-        _imageWorkflowState.CanPreview && _decodedImage is not null && !IsLoadingMedia && !IsExportActive;
+        _imageWorkflowState.CanPreview
+        && _decodedImage is not null
+        && !IsLoadingMedia
+        && !IsVideoFrameLoading
+        && !IsExportActive;
 
-    private bool CanExportImage() => CanGeneratePreview();
+    private bool CanExportImage() => IsImageSelected && _imageWorkflowState.CanExport && CanGeneratePreview();
 
     private bool CanBrowseOutput() => IsImageSelected && !IsLoadingMedia && !IsExportActive;
 
@@ -979,6 +1220,7 @@ public sealed class MainWindowViewModel : ObservableObject
         CancellationTokenSource? previous = Interlocked.Exchange(ref _mediaLoadCancellation, null);
         previous?.Cancel();
         previous?.Dispose();
+        CancelVideoFrameRequestCore();
         CancelImageOperationCore();
 
         long requestId = Interlocked.Increment(ref _mediaRequestId);
@@ -1020,13 +1262,17 @@ public sealed class MainWindowViewModel : ObservableObject
             nameof(CurrentMedia), nameof(ImageMetadata), nameof(VideoMetadata),
             nameof(IsNoMediaSelected), nameof(IsMediaSelected), nameof(IsImageSelected), nameof(IsVideoSelected),
             nameof(IsLoadingMedia), nameof(HasMediaInputError), nameof(ShowEmptyPreview), nameof(ShowLoadingPreview),
-            nameof(ShowMediaPlaceholder), nameof(ShowImagePreview), nameof(ShowErrorPreview), nameof(IsBrowseMediaAvailable),
+            nameof(HasVideoFrame), nameof(IsVideoFrameLoading), nameof(HasVideoFrameError),
+            nameof(VideoFrameStatusMessage), nameof(VideoFrameTechnicalDetail), nameof(ShowVideoFrameLoading),
+            nameof(ShowVideoFrameError), nameof(ShowMediaPlaceholder), nameof(ShowImagePreview),
+            nameof(ShowErrorPreview), nameof(IsBrowseMediaAvailable), nameof(IsVideoSeekEnabled),
             nameof(AreSettingsEnabled), nameof(InputLabel), nameof(PreviewActionLabel), nameof(ExportActionLabel),
             nameof(SelectedFileName), nameof(SelectedFilePath), nameof(MediaTypeText), nameof(MetadataPrimaryText),
             nameof(MetadataSecondaryText), nameof(FormattedFileSize), nameof(FormattedDimensions),
             nameof(FormattedDuration), nameof(FormattedFps), nameof(FormattedFrameCount),
             nameof(FormattedCodecInformation), nameof(OrientationText), nameof(AudioInformation),
-            nameof(InputStatusMessage), nameof(InputMetadataSummary), nameof(TimelineText), nameof(OutputPathText),
+            nameof(InputStatusMessage), nameof(InputMetadataSummary), nameof(TimelineText),
+            nameof(VideoFramePositionText), nameof(OutputPathText),
             nameof(OutputFormatText), nameof(IsOriginalPreviewSelected), nameof(IsSymbolizedPreviewSelected),
             nameof(ShowResolutionWarning), nameof(CurrentPreviewImageSource)
         ];
@@ -1043,11 +1289,30 @@ public sealed class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SymbolizedImageSource));
         OnPropertyChanged(nameof(CurrentPreviewImageSource));
         OnPropertyChanged(nameof(ShowImagePreview));
+        OnPropertyChanged(nameof(HasVideoFrame));
         OnPropertyChanged(nameof(HasSymbolizedPreview));
         OnPropertyChanged(nameof(IsSymbolizedPreviewStale));
         OnPropertyChanged(nameof(PreviewStaleMessage));
         OnPropertyChanged(nameof(OutputPathText));
         NotifyCommandStates();
+    }
+
+    private void NotifyVideoFrameProperties()
+    {
+        string[] propertyNames =
+        [
+            nameof(HasVideoFrame), nameof(IsVideoFrameLoading), nameof(HasVideoFrameError),
+            nameof(VideoFrameStatusMessage), nameof(VideoFrameTechnicalDetail),
+            nameof(ShowVideoFrameLoading), nameof(ShowVideoFrameError), nameof(ShowMediaPlaceholder),
+            nameof(ShowImagePreview), nameof(IsVideoSeekEnabled), nameof(AreSettingsEnabled),
+            nameof(InputStatusMessage), nameof(TimelineText), nameof(VideoFramePositionText),
+            nameof(CurrentPreviewImageSource)
+        ];
+
+        foreach (string propertyName in propertyNames)
+        {
+            OnPropertyChanged(propertyName);
+        }
     }
 
     private void NotifyCommandStates()
@@ -1104,6 +1369,87 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             InvalidateSymbolizedPreview(ImageRenderSetting.ApplicationDefaults);
         }
+    }
+
+    private void CancelVideoFrameRequestCore()
+    {
+        CancellationTokenSource? cancellation = Interlocked.Exchange(ref _videoFrameCancellation, null);
+        if (cancellation is not null)
+        {
+            cancellation.Cancel();
+            cancellation.Dispose();
+            Interlocked.Increment(ref _videoFrameRequestId);
+        }
+
+        if (IsVideoFrameLoading)
+        {
+            IsVideoFrameLoading = false;
+            NotifyVideoFrameProperties();
+        }
+    }
+
+    private void ResetVideoFramePresentation()
+    {
+        CancelVideoFrameRequestCore();
+        _resolvedVideoPosition = 0d;
+        _resolvedVideoTimestamp = null;
+        _resolvedVideoDuration = null;
+        _resolvedVideoFrameIndex = null;
+        _videoFrameError = null;
+        _videoFrameTechnicalDetail = null;
+        SetTimelinePositionSilently(0d);
+        NotifyVideoFrameProperties();
+    }
+
+    private void SetTimelinePositionSilently(double position)
+    {
+        _suppressTimelineSeek = true;
+        try
+        {
+            TimelinePosition = NormalizeVideoPosition(position);
+        }
+        finally
+        {
+            _suppressTimelineSeek = false;
+        }
+    }
+
+    private static double NormalizeVideoPosition(double position) => double.IsFinite(position)
+        ? Math.Clamp(position, 0d, 1d)
+        : 0d;
+
+    private static TimeSpan? ResolveTimelineTimestamp(double position, TimeSpan? duration) =>
+        duration is TimeSpan knownDuration && knownDuration > TimeSpan.Zero
+            ? TimeSpan.FromTicks((long)Math.Round(knownDuration.Ticks * NormalizeVideoPosition(position)))
+            : null;
+
+    private static string FormatNormalizedPosition(double position) => $"{NormalizeVideoPosition(position):P0}";
+
+    private static string FormatVideoPosition(TimeSpan? timestamp, double position) => timestamp is TimeSpan time
+        ? FormatDuration(time)
+        : FormatNormalizedPosition(position);
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _settingsManager.SettingsChanged -= OnSettingsChanged;
+        CancellationTokenSource? mediaCancellation = Interlocked.Exchange(ref _mediaLoadCancellation, null);
+        mediaCancellation?.Cancel();
+        mediaCancellation?.Dispose();
+        CancellationTokenSource? videoCancellation = Interlocked.Exchange(ref _videoFrameCancellation, null);
+        videoCancellation?.Cancel();
+        videoCancellation?.Dispose();
+        CancellationTokenSource? imageCancellation = Interlocked.Exchange(ref _imageOperationCancellation, null);
+        imageCancellation?.Cancel();
+        imageCancellation?.Dispose();
+        Interlocked.Increment(ref _mediaRequestId);
+        Interlocked.Increment(ref _videoFrameRequestId);
+        Interlocked.Increment(ref _imageOperationId);
     }
 
     private static MediaInputErrorCategory MapImageError(ImageProcessingErrorCategory category) => category switch

@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Final documentation for Phase 1  
+Status: Updated through Phase 8 — Video Preview
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -107,8 +107,8 @@ The user should not need to install:
 - Architecture pattern: MVVM
 - MVVM library: CommunityToolkit.Mvvm
 - Rendering: SkiaSharp
-- Video frame reading: OpenCvSharp
-- Video encoding and audio processing: FFmpeg
+- Video frame reading: bundled FFmpeg 9.0 through a bounded binary stdout pipe
+- Video encoding and audio processing: bundled FFmpeg
 - Metadata probing: ffprobe
 - Testing: xUnit or NUnit
 
@@ -205,7 +205,7 @@ MKV
 AVI
 ```
 
-Actual decoding support depends on OpenCvSharp and bundled FFmpeg capabilities.
+Bundled FFmpeg is the authoritative video-preview decoder and bundled ffprobe is the authoritative metadata enrichment path. Neither operation depends on the system `PATH`; Unicode, spaces, and mixed-language paths are passed as individual process arguments.
 
 Video loading must:
 
@@ -217,6 +217,10 @@ Video loading must:
 - Handle videos without audio.
 - Handle Unicode file paths.
 - Show friendly errors for unsupported or unreadable files.
+- Decode exactly one display-oriented preview frame through bundled FFmpeg without requiring a system media installation.
+- Read tightly packed straight-alpha RGBA8888 through bounded binary stdout while draining bounded stderr concurrently.
+- Avoid temporary frames, copied videos, and command-line string concatenation.
+- Release the source file after every frame read.
 
 ### 5.4 Supported Video Output Format
 
@@ -483,6 +487,17 @@ GlyphFrame must:
 12. User exports MP4.
 ```
 
+Phase 8 preview behavior:
+
+- After metadata succeeds, request a frame near normalized position `0.5` and show a non-blocking loading state.
+- The video slider maps start to `0.0` and end to `1.0` and reconciles to the nearest frame position actually returned by the decoder.
+- Convert normalized position to an invariant FFmpeg timestamp when duration is known and back the end position away from the duration boundary to request the final available frame.
+- Debounce slider input for 200 ms, cancel superseded requests, serialize extraction processes, and apply latest-request-wins generation checks.
+- Preserve metadata and show a friendly retry state when frame loading fails.
+- `Preview Symbolized Frame` uses the exact owned frame currently displayed in Original mode and the shared image symbolization pipeline.
+- Preview identity includes media version, original-frame/source version, and render-settings version. A frame or setting change therefore makes the previous symbolized frame stale.
+- Phase 8 does not implement animated playback, sequential processing, audio work, or full-video export.
+
 ### 9.2 Video Export Flow
 
 ```text
@@ -665,6 +680,10 @@ Preview panel behavior:
 - Symbolized tab becomes available after symbolized preview generation.
 - Changing render settings after preview marks the symbolized preview as stale.
 - Export remains available only when input and output requirements are valid.
+- Video selection loads an original frame near the middle, enables the normalized position slider, and displays current/total time when duration is known.
+- Rapid slider changes are coalesced; a superseded or cancelled read never replaces the newest frame and is not shown as an error.
+- Video frame loading and failure states are visually distinct while retaining successfully loaded metadata.
+- `Preview Symbolized Frame` is enabled only after an owned original frame is available; the video export action remains disabled until Phase 9.
 
 ### 10.7 Settings Panel
 
@@ -759,6 +778,7 @@ Footer does not contain:
 ```text
 Empty
 LoadingMedia
+LoadingVideoFrame
 MediaLoaded
 GeneratingPreview
 PreviewReady
@@ -782,12 +802,20 @@ LoadingMedia:
 - Browse and drop disabled.
 - Loading indicator visible.
 
+LoadingVideoFrame:
+
+- Selected video metadata remains visible.
+- Original-frame decoding runs away from the UI thread.
+- Conflicting preview actions are temporarily disabled; the position slider remains available so a newer request can supersede the active read.
+- Superseded frame reads are cancelled without displaying an error.
+
 MediaLoaded:
 
 - Original preview visible.
 - Settings enabled.
 - Preview action enabled.
 - Export enabled only when output path is valid.
+- In video mode, the currently resolved original frame and position controls are available while full-video export remains disabled.
 
 GeneratingPreview:
 
@@ -943,6 +971,7 @@ StreamingVideoEncoder
 AudioMuxer
 ExportService
 FfmpegProcessRunner
+BinaryProcessRunner
 TempFileManager
 SettingsService
 LoggingService
@@ -971,6 +1000,19 @@ public interface IVideoMetadataReader
     Task<VideoMetadata> ReadAsync(string inputPath, CancellationToken cancellationToken);
 }
 ```
+
+```csharp
+public interface IVideoFrameReader
+{
+    Task<VideoFrameReadResult> ReadAsync(
+        string inputPath,
+        double normalizedPosition,
+        VideoMetadata? metadataContext,
+        CancellationToken cancellationToken);
+}
+```
+
+`IVideoFrameReader` is platform-neutral. FFmpeg paths, process arguments, binary pipes, exit codes, and backend diagnostics remain isolated in Infrastructure. A successful result owns an exact, tightly packed, straight-alpha RGBA8888 managed buffer independently of the completed process and reports requested and resolved position/timestamp/frame context only when available.
 
 ```csharp
 public interface ICharacterPresetProvider
@@ -1069,10 +1111,33 @@ public sealed class VideoMetadata
     public string? VideoCodec { get; init; }
     public string? AudioCodec { get; init; }
     public int? AudioSampleRate { get; init; }
+    public int? RotationDegrees { get; init; }
+    public int? DisplayWidth { get; }
+    public int? DisplayHeight { get; }
 }
 ```
 
-### 14.4 RenderSettings
+Encoded dimensions remain available for diagnostics. Display dimensions apply normalized quarter-turn rotation metadata and define the exact display-oriented RGBA frame layout expected from FFmpeg's default autorotation behavior.
+
+### 14.4 VideoFrameReadResult
+
+The Phase 8 result model contains:
+
+```text
+Status and typed error category
+Owned DecodedImage frame on success
+Requested normalized position
+Actual normalized position when available
+Requested and actual timestamps when available
+Actual frame index when available
+Duration and frame-count context when available
+Friendly user message
+Separate technical detail
+```
+
+Cancellation is represented explicitly and superseded cancellation is not treated as a user-facing error. Unknown or unreliable timing fields remain absent rather than being fabricated.
+
+### 14.5 RenderSettings
 
 ```csharp
 public sealed class RenderSettings
@@ -1087,7 +1152,7 @@ public sealed class RenderSettings
 
 The platform-neutral `SymbolFrame` stores the resolved opaque `BackgroundColor`. This makes preview, still-image export, and the future video pipeline deterministic without consulting mutable application settings during rendering.
 
-### 14.5 CharacterPreset
+### 14.6 CharacterPreset
 
 ```csharp
 public sealed class CharacterPreset
@@ -1098,7 +1163,7 @@ public sealed class CharacterPreset
 }
 ```
 
-### 14.6 ExportJob
+### 14.7 ExportJob
 
 ```csharp
 public sealed class ExportJob
@@ -1113,7 +1178,7 @@ public sealed class ExportJob
 }
 ```
 
-### 14.7 ExportProgress
+### 14.8 ExportProgress
 
 ```csharp
 public sealed class ExportProgress
@@ -1196,6 +1261,7 @@ GlyphFrame must follow these privacy rules:
 - Logs must not contain image pixels, video frames, or media content.
 - Temporary files are removed after success, failure, or cancel.
 - Settings are stored locally.
+- The current video preview frame exists only in memory; it is not copied to application data, preferences, logs, or a temporary image file.
 
 ## 17. Error Handling
 
@@ -1210,6 +1276,8 @@ The app must show friendly messages for:
 - Permission denied.
 - Not enough disk space.
 - Video frame reading error.
+- Missing, invalid, or inaccessible bundled FFmpeg executable.
+- Video open, seek, frame decode, timeout, or incomplete binary-frame failure.
 - Encoding error.
 - Audio muxing error.
 - Export cancellation.
@@ -1228,6 +1296,10 @@ GlyphFrame must:
 - Avoid writing thousands of temporary PNG frames for video export.
 - Stream rendered frames to FFmpeg through stdin.
 - Dispose bitmaps, frames, and process resources correctly.
+- Keep at most the current decoded video frame in memory; do not cache an unbounded frame history.
+- Serialize random-access FFmpeg extractions, debounce slider input, and reject late results with generation identifiers in addition to cancellation.
+- Bound extraction time, RGBA stdout, and stderr; terminate the process tree on timeout or cancellation.
+- Never retain process handles, pipe buffers, or source-file handles after a frame read completes.
 
 ## 19. Testing Requirements
 
@@ -1265,6 +1337,12 @@ Minimum test matrix:
 - Missing ffprobe.
 - Cancel during export.
 - Invalid/corrupted media.
+- Real bundled-FFmpeg frame decoding for MP4, MOV, MKV, and AVI with committed offline fixtures.
+- Genuine Cyrillic, spaces, and mixed-language directory and filename paths passed directly to FFmpeg.
+- Start, middle, near-end, short-video, normalized-clamping, owned-buffer, channel-order, cancellation, and file-lock frame-reader behavior.
+- Middle-frame ViewModel loading, retryable failure, slider visibility, seek coalescing, latest-request-wins, and media-switch races.
+- Video symbolization from the displayed frame plus stale identity after frame, media, or render-setting changes.
+- Debug, Release, and publish inclusion of FFmpeg, ffprobe, checksums, licenses, and third-party notices with no obsolete video-decoder native assets.
 
 ## 20. Packaging Requirements
 
@@ -1392,16 +1470,21 @@ Tasks:
 
 ### Phase 8 - Video Preview
 
-- Video frame reader.
-- Middle-frame default.
-- Position slider.
-- Original frame preview.
-- Stale symbolized preview behavior.
-- Preview Symbolized Frame.
+- Platform-neutral structured video-frame reader contract.
+- Bundled FFmpeg frame extraction isolated in Infrastructure behind `IVideoFrameReader` and a binary-safe process abstraction.
+- Unicode-safe `ArgumentList` paths and normalized-position-to-timestamp random access.
+- One display-oriented straight-alpha RGBA8888 frame through bounded in-memory stdout with exact-length validation.
+- Bounded timeout, concurrent stderr draining, process-tree cancellation, and deterministic process/file-handle release.
+- Asynchronous middle-frame default at normalized position `0.5`.
+- Video-only normalized position slider with 200 ms debounce, cancellation, one-read serialization, and latest-request-wins identity checks.
+- Original frame preview with loading, ready, and friendly failure states.
+- Shared symbolization of the currently displayed frame.
+- Media/source/settings preview identity and stale symbolized-frame behavior.
+- No animated playback or full-video export.
 
 ### Phase 9 - Streaming Video Export
 
-- OpenCvSharp sequential reading.
+- Sequential frame-source coordination building on the bundled-FFmpeg process infrastructure.
 - SkiaSharp raw frame output.
 - FFmpeg stdin pipe.
 - H.264 CRF 20.
@@ -1545,6 +1628,14 @@ MVP is accepted when all criteria below are met.
 - User can select frame position with a slider.
 - App generates symbolized preview frame.
 - App shows video-only controls for videos.
+- App automatically requests an original frame near the middle after metadata succeeds.
+- Slider seeking remains responsive, reconciles to the nearest resolved frame, and cannot publish an obsolete result.
+- Frame pixels retain correct red/blue channel order and remain valid after the FFmpeg process and pipes are disposed.
+- Cyrillic, spaces, and mixed-language input paths decode directly without renaming or temporary copies.
+- Source videos are not left locked after preview reads, failures, cancellation, or repeated seeking.
+- The symbolized frame uses the exact currently displayed original frame and the shared image pipeline.
+- Frame/media/render-setting changes mark the previous symbolized frame stale; output-format-only changes do not.
+- Missing native dependencies, unsupported codecs, and frame failures remain non-fatal and user-friendly.
 
 ### 22.6 Video Export
 

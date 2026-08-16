@@ -124,6 +124,39 @@ public sealed class FfprobeVideoMetadataReaderTests
         Assert.Null(metadata.AudioSampleRate);
     }
 
+    [Theory]
+    [InlineData(-90, 270, 240, 320)]
+    [InlineData(90, 90, 240, 320)]
+    [InlineData(180, 180, 320, 240)]
+    public void Enrich_ParsesDisplayRotationAndDimensions(
+        int reportedRotation,
+        int normalizedRotation,
+        int displayWidth,
+        int displayHeight)
+    {
+        VideoMetadata fallback = new(
+            "rotation.mov", "rotation.mov", 320, 240, TimeSpan.FromSeconds(1), 30, 30,
+            "MOV", 100, "h264", false, null, null);
+        string json = $$"""
+            {
+              "streams": [
+                {
+                  "codec_type": "video",
+                  "width": 320,
+                  "height": 240,
+                  "side_data_list": [ { "rotation": {{reportedRotation}} } ]
+                }
+              ]
+            }
+            """;
+
+        VideoMetadata result = FfprobeVideoMetadataReader.Enrich(fallback, json);
+
+        Assert.Equal(normalizedRotation, result.NormalizedRotationDegrees);
+        Assert.Equal(displayWidth, result.DisplayWidth);
+        Assert.Equal(displayHeight, result.DisplayHeight);
+    }
+
     private static ProcessExecutionResult SuccessfulProbeResult()
     {
         const string json = """

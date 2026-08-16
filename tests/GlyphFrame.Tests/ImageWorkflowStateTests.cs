@@ -20,7 +20,7 @@ public sealed class ImageWorkflowStateTests
     }
 
     [Fact]
-    public void VideoSelection_DoesNotEnableImagePreviewOrExport()
+    public void VideoSelection_WaitsForAFrameAndNeverEnablesImageExport()
     {
         ImageWorkflowState state = ImageWorkflowState.Empty.SelectMedia(
             MediaSelectionKind.Video,
@@ -31,6 +31,59 @@ public sealed class ImageWorkflowStateTests
         Assert.False(state.CanPreview);
         Assert.False(state.CanExport);
         Assert.False(state.HasSymbolizedPreview);
+    }
+
+    [Fact]
+    public void DecodedVideoFrame_EnablesFramePreviewButNotImageExport()
+    {
+        ImageWorkflowState state = ReadyVideo();
+
+        Assert.True(state.HasOriginal);
+        Assert.True(state.CanPreview);
+        Assert.False(state.CanExport);
+        Assert.Equal(MediaSelectionKind.Video, state.CurrentIdentity?.MediaType);
+    }
+
+    [Fact]
+    public void VideoPositionChange_MarksExistingSymbolizedFrameStale()
+    {
+        ImageWorkflowState state = WithVideoPreview();
+        PreviewIdentity previousIdentity = state.SymbolizedPreviewIdentity!;
+
+        state = state.SourceChanged();
+
+        Assert.True(state.HasSymbolizedPreview);
+        Assert.True(state.IsPreviewStale);
+        Assert.NotEqual(previousIdentity.SourceVersion, state.CurrentIdentity?.SourceVersion);
+    }
+
+    [Fact]
+    public void OldVideoFrameResult_CannotReplacePreviewForNewPosition()
+    {
+        ImageWorkflowState rendering = ReadyVideo().BeginOperation(70);
+        PreviewIdentity oldFrameIdentity = rendering.CurrentIdentity!;
+        ImageWorkflowState moved = rendering.SourceChanged().BeginOperation(71);
+
+        ImageWorkflowState rejected = moved.CompletePreview(70, oldFrameIdentity);
+        ImageWorkflowState accepted = rejected.CompletePreview(71, moved.CurrentIdentity!);
+
+        Assert.Same(moved, rejected);
+        Assert.False(rejected.HasSymbolizedPreview);
+        Assert.True(accepted.HasSymbolizedPreview);
+        Assert.False(accepted.IsPreviewStale);
+    }
+
+    [Fact]
+    public void RenderSettingChange_MakesVideoFramePreviewIdentityStale()
+    {
+        ImageWorkflowState state = WithVideoPreview();
+
+        state = state.RenderingSettingChanged(ImageRenderSetting.SymbolPolarity);
+
+        Assert.True(state.IsPreviewStale);
+        Assert.NotEqual(
+            state.SymbolizedPreviewIdentity?.SettingsVersion,
+            state.CurrentIdentity?.SettingsVersion);
     }
 
     [Fact]
@@ -195,5 +248,16 @@ public sealed class ImageWorkflowStateTests
     {
         ImageWorkflowState state = ReadyImage().BeginOperation(1);
         return state.CompletePreview(1, state.MediaVersion, state.SettingsVersion).EndOperation(1);
+    }
+
+    private static ImageWorkflowState ReadyVideo() => ImageWorkflowState.Empty
+        .SelectMedia(MediaSelectionKind.Video, mediaVersion: 1, hasOriginal: false)
+        .SourceChanged()
+        .OriginalAvailable(mediaVersion: 1);
+
+    private static ImageWorkflowState WithVideoPreview()
+    {
+        ImageWorkflowState state = ReadyVideo().BeginOperation(1);
+        return state.CompletePreview(1, state.CurrentIdentity!).EndOperation(1);
     }
 }

@@ -63,4 +63,14 @@ public sealed class ApplicationInfoTests
         Assert.Equal("Video & Image to Symbol Converter", applicationInfo.Description);
         Assert.Equal("Phase 7 - Bundled FFmpeg", applicationInfo.Status);
     }
+
+    [Fact]
+    public void Phase8_ProvidesExpectedApplicationIdentityAndStatus()
+    {
+        ApplicationInfo applicationInfo = ApplicationInfo.Phase8;
+
+        Assert.Equal("GlyphFrame", applicationInfo.Name);
+        Assert.Equal("Video & Image to Symbol Converter", applicationInfo.Description);
+        Assert.Equal("Phase 8 - Video Preview", applicationInfo.Status);
+    }
 }

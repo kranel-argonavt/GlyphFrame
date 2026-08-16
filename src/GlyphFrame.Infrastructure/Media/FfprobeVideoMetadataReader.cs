@@ -84,6 +84,7 @@ public sealed class FfprobeVideoMetadataReader : IVideoMetadataReader
         string? videoCodec = GetNonEmptyString(videoStream, "codec_name") ?? fallback.VideoCodec;
         string? audioCodec = GetNonEmptyString(audioStream, "codec_name") ?? fallback.AudioCodec;
         int? audioSampleRate = GetPositiveInt(audioStream, "sample_rate") ?? fallback.AudioSampleRate;
+        int? rotation = GetRotation(videoStream) ?? fallback.RotationDegrees;
         bool? hasAudio = audioStream.HasValue
             ? true
             : HasStreamCatalog(root)
@@ -99,8 +100,52 @@ public sealed class FfprobeVideoMetadataReader : IVideoMetadataReader
             VideoCodec = videoCodec,
             HasAudio = hasAudio,
             AudioCodec = audioCodec,
-            AudioSampleRate = audioSampleRate
+            AudioSampleRate = audioSampleRate,
+            RotationDegrees = rotation
         };
+    }
+
+    private static int? GetRotation(JsonElement? stream)
+    {
+        if (!stream.HasValue)
+        {
+            return null;
+        }
+
+        if (stream.Value.TryGetProperty("side_data_list", out JsonElement sideData)
+            && sideData.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement item in sideData.EnumerateArray())
+            {
+                string? rotationText = GetInvariantText(item, "rotation");
+                if (TryNormalizeRotation(rotationText, out int rotation))
+                {
+                    return rotation;
+                }
+            }
+        }
+
+        if (stream.Value.TryGetProperty("tags", out JsonElement tags)
+            && TryNormalizeRotation(GetInvariantText(tags, "rotate"), out int tagRotation))
+        {
+            return tagRotation;
+        }
+
+        return null;
+    }
+
+    private static bool TryNormalizeRotation(string? text, out int rotation)
+    {
+        rotation = 0;
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed)
+            || !double.IsFinite(parsed))
+        {
+            return false;
+        }
+
+        int nearestQuarterTurn = (int)Math.Round(parsed / 90d, MidpointRounding.AwayFromZero) * 90;
+        rotation = ((nearestQuarterTurn % 360) + 360) % 360;
+        return true;
     }
 
     private static JsonElement? FindStream(JsonElement root, string codecType)

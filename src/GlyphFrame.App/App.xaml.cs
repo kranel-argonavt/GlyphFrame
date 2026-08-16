@@ -55,7 +55,7 @@ public partial class App : Application
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton(ApplicationInfo.Phase7);
+        services.AddSingleton(ApplicationInfo.Phase8);
         services.AddSingleton<IApplicationPaths, ApplicationPaths>();
         services.AddSingleton<ISettingsService, JsonSettingsService>();
         services.AddSingleton<IFolderLauncher, WindowsFolderLauncher>();
@@ -63,9 +63,11 @@ public partial class App : Application
         services.AddSingleton<IImageMetadataReader, MetadataExtractorImageMetadataReader>();
         services.AddSingleton<IBundledFfmpegLocator, BundledFfmpegLocator>();
         services.AddSingleton<IProcessRunner, ProcessRunner>();
+        services.AddSingleton<IBinaryProcessRunner, BinaryProcessRunner>();
         services.AddSingleton<IFfmpegValidationService, FfmpegValidationService>();
         services.AddSingleton<MetadataExtractorVideoMetadataReader>();
         services.AddSingleton<IVideoMetadataReader, FfprobeVideoMetadataReader>();
+        services.AddSingleton<IVideoFrameReader, FfmpegVideoFrameReader>();
         services.AddSingleton<IMediaInputService, MediaInputService>();
         services.AddSingleton<ICharacterPresetProvider, CharacterPresetProvider>();
         services.AddSingleton<IImageDecoder, SkiaImageDecoder>();

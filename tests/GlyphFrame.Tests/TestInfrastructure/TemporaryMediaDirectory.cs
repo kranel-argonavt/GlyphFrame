@@ -2,9 +2,13 @@ namespace GlyphFrame.Tests.TestInfrastructure;
 
 internal sealed class TemporaryMediaDirectory : IDisposable
 {
-    public TemporaryMediaDirectory()
+    public TemporaryMediaDirectory(string? childDirectoryName = null)
     {
-        RootPath = Path.Combine(Path.GetTempPath(), "GlyphFrame.Tests", Guid.NewGuid().ToString("N"));
+        RootPath = Path.Combine(
+            Path.GetTempPath(),
+            "GlyphFrame.Tests",
+            childDirectoryName ?? Guid.NewGuid().ToString("N"),
+            childDirectoryName is null ? string.Empty : Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(RootPath);
     }
 

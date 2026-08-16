@@ -160,16 +160,58 @@
 
                         <Grid Visibility="{Binding ShowMediaPlaceholder, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" TextBlock.TextAlignment="Center">
-                                <TextBlock FontSize="30" FontWeight="SemiBold" Text="Original media selected" />
+                                <TextBlock FontSize="30" FontWeight="SemiBold" Text="Video selected" />
                                 <TextBlock Margin="0,12,0,0"
                                            FontSize="18"
                                            Foreground="{StaticResource SecondaryTextBrush}"
-                                           Text="Video frame preview begins in Phase 8" />
+                                           Text="Choose a position to load an original frame" />
                                 <TextBlock Margin="0,10,0,0"
                                            Style="{StaticResource MutedTextStyle}"
                                            Text="{Binding InputMetadataSummary}" />
                             </StackPanel>
                         </Grid>
+
+                        <Border Background="#C90D0F14"
+                                Visibility="{Binding ShowVideoFrameLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel Width="520"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        TextBlock.TextAlignment="Center">
+                                <TextBlock FontSize="24"
+                                           FontWeight="SemiBold"
+                                           Text="Loading video frame..." />
+                                <TextBlock Margin="0,12,0,0"
+                                           FontSize="15"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="{Binding TimelineText}" />
+                                <ProgressBar Width="280"
+                                             Height="5"
+                                             Margin="0,22,0,0"
+                                             IsIndeterminate="True" />
+                                <TextBlock Margin="0,14,0,0"
+                                           Style="{StaticResource MutedTextStyle}"
+                                           Text="Decoding one local frame without loading the whole video" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#E60D0F14"
+                                Visibility="{Binding ShowVideoFrameError, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel Width="560"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        TextBlock.TextAlignment="Center">
+                                <TextBlock FontSize="24" FontWeight="SemiBold" Text="Frame preview unavailable" />
+                                <TextBlock Margin="0,12,0,0"
+                                           FontSize="15"
+                                           Foreground="{StaticResource ErrorBrush}"
+                                           Text="{Binding VideoFrameStatusMessage}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Margin="0,12,0,0"
+                                           Style="{StaticResource MutedTextStyle}"
+                                           Text="Move the position slider to retry, or choose another video."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
 
                         <Border Background="#D90D0F14"
                                 Visibility="{Binding IsExportActive, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -213,7 +255,8 @@
                         Padding="0"
                         Command="{Binding SelectOriginalCommand}"
                         Content="▶"
-                        ToolTip="Video playback is not implemented in Phase 3" />
+                        IsEnabled="False"
+                        ToolTip="Animated playback is outside the MVP; use the frame-position slider" />
                 <TextBlock Grid.Column="1"
                            Margin="10,0,12,0"
                            Style="{StaticResource MutedTextStyle}"
@@ -221,9 +264,13 @@
                            VerticalAlignment="Center" />
                 <Slider Grid.Column="2"
                         Margin="0,0,12,0"
-                        IsEnabled="False"
-                        Maximum="100"
-                        Value="{Binding TimelinePosition}" />
+                        IsEnabled="{Binding IsVideoSeekEnabled}"
+                        Maximum="1"
+                        Minimum="0"
+                        SmallChange="0.01"
+                        LargeChange="0.1"
+                        ToolTip="Choose the video frame position"
+                        Value="{Binding TimelinePosition, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 <ComboBox Grid.Column="3"
                           Width="82"
                           Margin="0,0,8,0"

@@ -3,24 +3,27 @@ using GlyphFrame.Core.Enums;
 namespace GlyphFrame.Core.Models;
 
 /// <summary>
-/// Tracks platform-neutral image preview validity and operation coordination.
-/// Media paths, image bytes, and UI-framework objects are intentionally excluded.
+/// Tracks platform-neutral still-frame preview validity and operation coordination.
+/// A source version identifies either a decoded image or one decoded video frame.
+/// Media paths, pixel bytes, and UI-framework objects are intentionally excluded.
 /// </summary>
 public sealed record ImageWorkflowState
 {
     private ImageWorkflowState(
         MediaSelectionKind mediaType,
         long mediaVersion,
+        long sourceVersion,
         long settingsVersion,
-        long? previewSettingsVersion,
+        PreviewIdentity? symbolizedPreviewIdentity,
         long activeOperationId,
         bool hasOriginal,
         bool hasSymbolizedPreview)
     {
         MediaType = mediaType;
         MediaVersion = mediaVersion;
+        SourceVersion = sourceVersion;
         SettingsVersion = settingsVersion;
-        PreviewSettingsVersion = previewSettingsVersion;
+        SymbolizedPreviewIdentity = symbolizedPreviewIdentity;
         ActiveOperationId = activeOperationId;
         HasOriginal = hasOriginal;
         HasSymbolizedPreview = hasSymbolizedPreview;
@@ -28,6 +31,7 @@ public sealed record ImageWorkflowState
 
     public static ImageWorkflowState Empty { get; } = new(
         MediaSelectionKind.None,
+        0,
         0,
         0,
         null,
@@ -39,9 +43,13 @@ public sealed record ImageWorkflowState
 
     public long MediaVersion { get; private init; }
 
+    public long SourceVersion { get; private init; }
+
     public long SettingsVersion { get; private init; }
 
-    public long? PreviewSettingsVersion { get; private init; }
+    public PreviewIdentity? SymbolizedPreviewIdentity { get; private init; }
+
+    public long? PreviewSettingsVersion => SymbolizedPreviewIdentity?.SettingsVersion;
 
     public long ActiveOperationId { get; private init; }
 
@@ -49,11 +57,15 @@ public sealed record ImageWorkflowState
 
     public bool HasSymbolizedPreview { get; private init; }
 
-    public bool CanPreview => MediaType == MediaSelectionKind.Image && HasOriginal;
+    public PreviewIdentity? CurrentIdentity => HasOriginal
+        ? new PreviewIdentity(MediaType, MediaVersion, SourceVersion, SettingsVersion)
+        : null;
 
-    public bool CanExport => CanPreview;
+    public bool CanPreview => MediaType is MediaSelectionKind.Image or MediaSelectionKind.Video && HasOriginal;
 
-    public bool IsPreviewStale => HasSymbolizedPreview && PreviewSettingsVersion != SettingsVersion;
+    public bool CanExport => MediaType == MediaSelectionKind.Image && HasOriginal;
+
+    public bool IsPreviewStale => HasSymbolizedPreview && SymbolizedPreviewIdentity != CurrentIdentity;
 
     public bool RequiresRenderForExport => !HasSymbolizedPreview || IsPreviewStale;
 
@@ -64,15 +76,37 @@ public sealed record ImageWorkflowState
             throw new ArgumentOutOfRangeException(nameof(mediaVersion), "Media versions must increase.");
         }
 
-        bool validImage = mediaType == MediaSelectionKind.Image && hasOriginal;
+        bool validOriginal = mediaType is MediaSelectionKind.Image or MediaSelectionKind.Video && hasOriginal;
         return new(
             mediaType,
             mediaVersion,
+            validOriginal ? 1 : 0,
             SettingsVersion,
             null,
             0,
-            validImage,
+            validOriginal,
             false);
+    }
+
+    public ImageWorkflowState SourceChanged()
+    {
+        if (MediaType == MediaSelectionKind.None)
+        {
+            return this;
+        }
+
+        return this with { SourceVersion = checked(SourceVersion + 1) };
+    }
+
+    public ImageWorkflowState OriginalAvailable(long mediaVersion)
+    {
+        if (mediaVersion != MediaVersion || MediaType == MediaSelectionKind.None)
+        {
+            return this;
+        }
+
+        long sourceVersion = SourceVersion == 0 ? 1 : SourceVersion;
+        return this with { SourceVersion = sourceVersion, HasOriginal = true };
     }
 
     public ImageWorkflowState RenderingSettingChanged(ImageRenderSetting setting)
@@ -97,20 +131,32 @@ public sealed record ImageWorkflowState
         return this with { ActiveOperationId = operationId };
     }
 
-    public bool CanAcceptResult(long operationId, long mediaVersion, long settingsVersion) =>
+    public bool CanAcceptResult(long operationId, PreviewIdentity identity) =>
         operationId != 0
         && operationId == ActiveOperationId
-        && mediaVersion == MediaVersion
-        && settingsVersion == SettingsVersion
+        && identity == CurrentIdentity
         && CanPreview;
 
-    public ImageWorkflowState CompletePreview(long operationId, long mediaVersion, long settingsVersion) =>
-        CanAcceptResult(operationId, mediaVersion, settingsVersion)
+    public bool CanAcceptResult(long operationId, long mediaVersion, long settingsVersion) =>
+        CurrentIdentity is PreviewIdentity identity
+        && identity.MediaVersion == mediaVersion
+        && identity.SettingsVersion == settingsVersion
+        && CanAcceptResult(operationId, identity);
+
+    public ImageWorkflowState CompletePreview(long operationId, PreviewIdentity identity) =>
+        CanAcceptResult(operationId, identity)
             ? this with
             {
-                PreviewSettingsVersion = settingsVersion,
+                SymbolizedPreviewIdentity = identity,
                 HasSymbolizedPreview = true
             }
+            : this;
+
+    public ImageWorkflowState CompletePreview(long operationId, long mediaVersion, long settingsVersion) =>
+        CurrentIdentity is PreviewIdentity identity
+        && identity.MediaVersion == mediaVersion
+        && identity.SettingsVersion == settingsVersion
+            ? CompletePreview(operationId, identity)
             : this;
 
     public ImageWorkflowState EndOperation(long operationId) => operationId == ActiveOperationId
@@ -121,7 +167,7 @@ public sealed record ImageWorkflowState
 
     public ImageWorkflowState ClearPreview() => this with
     {
-        PreviewSettingsVersion = null,
+        SymbolizedPreviewIdentity = null,
         HasSymbolizedPreview = false
     };
 }
