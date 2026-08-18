@@ -187,6 +187,98 @@ public sealed class FfmpegVideoFrameReaderTests
     }
 
     [Fact]
+    public async Task ReadAsync_RealRotatedMovUsesFfprobeMetadataAndFfmpegAutorotation()
+    {
+        string path = FixturePath("video-preview-rotated.mov");
+        string fixtureDirectory = Path.GetDirectoryName(path)!;
+        string[] filesBefore = Directory.GetFiles(fixtureDirectory)
+            .Select(file => Path.GetFileName(file)!)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        BundledFfmpegLocator locator = new(RepositoryRoot);
+        ProcessRunner processRunner = new();
+        using FfmpegValidationService validation = new(locator, processRunner);
+        FfprobeVideoMetadataReader metadataReader = new(
+            new MetadataExtractorVideoMetadataReader(),
+            validation,
+            processRunner);
+
+        VideoMetadata metadata = await metadataReader.ReadAsync(path);
+        FfmpegVideoFrameReader frameReader = new(locator, new BinaryProcessRunner(), metadataReader);
+        VideoFrameReadResult result = await frameReader.ReadAsync(path, 0.5d, metadata);
+
+        Assert.Equal(320, metadata.Width);
+        Assert.Equal(240, metadata.Height);
+        Assert.Equal(90, metadata.RotationDegrees);
+        Assert.Equal(90, metadata.NormalizedRotationDegrees);
+        Assert.Equal(240, metadata.DisplayWidth);
+        Assert.Equal(320, metadata.DisplayHeight);
+        Assert.Equal(10d, metadata.Fps);
+        Assert.Equal(12, metadata.FrameCount);
+        Assert.Equal("h264", metadata.VideoCodec);
+        Assert.True(result.Success, result.TechnicalDetail ?? result.UserMessage);
+        Assert.Equal(0.5d, result.RequestedNormalizedPosition);
+        Assert.Equal(240, result.Frame!.Width);
+        Assert.Equal(320, result.Frame.Height);
+        Assert.Equal(240 * 320 * 4, result.Frame.RgbaPixels.Length);
+
+        AssertPixel(result.Frame, 60, 80, red: 0, green: 255, blue: 0);
+        AssertPixel(result.Frame, 180, 80, red: 255, green: 255, blue: 0);
+        AssertPixel(result.Frame, 60, 240, red: 255, green: 0, blue: 0);
+        AssertPixel(result.Frame, 180, 240, red: 0, green: 0, blue: 255);
+
+        byte[] ownedFrame = result.Frame.RgbaPixels.ToArray();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        Assert.Equal(255, ownedFrame[((80 * 240) + 60) * 4 + 3]);
+
+        using (FileStream exclusive = new(path, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.True(exclusive.CanRead);
+        }
+
+        string[] filesAfter = Directory.GetFiles(fixtureDirectory)
+            .Select(file => Path.GetFileName(file)!)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(filesBefore, filesAfter);
+        Assert.DoesNotContain(filesAfter, name =>
+            name!.EndsWith(".rgba", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".raw", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ReadAsync_RealRotatedMovAlsoDecodesFromUnicodePath()
+    {
+        using TemporaryMediaDirectory media = new("Поворот 日本語 测试");
+        string path = media.CopyFixture("video-preview-rotated.mov", "обернене відео 日本語.MOV");
+        Assert.Contains(path, character => character > 127);
+        BundledFfmpegLocator locator = new(RepositoryRoot);
+        ProcessRunner processRunner = new();
+        using FfmpegValidationService validation = new(locator, processRunner);
+        FfprobeVideoMetadataReader metadataReader = new(
+            new MetadataExtractorVideoMetadataReader(),
+            validation,
+            processRunner);
+
+        VideoMetadata metadata = await metadataReader.ReadAsync(path);
+        VideoFrameReadResult result = await new FfmpegVideoFrameReader(
+            locator,
+            new BinaryProcessRunner(),
+            metadataReader).ReadAsync(path, 0.5d, metadata);
+
+        Assert.Equal(90, metadata.NormalizedRotationDegrees);
+        Assert.True(result.Success, result.TechnicalDetail ?? result.UserMessage);
+        Assert.Equal(240, result.Frame!.Width);
+        Assert.Equal(320, result.Frame.Height);
+        AssertPixel(result.Frame, 60, 80, red: 0, green: 255, blue: 0);
+        AssertPixel(result.Frame, 180, 240, red: 0, green: 0, blue: 255);
+        using FileStream exclusive = new(path, FileMode.Open, FileAccess.Read, FileShare.None);
+        Assert.True(exclusive.CanRead);
+    }
+
+    [Fact]
     public async Task ReadAsync_MissingFfmpegReturnsFriendlyUnavailableFailure()
     {
         using TemporaryMediaDirectory media = new();
@@ -330,6 +422,29 @@ public sealed class FfmpegVideoFrameReaderTests
         new BundledFfmpegLocator(RepositoryRoot),
         new BinaryProcessRunner(),
         new RecordingMetadataReader(FixtureMetadata("unused.mp4")));
+
+    private static string FixturePath(string fixtureName)
+    {
+        string path = Path.Combine(AppContext.BaseDirectory, "Fixtures", fixtureName);
+        Assert.True(File.Exists(path), $"The committed media fixture '{fixtureName}' is missing.");
+        return path;
+    }
+
+    private static void AssertPixel(
+        DecodedImage frame,
+        int x,
+        int y,
+        byte red,
+        byte green,
+        byte blue)
+    {
+        int offset = checked(((y * frame.Width) + x) * 4);
+        ReadOnlySpan<byte> pixels = frame.RgbaPixels.Span;
+        Assert.InRange((int)pixels[offset], Math.Max(0, red - 8), Math.Min(255, red + 8));
+        Assert.InRange((int)pixels[offset + 1], Math.Max(0, green - 8), Math.Min(255, green + 8));
+        Assert.InRange((int)pixels[offset + 2], Math.Max(0, blue - 8), Math.Min(255, blue + 8));
+        Assert.Equal(255, pixels[offset + 3]);
+    }
 
     private static FfmpegVideoFrameReader CreateFakeReader(
         RecordingBinaryRunner runner,
