@@ -28,4 +28,22 @@ public sealed class ImageSaveDialogService : IImageSaveDialogService
 
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
+
+    public string? SelectVideoOutputFile(string sourcePath)
+    {
+        string sourceName = Path.GetFileNameWithoutExtension(sourcePath);
+        SaveFileDialog dialog = new()
+        {
+            Title = "Export Symbolized Video - GlyphFrame",
+            AddExtension = true,
+            CheckPathExists = true,
+            DefaultExt = ".mp4",
+            FileName = $"{sourceName}_symbolized.mp4",
+            Filter = "MP4 video (*.mp4)|*.mp4",
+            OverwritePrompt = false,
+            ValidateNames = true
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
 }

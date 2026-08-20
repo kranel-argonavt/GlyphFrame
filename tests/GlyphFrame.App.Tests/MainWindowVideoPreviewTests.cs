@@ -43,8 +43,119 @@ public sealed class MainWindowVideoPreviewTests
         Assert.Equal(VideoPreviewDefaults.MiddlePosition, viewModel.TimelinePosition, 3);
         Assert.Equal(middleFrame, harness.ImageSources.LastDecodedImage);
         Assert.True(viewModel.PreviewCommand.CanExecute(null));
-        Assert.False(viewModel.ExportCommand.CanExecute(null));
+        Assert.True(viewModel.ExportCommand.CanExecute(null));
         Assert.Contains("0:05", viewModel.TimelineText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task VideoExport_UsesCurrentSettingsAndRestoresUiAfterSuccess()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("export.mp4");
+        string outputPath = files.PathFor("символи output.mp4");
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = outputPath;
+        harness.VideoExports.Handler = (job, _) => Task.FromResult(VideoExportResult.Completed(
+            job.OutputPath,
+            12,
+            new PixelDimensions(64, 48),
+            10));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+
+        await viewModel.ExportCommand.ExecuteAsync(null);
+
+        Assert.NotNull(harness.VideoExports.LastJob);
+        Assert.Equal(videoPath, harness.VideoExports.LastJob!.InputPath);
+        Assert.Equal(outputPath, harness.VideoExports.LastJob.OutputPath);
+        Assert.Equal(viewModel.SelectedPreset, harness.VideoExports.LastJob.CharacterPreset);
+        Assert.Equal(100, viewModel.ExportProgress);
+        Assert.False(viewModel.IsExportActive);
+        Assert.Contains("without audio", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(outputPath, viewModel.OutputPathText);
+    }
+
+    [Fact]
+    public async Task VideoExport_FailureRestoresUiAndShowsFriendlyMessage()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("failure.mp4");
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = files.PathFor("failure-output.mp4");
+        harness.VideoExports.Handler = (_, _) => Task.FromResult(VideoExportResult.Failure(
+            VideoExportErrorCategory.EncoderFailed,
+            "GlyphFrame could not finish encoding the MP4 video.",
+            "raw encoder detail"));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+
+        await viewModel.ExportCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsExportActive);
+        Assert.True(viewModel.ExportCommand.CanExecute(null));
+        Assert.Contains("could not finish", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("raw encoder detail", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task VideoExport_PreventsConcurrentActionsUntilCompletion()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("concurrent.mp4");
+        string outputPath = files.PathFor("concurrent-output.mp4");
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = outputPath;
+        TaskCompletionSource<bool> started = NewCompletion<bool>();
+        TaskCompletionSource<VideoExportResult> completion = NewCompletion<VideoExportResult>();
+        harness.VideoExports.Handler = (_, _) =>
+        {
+            started.TrySetResult(true);
+            return completion.Task;
+        };
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+
+        Task export = viewModel.ExportCommand.ExecuteAsync(null);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+
+        Assert.True(viewModel.IsExportActive);
+        Assert.False(viewModel.ExportCommand.CanExecute(null));
+        Assert.False(viewModel.BrowseMediaCommand.CanExecute(null));
+        Assert.False(viewModel.BrowseOutputCommand.CanExecute(null));
+        Assert.False(viewModel.AreSettingsEnabled);
+
+        completion.SetResult(VideoExportResult.Completed(
+            outputPath,
+            12,
+            new PixelDimensions(64, 48),
+            10));
+        await export;
+        Assert.False(viewModel.IsExportActive);
+        Assert.True(viewModel.ExportCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task VideoExport_DeclinedOverwritePreservesFileAndSkipsService()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("source-overwrite.mp4");
+        string outputPath = files.Create("existing-output.mp4");
+        byte[] original = await File.ReadAllBytesAsync(outputPath);
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = outputPath;
+        harness.UserDialogs.ConfirmResult = false;
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+
+        await viewModel.ExportCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, harness.VideoExports.Calls);
+        Assert.Equal(original, await File.ReadAllBytesAsync(outputPath));
+        Assert.Contains("existing file was not changed", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -436,20 +547,27 @@ public sealed class MainWindowVideoPreviewTests
 
         public FakeImageSourceFactory ImageSources { get; } = new();
 
+        public FakeVideoExportService VideoExports { get; } = new();
+
+        public FakeImageSaveDialogService SaveDialogs { get; } = new();
+
+        public FakeUserDialogService UserDialogs { get; } = new();
+
         public MainWindowViewModel CreateViewModel(
             IVideoFrameReader? videoFrameReader = null,
             bool allowNull = false) => new(
-            ApplicationInfo.Phase8,
+            ApplicationInfo.Phase9,
             new FakeSettingsManager(),
             new FakeSettingsDialogService(),
             new FakeMediaDialogService(),
             MediaInput,
             allowNull ? videoFrameReader! : videoFrameReader ?? VideoFrames,
+            VideoExports,
             ImagePipeline,
             new FakeImageExporter(),
-            new FakeImageSaveDialogService(),
+            SaveDialogs,
             ImageSources,
-            new FakeUserDialogService(),
+            UserDialogs,
             new CharacterPresetProvider());
     }
 
@@ -473,6 +591,29 @@ public sealed class MainWindowVideoPreviewTests
 
         public Task<MediaInputResult> LoadAsync(string? inputPath, CancellationToken cancellationToken = default) =>
             Handler(inputPath, cancellationToken);
+    }
+
+    private sealed class FakeVideoExportService : IVideoExportService
+    {
+        public Func<VideoExportJob, CancellationToken, Task<VideoExportResult>> Handler { get; set; } =
+            (job, _) => Task.FromResult(VideoExportResult.Completed(
+                job.OutputPath,
+                1,
+                new PixelDimensions(2, 2),
+                30));
+
+        public VideoExportJob? LastJob { get; private set; }
+
+        public int Calls { get; private set; }
+
+        public Task<VideoExportResult> ExportAsync(
+            VideoExportJob job,
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            LastJob = job;
+            return Handler(job, cancellationToken);
+        }
     }
 
     private sealed class FakeImagePipelineService : IImagePipelineService
@@ -568,16 +709,22 @@ public sealed class MainWindowVideoPreviewTests
 
     private sealed class FakeImageSaveDialogService : IImageSaveDialogService
     {
+        public string? VideoOutputPath { get; set; }
+
         public string? SelectOutputFile(string sourcePath, ImageExportFormat format) => null;
+
+        public string? SelectVideoOutputFile(string sourcePath) => VideoOutputPath;
     }
 
     private sealed class FakeUserDialogService : IUserDialogService
     {
+        public bool ConfirmResult { get; set; } = true;
+
         public bool Confirm(
             string title,
             string message,
             string confirmButtonText = "Confirm",
-            string cancelButtonText = "Cancel") => true;
+            string cancelButtonText = "Cancel") => ConfirmResult;
     }
 
     private sealed class TestMediaFiles : IDisposable
@@ -595,6 +742,8 @@ public sealed class MainWindowVideoPreviewTests
             File.WriteAllBytes(path, [1, 2, 3, 4]);
             return path;
         }
+
+        public string PathFor(string fileName) => Path.Combine(_root, fileName);
 
         public void Dispose()
         {

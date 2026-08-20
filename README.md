@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 8 — Video Preview. GlyphFrame now loads an original frame near the middle of a selected video, supports debounced random-access seeking, and can symbolize the currently displayed frame through the existing image pipeline. The application uses its validated bundled Windows x64 FFmpeg and ffprobe tools and does not depend on a system media installation. Full video export remains deferred to Phase 9.
+Phase 9 — Streaming Video Export. GlyphFrame can export an entire selected video as a symbolized, video-only MP4 while retaining the Phase 8 middle-frame preview, debounced seeking, and symbolized-frame preview. The application uses its validated bundled Windows x64 FFmpeg and ffprobe tools and does not depend on a system media installation.
 
 ## Platform and target framework
 
@@ -132,7 +132,15 @@ MP4, MOV, MKV, and AVI selections load one original frame near the 50% position 
 
 GlyphFrame maps the normalized slider value to an invariant FFmpeg timestamp when duration is known and backs the `1.0` position away from the duration boundary to request the final available frame. Input paths are passed as individual Unicode-safe process arguments, including spaces, Cyrillic, and mixed-language filenames. FFmpeg selects the first video stream, decodes exactly one display-oriented frame, and writes tightly packed straight-alpha RGBA8888 bytes through an in-memory binary pipe. GlyphFrame validates the exact byte count and takes ownership of the managed buffer; it creates no copied videos or temporary frame files.
 
-`Preview Symbolized Frame` passes the currently displayed owned frame to the same grid, luminance, character-preset, polarity, and SkiaSharp renderer used for images. Moving the slider, selecting other media, or changing a render setting makes the old symbolized frame stale; output-format-only changes do not. Video preview is intentionally one frame at a time—there is no animated playback, sequential frame processing, audio work, or MP4 export in Phase 8.
+`Preview Symbolized Frame` passes the currently displayed owned frame to the same grid, luminance, character-preset, polarity, and SkiaSharp renderer used for images. Moving the slider, selecting other media, or changing a render setting makes the old symbolized frame stale; output-format-only changes do not. Preview remains intentionally one frame at a time—there is no animated playback.
+
+## Streaming video export
+
+Phase 9 opens one long-lived bundled-FFmpeg decoder for the selected video and reads one display-oriented straight-alpha RGBA frame at a time. Each frame passes through the same character preset, font measurement, symbol grid, luminance mapping, color sampling, polarity, and SkiaSharp renderer used by image export. A second long-lived bundled-FFmpeg process receives rendered RGBA frames through stdin with backpressure and writes H.264 at CRF 20, the `medium` preset, and `yuv420p` into an MP4 container.
+
+The source FPS is retained when it is finite, positive, and no greater than 240 FPS; otherwise export uses a deterministic 30 FPS fallback. Because `yuv420p` requires even dimensions, an odd trailing row or column is cropped after rendering—never stretched—while preserving the source aspect ratio to within that single-pixel adjustment.
+
+Export creates one unique partial MP4 beside the requested destination and publishes it only after both FFmpeg processes complete successfully. Failure or cancellation removes the partial file, and overwrite confirmation protects an existing destination. Unicode input and output paths are passed through `ArgumentList`; no temporary PNG, raw-frame, or copied-video files are created. Phase 9 deliberately produces video only with no audio stream. Audio handling arrives in Phase 10, and detailed frame progress, remaining-time estimates, and the complete cancellation presentation arrive in Phase 11.
 
 ## Bundled FFmpeg tools
 
@@ -156,9 +164,10 @@ GlyphFrame resolves these tools relative to the running application directory, n
 
 ## Upcoming phases
 
-- Phases 9–11 add streaming video export, audio, progress, and cancellation using the Phase 7 tool infrastructure and Phase 8 frame pipeline.
+- Phase 10 adds Keep Audio and Remove Audio muxing behavior.
+- Phase 11 adds detailed frame progress, remaining-time estimates, and the complete cancellation experience.
 - Later phases cover error handling, UI polish, comprehensive testing, and portable packaging.
 
 ## Privacy
 
-GlyphFrame is local-only software. It does not upload media and includes no telemetry or analytics. Media input is opened read-only and is never copied, renamed, modified, or deleted. Image pixels and the single current video frame are processed only in memory, and image export writes only to the explicitly selected destination. Settings remain on the current device under the user-local application-data directory; media paths, decoded frames, and media content are not stored in preferences.
+GlyphFrame is local-only software. It does not upload media and includes no telemetry or analytics. Media input is opened read-only and is never copied, renamed, modified, or deleted. Image pixels, preview frames, and sequential video-export frames are processed only in bounded memory; exports write only to the explicitly selected destination. Settings remain on the current device under the user-local application-data directory; media paths, decoded frames, and media content are not stored in preferences.

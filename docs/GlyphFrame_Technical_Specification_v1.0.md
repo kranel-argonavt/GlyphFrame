@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 8 — Video Preview
+Status: Updated through Phase 9 — Streaming Video Export
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -510,12 +510,13 @@ Phase 8 preview behavior:
    -> Convert frame to symbol frame.
    -> Render symbolized frame with SkiaSharp.
    -> Send raw frame to FFmpeg through stdin.
-7. Generate temporary video-only MP4.
-8. If Keep Audio is selected, mux original audio into final MP4.
-9. If Remove Audio is selected, finalize video without audio.
-10. Clean temporary files.
-11. Show completed status.
+7. Close encoder stdin and verify successful FFmpeg completion.
+8. Publish the completed partial MP4 to the requested destination.
+9. Clean partial output after failure or cancellation.
+10. Show the basic completed or failure status.
 ```
+
+Phase 9 always passes `-an` and publishes a video-only MP4. The selected audio preference does not alter Phase 9 output. The Keep Audio and Remove Audio muxing branches below become active in Phase 10.
 
 ### 9.3 Audio Modes
 
@@ -683,7 +684,7 @@ Preview panel behavior:
 - Video selection loads an original frame near the middle, enables the normalized position slider, and displays current/total time when duration is known.
 - Rapid slider changes are coalesced; a superseded or cancelled read never replaces the newest frame and is not shown as an error.
 - Video frame loading and failure states are visually distinct while retaining successfully loaded metadata.
-- `Preview Symbolized Frame` is enabled only after an owned original frame is available; the video export action remains disabled until Phase 9.
+- `Preview Symbolized Frame` is enabled only after an owned original frame is available. In Phase 9, video export is enabled when valid video metadata is selected and no conflicting operation is active.
 
 ### 10.7 Settings Panel
 
@@ -815,7 +816,7 @@ MediaLoaded:
 - Settings enabled.
 - Preview action enabled.
 - Export enabled only when output path is valid.
-- In video mode, the currently resolved original frame and position controls are available while full-video export remains disabled.
+- In video mode, the currently resolved original frame and position controls remain available, and Phase 9 enables video-only MP4 export when its prerequisites are valid.
 
 GeneratingPreview:
 
@@ -1059,16 +1060,21 @@ public interface IImageExporter
 ```csharp
 public interface IVideoEncoder
 {
-    Task EncodeAsync(EncodingJob job, IProgress<ExportProgress> progress, CancellationToken cancellationToken);
+    Task<VideoEncodingResult> EncodeAsync(
+        VideoEncodingJob job,
+        IAsyncEnumerable<RenderedImage> frames,
+        CancellationToken cancellationToken);
 }
 ```
 
 ```csharp
-public interface IExportService
+public interface IVideoExportService
 {
-    Task ExportAsync(ExportJob job, IProgress<ExportProgress> progress, CancellationToken cancellationToken);
+    Task<VideoExportResult> ExportAsync(VideoExportJob job, CancellationToken cancellationToken);
 }
 ```
+
+`ISequentialVideoFrameReader` is separate from the random-access preview reader. It owns one bundled-FFmpeg decoder for the export lifetime and yields exactly one owned display-oriented RGBA8888 frame at a time. `IVideoEncoder` owns one bundled-FFmpeg encoder and awaits every stdin write so pipe backpressure bounds memory. `IVideoExportService` coordinates those contracts with the shared image pipeline and never exposes processes, WPF, or native rendering types through Core.
 
 ## 14. Data Models
 
@@ -1484,13 +1490,17 @@ Tasks:
 
 ### Phase 9 - Streaming Video Export
 
-- Sequential frame-source coordination building on the bundled-FFmpeg process infrastructure.
-- SkiaSharp raw frame output.
-- FFmpeg stdin pipe.
-- H.264 CRF 20.
-- yuv420p.
-- FPS normalization.
-- Partial output handling.
+- One long-lived bundled-FFmpeg decoder emits display-oriented RGBA8888 frames sequentially through stdout.
+- At most the active decoded frame, active rendered frame, and bounded pipe buffers are retained.
+- Every frame uses the shared preset, grid, luminance, color, polarity, and SkiaSharp rendering pipeline.
+- One long-lived bundled-FFmpeg encoder accepts rendered RGBA frames through awaited stdin writes.
+- Output is video-only MP4 using H.264, CRF 20, the `medium` preset, and `yuv420p`.
+- Trustworthy finite source FPS values from `(0, 240]` are retained; unavailable or invalid FPS uses a deterministic 30 FPS fallback.
+- Odd output dimensions crop at most the trailing row or column to satisfy `yuv420p`; frames are never stretched.
+- Unicode input and output paths use `ArgumentList`; neither system `PATH` nor temporary media copies are used.
+- A unique partial MP4 is created in the destination directory, then atomically moved or replaced only after successful completion.
+- Failure and cancellation terminate child processes, preserve an existing destination, and remove partial output.
+- Phase 9 contains no audio stream. Audio muxing remains Phase 10, while detailed progress and remaining-time UX remain Phase 11.
 
 ### Phase 10 - Audio
 

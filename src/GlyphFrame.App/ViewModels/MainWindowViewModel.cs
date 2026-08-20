@@ -20,6 +20,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly IMediaFileDialogService _mediaFileDialogService;
     private readonly IMediaInputService _mediaInputService;
     private readonly IVideoFrameReader _videoFrameReader;
+    private readonly IVideoExportService _videoExportService;
     private readonly IImagePipelineService _imagePipelineService;
     private readonly IImageExporter _imageExporter;
     private readonly IImageSaveDialogService _imageSaveDialogService;
@@ -84,6 +85,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         IMediaFileDialogService mediaFileDialogService,
         IMediaInputService mediaInputService,
         IVideoFrameReader videoFrameReader,
+        IVideoExportService videoExportService,
         IImagePipelineService imagePipelineService,
         IImageExporter imageExporter,
         IImageSaveDialogService imageSaveDialogService,
@@ -97,6 +99,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _mediaFileDialogService = mediaFileDialogService ?? throw new ArgumentNullException(nameof(mediaFileDialogService));
         _mediaInputService = mediaInputService ?? throw new ArgumentNullException(nameof(mediaInputService));
         _videoFrameReader = videoFrameReader ?? throw new ArgumentNullException(nameof(videoFrameReader));
+        _videoExportService = videoExportService ?? throw new ArgumentNullException(nameof(videoExportService));
         _imagePipelineService = imagePipelineService ?? throw new ArgumentNullException(nameof(imagePipelineService));
         _imageExporter = imageExporter ?? throw new ArgumentNullException(nameof(imageExporter));
         _imageSaveDialogService = imageSaveDialogService ?? throw new ArgumentNullException(nameof(imageSaveDialogService));
@@ -123,7 +126,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             AsyncRelayCommandOptions.AllowConcurrentExecutions);
         _browseOutputCommand = new RelayCommand(BrowseOutput, CanBrowseOutput);
         _previewCommand = new AsyncRelayCommand(GeneratePreviewAsync, CanGeneratePreview);
-        _exportCommand = new AsyncRelayCommand(ExportImageAsync, CanExportImage);
+        _exportCommand = new AsyncRelayCommand(ExportAsync, CanExportMedia);
         _cancelExportCommand = new RelayCommand(CancelActiveImageOperation, () => IsExportActive);
         _selectOriginalCommand = new RelayCommand(
             () => PreviewMode = PreviewMode.Original,
@@ -408,7 +411,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public string OutputPathText => _selectedOutputPath
         ?? (IsImageSelected
             ? "Choose a PNG or JPEG destination"
-            : IsVideoSelected ? "Full video export arrives in Phase 9" : "Available after image selection");
+            : IsVideoSelected ? "Choose an MP4 destination" : "Available after media selection");
 
     public string OutputFormatText => _mediaInputState.SelectedMediaType switch
     {
@@ -951,6 +954,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    private Task ExportAsync() => IsVideoSelected ? ExportVideoAsync() : ExportImageAsync();
+
     private async Task ExportImageAsync()
     {
         if (_decodedImage is null
@@ -1071,14 +1076,113 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    private async Task ExportVideoAsync()
+    {
+        if (VideoMetadata is not VideoMetadata metadata)
+        {
+            return;
+        }
+
+        if (!File.Exists(metadata.FilePath))
+        {
+            StatusMessage = "The selected video no longer exists. Choose the video again to continue.";
+            return;
+        }
+
+        string? outputPath = _selectedOutputPath ?? _imageSaveDialogService.SelectVideoOutputFile(metadata.FilePath);
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            return;
+        }
+
+        outputPath = NormalizeVideoOutputExtension(outputPath);
+        string resolvedInput;
+        string resolvedOutput;
+        try
+        {
+            resolvedInput = Path.GetFullPath(metadata.FilePath);
+            resolvedOutput = Path.GetFullPath(outputPath);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            StatusMessage = "The selected video output path is not valid.";
+            return;
+        }
+
+        if (resolvedInput.Equals(resolvedOutput, StringComparison.OrdinalIgnoreCase))
+        {
+            StatusMessage = "Choose a different output file so the source video is not overwritten.";
+            return;
+        }
+
+        bool overwrite = File.Exists(resolvedOutput);
+        if (overwrite && !_userDialogService.Confirm(
+                "Replace existing video?",
+                $"A file named '{Path.GetFileName(resolvedOutput)}' already exists. Replace it with the new symbolized video?",
+                "Replace Video",
+                "Cancel"))
+        {
+            StatusMessage = "Export cancelled. The existing file was not changed.";
+            return;
+        }
+
+        (long operationId, CancellationToken token) = BeginImageOperation(
+            "Exporting video...",
+            "Streaming symbolized frames to a local video-only MP4");
+        try
+        {
+            VideoExportJob job = new(
+                metadata.FilePath,
+                resolvedOutput,
+                metadata,
+                CaptureRenderSettings(),
+                SelectedPreset,
+                overwrite);
+            VideoExportResult result = await _videoExportService.ExportAsync(job, token);
+            if (operationId != _imageOperationId || !ReferenceEquals(metadata, VideoMetadata))
+            {
+                return;
+            }
+
+            if (result.Success)
+            {
+                _selectedOutputPath = resolvedOutput;
+                ExportProgress = 100;
+                OnPropertyChanged(nameof(OutputPathText));
+                StatusMessage = $"Symbolized video exported to {Path.GetFileName(resolvedOutput)} without audio.";
+            }
+            else
+            {
+                StatusMessage = result.UserMessage;
+            }
+        }
+        catch (Exception)
+        {
+            if (operationId == _imageOperationId)
+            {
+                StatusMessage = "GlyphFrame could not export the symbolized video.";
+            }
+        }
+        finally
+        {
+            EndImageOperation(operationId);
+        }
+    }
+
     private void BrowseOutput()
     {
-        string? selected = SelectOutputPath(ResolveImageExportFormat());
+        string? selected = IsVideoSelected
+            ? VideoMetadata is null ? null : _imageSaveDialogService.SelectVideoOutputFile(VideoMetadata.FilePath)
+            : SelectOutputPath(ResolveImageExportFormat());
         if (!string.IsNullOrWhiteSpace(selected))
         {
-            _selectedOutputPath = NormalizeOutputExtension(selected, ResolveImageExportFormat());
+            _selectedOutputPath = IsVideoSelected
+                ? NormalizeVideoOutputExtension(selected)
+                : NormalizeOutputExtension(selected, ResolveImageExportFormat());
             OnPropertyChanged(nameof(OutputPathText));
-            StatusMessage = "Image output destination selected.";
+            StatusMessage = IsVideoSelected
+                ? "Video output destination selected. Phase 9 exports video only, without audio."
+                : "Image output destination selected.";
         }
     }
 
@@ -1123,7 +1227,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private void CancelActiveImageOperation()
     {
         _imageOperationCancellation?.Cancel();
-        StatusMessage = "Cancelling the current image operation...";
+        StatusMessage = IsVideoSelected
+            ? "Cancelling the current video export..."
+            : "Cancelling the current image operation...";
     }
 
     private void CancelImageOperationCore()
@@ -1211,9 +1317,13 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         && !IsVideoFrameLoading
         && !IsExportActive;
 
-    private bool CanExportImage() => IsImageSelected && _imageWorkflowState.CanExport && CanGeneratePreview();
+    private bool CanExportMedia() => IsVideoSelected
+        ? VideoMetadata is not null && !IsLoadingMedia && !IsVideoFrameLoading && !IsExportActive
+        : IsImageSelected && _imageWorkflowState.CanExport && CanGeneratePreview();
 
-    private bool CanBrowseOutput() => IsImageSelected && !IsLoadingMedia && !IsExportActive;
+    private bool CanBrowseOutput() => (IsImageSelected || IsVideoSelected)
+        && !IsLoadingMedia
+        && !IsExportActive;
 
     private void ApplyImmediateFailure(MediaInputResult failure)
     {
@@ -1477,6 +1587,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         return Path.ChangeExtension(path, format == ImageExportFormat.Png ? ".png" : ".jpg");
     }
+
+    private static string NormalizeVideoOutputExtension(string path) =>
+        Path.GetExtension(path).Equals(".mp4", StringComparison.OrdinalIgnoreCase)
+            ? path
+            : Path.ChangeExtension(path, ".mp4");
 
     private static bool IsAbove1080p(int width, int height) => height > width
         ? width > 1080 || height > 1920

@@ -36,4 +36,9 @@ public sealed record ApplicationInfo(string Name, string Description, string Sta
         "GlyphFrame",
         "Video & Image to Symbol Converter",
         "Phase 8 - Video Preview");
+
+    public static ApplicationInfo Phase9 { get; } = new(
+        "GlyphFrame",
+        "Video & Image to Symbol Converter",
+        "Phase 9 - Streaming Video Export");
 }

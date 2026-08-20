@@ -55,7 +55,7 @@ public partial class App : Application
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton(ApplicationInfo.Phase8);
+        services.AddSingleton(ApplicationInfo.Phase9);
         services.AddSingleton<IApplicationPaths, ApplicationPaths>();
         services.AddSingleton<ISettingsService, JsonSettingsService>();
         services.AddSingleton<IFolderLauncher, WindowsFolderLauncher>();
@@ -68,6 +68,8 @@ public partial class App : Application
         services.AddSingleton<MetadataExtractorVideoMetadataReader>();
         services.AddSingleton<IVideoMetadataReader, FfprobeVideoMetadataReader>();
         services.AddSingleton<IVideoFrameReader, FfmpegVideoFrameReader>();
+        services.AddSingleton<ISequentialVideoFrameReader, FfmpegSequentialVideoFrameReader>();
+        services.AddSingleton<IVideoEncoder, FfmpegVideoEncoder>();
         services.AddSingleton<IMediaInputService, MediaInputService>();
         services.AddSingleton<ICharacterPresetProvider, CharacterPresetProvider>();
         services.AddSingleton<IImageDecoder, SkiaImageDecoder>();
@@ -78,6 +80,7 @@ public partial class App : Application
         services.AddSingleton<IFrameToSymbolConverter, FrameToSymbolConverter>();
         services.AddSingleton<ISymbolFrameRenderer, SkiaSymbolFrameRenderer>();
         services.AddSingleton<IImagePipelineService, ImagePipelineService>();
+        services.AddSingleton<IVideoExportService, StreamingVideoExportService>();
         services.AddSingleton<IImageExporter, SkiaImageExporter>();
         services.AddSingleton<IAccentThemeService, AccentThemeService>();
         services.AddSingleton<IApplicationSettingsManager, ApplicationSettingsManager>();
