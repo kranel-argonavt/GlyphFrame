@@ -14,6 +14,12 @@ public enum VideoExportErrorCategory
     EncoderStartFailed,
     EncoderWriteFailed,
     EncoderFailed,
+    AudioMetadataUnavailable,
+    AudioProbeFailed,
+    AudioMuxStartFailed,
+    AudioStreamCopyFailed,
+    AudioTranscodeFailed,
+    AudioMuxFailed,
     OutputFinalizationFailed,
     Cancelled,
     UnexpectedFailure

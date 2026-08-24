@@ -3,6 +3,7 @@ using GlyphFrame.Core.Enums;
 using GlyphFrame.Core.Interfaces;
 using GlyphFrame.Core.Models;
 using GlyphFrame.Core.Presets;
+using GlyphFrame.Core.Policies;
 using GlyphFrame.Infrastructure.Ffmpeg;
 using GlyphFrame.Infrastructure.Media;
 using GlyphFrame.Rendering.Conversion;
@@ -34,7 +35,10 @@ public sealed class StreamingVideoExportIntegrationTests
             new FfmpegSequentialVideoFrameReader(locator),
             new FfmpegVideoEncoder(locator),
             pipeline,
-            new OutputDimensionResolver());
+            new OutputDimensionResolver(),
+            new FfprobeAudioStreamProbe(validation, processRunner),
+            new Mp4AudioCompatibilityPolicy(),
+            new FfmpegAudioMuxer(locator));
         CharacterPresetOption preset = new CharacterPresetProvider().Get(CharacterPresetKind.SimpleAscii);
         VideoExportJob job = new(
             input,
@@ -42,7 +46,8 @@ public sealed class StreamingVideoExportIntegrationTests
             inputMetadata,
             new ImageRenderSettings("Consolas", 9, OutputResolution.SameAsSource, SymbolPolarity.LightOnDark),
             preset,
-            Overwrite: false);
+            Overwrite: false,
+            AudioMode: AudioExportMode.RemoveAudio);
 
         VideoExportResult result = await service.ExportAsync(job);
 

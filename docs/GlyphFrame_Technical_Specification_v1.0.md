@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 9 — Streaming Video Export
+Status: Updated through Phase 10 — Audio
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -511,12 +511,15 @@ Phase 8 preview behavior:
    -> Render symbolized frame with SkiaSharp.
    -> Send raw frame to FFmpeg through stdin.
 7. Close encoder stdin and verify successful FFmpeg completion.
-8. Publish the completed partial MP4 to the requested destination.
-9. Clean partial output after failure or cancellation.
-10. Show the basic completed or failure status.
+8. Apply the captured audio mode.
+9. For Remove Audio or a confirmed silent source, publish the video-only partial.
+10. For Keep Audio, map original audio into a second MP4 partial using video stream copy plus audio copy or AAC fallback.
+11. Publish only the completed final partial to the requested destination.
+12. Clean every intermediate after success, failure, or cancellation.
+13. Show the basic completed or failure status.
 ```
 
-Phase 9 always passes `-an` and publishes a video-only MP4. The selected audio preference does not alter Phase 9 output. The Keep Audio and Remove Audio muxing branches below become active in Phase 10.
+The Phase 9 encoder continues to pass `-an` and creates an authoritative video-only intermediate. Phase 10 performs its audio decision only after that intermediate completes and never decodes or re-encodes the symbolized H.264 stream during muxing.
 
 ### 9.3 Audio Modes
 
@@ -529,10 +532,17 @@ Remove Audio
 
 Rules:
 
-- If `Keep Audio` is selected and source audio is compatible, stream copy audio.
-- If `Keep Audio` is selected and source audio is incompatible, transcode to AAC.
+- Audio mode is captured when export begins and settings remain disabled during the operation.
+- `Keep Audio` requires a strict bundled-ffprobe result; unavailable audio metadata fails safely instead of silently dropping a possible stream.
+- AAC is the MVP MP4-compatible stream-copy codec, compared case-insensitively after trimming.
+- If `Keep Audio` is selected and source audio is AAC, use `-c:v copy -c:a copy`.
+- If `Keep Audio` is selected and source audio is incompatible, unknown, or unnamed, use `-c:v copy -c:a aac -b:a 192k -ar 48000 -ac 2`.
 - If source video has no audio, export a no-audio MP4 and show no failure.
 - If `Remove Audio` is selected, final MP4 must contain no audio stream.
+- Map the completed symbolized video as `0:v:0` and original source audio as `1:a:0`.
+- The rendered frame count divided by normalized FPS is the authoritative duration. Apply it as the output duration cap without `-shortest`: shorter audio may end naturally, while longer audio must not extend the completed video.
+- Stream-copy, AAC fallback, no-source-audio, and removed-audio outcomes are reported distinctly.
+- Video-only and mux partials live beside the destination, remain unpublished until complete success, and are cleaned on every failure or cancellation path.
 
 ## 10. UI Specification
 
@@ -816,7 +826,7 @@ MediaLoaded:
 - Settings enabled.
 - Preview action enabled.
 - Export enabled only when output path is valid.
-- In video mode, the currently resolved original frame and position controls remain available, and Phase 9 enables video-only MP4 export when its prerequisites are valid.
+- In video mode, the currently resolved original frame and position controls remain available, and Phase 10 enables MP4 export with the captured Keep Audio or Remove Audio choice when prerequisites are valid.
 
 GeneratingPreview:
 
@@ -969,6 +979,8 @@ FrameToSymbolConverter
 SkiaSymbolFrameRenderer
 ImageExporter
 StreamingVideoEncoder
+AudioStreamProbe
+AudioCompatibilityPolicy
 AudioMuxer
 ExportService
 FfmpegProcessRunner
@@ -1306,6 +1318,9 @@ GlyphFrame must:
 - Serialize random-access FFmpeg extractions, debounce slider input, and reject late results with generation identifiers in addition to cancellation.
 - Bound extraction time, RGBA stdout, and stderr; terminate the process tree on timeout or cancellation.
 - Never retain process handles, pipe buffers, or source-file handles after a frame read completes.
+- Probe Keep Audio strictly with bundled ffprobe; never treat unknown audio presence as confirmed silence.
+- Preserve the already encoded symbolized H.264 stream with `-c:v copy` during audio muxing.
+- Bound mux stderr and completion time, terminate the process tree on cancellation, and clean both video and audio partials.
 
 ## 19. Testing Requirements
 
@@ -1348,6 +1363,8 @@ Minimum test matrix:
 - Start, middle, near-end, short-video, normalized-clamping, owned-buffer, channel-order, cancellation, and file-lock frame-reader behavior.
 - Middle-frame ViewModel loading, retryable failure, slider visibility, seek coalescing, latest-request-wins, and media-switch races.
 - Video symbolization from the displayed frame plus stale identity after frame, media, or render-setting changes.
+- Strict audio-present/no-audio/probe-failure behavior, compatible-codec policy, AAC fallback, mux arguments, process lifecycle, and cleanup.
+- Real bundled-FFmpeg Keep Audio stream-copy, incompatible-audio AAC fallback, Remove Audio, silent-source, short-audio, and long-audio export fixtures.
 - Debug, Release, and publish inclusion of FFmpeg, ffprobe, checksums, licenses, and third-party notices with no obsolete video-decoder native assets.
 
 ## 20. Packaging Requirements
@@ -1500,16 +1517,17 @@ Tasks:
 - Unicode input and output paths use `ArgumentList`; neither system `PATH` nor temporary media copies are used.
 - A unique partial MP4 is created in the destination directory, then atomically moved or replaced only after successful completion.
 - Failure and cancellation terminate child processes, preserve an existing destination, and remove partial output.
-- Phase 9 contains no audio stream. Audio muxing remains Phase 10, while detailed progress and remaining-time UX remain Phase 11.
+- The Phase 9 encoder remains the video-only foundation. Phase 10 muxes audio afterward without re-encoding video; detailed progress and remaining-time UX remain Phase 11.
 
 ### Phase 10 - Audio
 
-- Keep Audio.
-- Remove Audio.
-- Stream copy when compatible.
-- AAC fallback.
-- No-audio handling.
-- Final muxing.
+- Capture Keep Audio or Remove Audio when export begins.
+- Confirm source audio with bundled ffprobe; uncertain probe results fail safely.
+- Stream-copy AAC into MP4; transcode incompatible or unknown codecs to AAC at 192 kb/s, 48 kHz stereo.
+- Keep the completed symbolized H.264 video unchanged with `-c:v copy`.
+- Allow shorter audio to end naturally and cap longer audio at the authoritative rendered-video duration without `-shortest`.
+- Publish a silent result successfully when the source has no audio or Remove Audio is selected.
+- Use separate video-only and mux partials, atomically publish only complete output, and preserve existing destinations on failure or cancellation.
 
 ### Phase 11 - Progress and Cancellation
 
@@ -1661,9 +1679,13 @@ MVP is accepted when all criteria below are met.
 ### 22.7 Audio
 
 - Keep Audio preserves audio when source audio exists.
-- Incompatible source audio falls back to AAC.
+- AAC source audio is stream-copied and the symbolized H.264 video is never re-encoded.
+- Incompatible or unknown source audio falls back to AAC at 192 kb/s, 48 kHz stereo.
 - Remove Audio produces an MP4 without audio.
 - Source videos without audio export successfully.
+- Keep Audio fails safely when bundled ffprobe cannot reliably determine audio presence.
+- Shorter audio does not truncate video; longer audio is capped at the completed symbolized-video duration.
+- Both video-only and mux partials are cleaned and an existing destination survives failure or cancellation.
 
 ### 22.8 Progress and Cancel
 

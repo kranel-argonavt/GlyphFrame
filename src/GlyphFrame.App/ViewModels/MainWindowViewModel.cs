@@ -1128,16 +1128,20 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         (long operationId, CancellationToken token) = BeginImageOperation(
             "Exporting video...",
-            "Streaming symbolized frames to a local video-only MP4");
+            SelectedAudioMode == AudioExportMode.KeepAudio
+                ? "Streaming symbolized frames and preserving source audio locally"
+                : "Streaming symbolized frames to a local video-only MP4");
         try
         {
+            AudioExportMode capturedAudioMode = SelectedAudioMode;
             VideoExportJob job = new(
                 metadata.FilePath,
                 resolvedOutput,
                 metadata,
                 CaptureRenderSettings(),
                 SelectedPreset,
-                overwrite);
+                overwrite,
+                capturedAudioMode);
             VideoExportResult result = await _videoExportService.ExportAsync(job, token);
             if (operationId != _imageOperationId || !ReferenceEquals(metadata, VideoMetadata))
             {
@@ -1149,7 +1153,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 _selectedOutputPath = resolvedOutput;
                 ExportProgress = 100;
                 OnPropertyChanged(nameof(OutputPathText));
-                StatusMessage = $"Symbolized video exported to {Path.GetFileName(resolvedOutput)} without audio.";
+                StatusMessage = $"{result.UserMessage} Output: {Path.GetFileName(resolvedOutput)}";
             }
             else
             {
@@ -1181,7 +1185,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 : NormalizeOutputExtension(selected, ResolveImageExportFormat());
             OnPropertyChanged(nameof(OutputPathText));
             StatusMessage = IsVideoSelected
-                ? "Video output destination selected. Phase 9 exports video only, without audio."
+                ? SelectedAudioMode == AudioExportMode.KeepAudio
+                    ? "Video output destination selected. Source audio will be preserved when available."
+                    : "Video output destination selected. The exported video will not contain audio."
                 : "Image output destination selected.";
         }
     }

@@ -4,6 +4,7 @@ using GlyphFrame.Core.Interfaces;
 using GlyphFrame.Core.Models;
 using GlyphFrame.Infrastructure.Media;
 using GlyphFrame.Rendering.Grid;
+using GlyphFrame.Core.Policies;
 using GlyphFrame.Tests.TestInfrastructure;
 
 namespace GlyphFrame.Tests;
@@ -237,21 +238,261 @@ public sealed class StreamingVideoExportServiceTests
         AssertNoExportArtifacts(media.RootPath);
     }
 
+    [Fact]
+    public async Task ExportAsync_RemoveAudioSkipsProbeAndMuxAndReportsRemoved()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-audio-aac.mp4");
+        string output = Path.Combine(media.RootPath, "removed.mp4");
+        FakeAudioProbe probe = new(AudioProbeResult.Present(new AudioStreamInfo("aac", 48_000, 1, null, null)));
+        FakeAudioMuxer muxer = new();
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 2),
+            new RecordingEncoder(writePartial: true),
+            new RecordingPipeline(),
+            probe,
+            muxer);
+
+        VideoExportResult result = await service.ExportAsync(Job(
+            input,
+            output,
+            overwrite: false,
+            audioMode: AudioExportMode.RemoveAudio));
+
+        Assert.True(result.Success);
+        Assert.Equal(AudioMuxOutcome.Removed, result.AudioOutcome);
+        Assert.Equal(0, probe.Calls);
+        Assert.Equal(0, muxer.Calls);
+        AssertNoExportArtifacts(media.RootPath);
+    }
+
+    [Fact]
+    public async Task ExportAsync_KeepAudioWithoutSourceAudioSkipsMuxAndReportsNoSourceAudio()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-preview.mp4");
+        string output = Path.Combine(media.RootPath, "silent.mp4");
+        FakeAudioProbe probe = new(AudioProbeResult.Absent());
+        FakeAudioMuxer muxer = new();
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 2),
+            new RecordingEncoder(writePartial: true),
+            new RecordingPipeline(),
+            probe,
+            muxer);
+
+        VideoExportResult result = await service.ExportAsync(Job(
+            input,
+            output,
+            overwrite: false,
+            audioMode: AudioExportMode.KeepAudio));
+
+        Assert.True(result.Success);
+        Assert.Equal(AudioMuxOutcome.NoSourceAudio, result.AudioOutcome);
+        Assert.Equal(1, probe.Calls);
+        Assert.Equal(0, muxer.Calls);
+        AssertNoExportArtifacts(media.RootPath);
+    }
+
+    [Theory]
+    [InlineData("aac", AudioMuxStrategy.StreamCopy, AudioMuxOutcome.StreamCopied)]
+    [InlineData("pcm_s16le", AudioMuxStrategy.TranscodeToAac, AudioMuxOutcome.TranscodedToAac)]
+    [InlineData(null, AudioMuxStrategy.TranscodeToAac, AudioMuxOutcome.TranscodedToAac)]
+    public async Task ExportAsync_KeepAudioUsesCentralPolicyMuxesOnceAndEncodesVideoOnce(
+        string? codec,
+        AudioMuxStrategy expectedStrategy,
+        AudioMuxOutcome expectedOutcome)
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-audio-aac.mp4");
+        string output = Path.Combine(media.RootPath, "kept.mp4");
+        RecordingEncoder encoder = new(writePartial: true);
+        FakeAudioProbe probe = new(AudioProbeResult.Present(new AudioStreamInfo(codec, 48_000, 1, null, null)));
+        FakeAudioMuxer muxer = new();
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 12),
+            encoder,
+            new RecordingPipeline(),
+            probe,
+            muxer);
+
+        VideoExportResult result = await service.ExportAsync(Job(
+            input,
+            output,
+            overwrite: false,
+            audioMode: AudioExportMode.KeepAudio));
+
+        Assert.True(result.Success, result.TechnicalDetail ?? result.UserMessage);
+        Assert.Equal(expectedOutcome, result.AudioOutcome);
+        Assert.Equal(1, encoder.Calls);
+        Assert.Equal(1, muxer.Calls);
+        Assert.Equal(expectedStrategy, muxer.LastJob!.Strategy);
+        Assert.Equal(TimeSpan.FromSeconds(1.2), muxer.LastJob.VideoDuration);
+        Assert.Equal(input, muxer.LastJob.SourceMediaPath);
+        AssertNoExportArtifacts(media.RootPath);
+    }
+
+    [Fact]
+    public async Task ExportAsync_AudioProbeFailureAfterEncodingDoesNotPublishVideoOnlyIntermediate()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-audio-aac.mp4");
+        string output = Path.Combine(media.RootPath, "existing.mp4");
+        await File.WriteAllBytesAsync(output, [8, 8, 8]);
+        FakeAudioProbe probe = new(AudioProbeResult.Failure("friendly probe failure", "probe detail"));
+        FakeAudioMuxer muxer = new();
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 2),
+            new RecordingEncoder(writePartial: true),
+            new RecordingPipeline(),
+            probe,
+            muxer);
+
+        VideoExportResult result = await service.ExportAsync(Job(
+            input,
+            output,
+            overwrite: true,
+            audioMode: AudioExportMode.KeepAudio));
+
+        Assert.Equal(VideoExportErrorCategory.AudioProbeFailed, result.ErrorCategory);
+        Assert.Equal([8, 8, 8], await File.ReadAllBytesAsync(output));
+        Assert.Equal(0, muxer.Calls);
+        AssertNoExportArtifacts(media.RootPath);
+    }
+
+    [Fact]
+    public async Task ExportAsync_AudioMuxFailurePreservesDestinationAndCleansBothPartials()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-audio-aac.mp4");
+        string output = Path.Combine(media.RootPath, "existing.mp4");
+        await File.WriteAllBytesAsync(output, [5, 5, 5]);
+        FakeAudioMuxer muxer = new()
+        {
+            Result = AudioMuxResult.Failure(
+                VideoExportErrorCategory.AudioStreamCopyFailed,
+                "friendly copy failure",
+                "copy detail")
+        };
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 2),
+            new RecordingEncoder(writePartial: true),
+            new RecordingPipeline(),
+            new FakeAudioProbe(AudioProbeResult.Present(new AudioStreamInfo("aac", 48_000, 1, null, null))),
+            muxer);
+
+        VideoExportResult result = await service.ExportAsync(Job(
+            input,
+            output,
+            overwrite: true,
+            audioMode: AudioExportMode.KeepAudio));
+
+        Assert.Equal(VideoExportErrorCategory.AudioStreamCopyFailed, result.ErrorCategory);
+        Assert.Equal([5, 5, 5], await File.ReadAllBytesAsync(output));
+        AssertNoExportArtifacts(media.RootPath);
+    }
+
+    [Fact]
+    public async Task ExportAsync_CancellationBeforeMuxDoesNotPublishVideoIntermediate()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-audio-aac.mp4");
+        string output = Path.Combine(media.RootPath, "cancel-before-mux.mp4");
+        FakeAudioProbe probe = new(AudioProbeResult.Present(new AudioStreamInfo("aac", 48_000, 1, null, null)))
+        {
+            Cancel = true
+        };
+        FakeAudioMuxer muxer = new();
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 2),
+            new RecordingEncoder(writePartial: true),
+            new RecordingPipeline(),
+            probe,
+            muxer);
+
+        VideoExportResult result = await service.ExportAsync(Job(
+            input,
+            output,
+            overwrite: false,
+            audioMode: AudioExportMode.KeepAudio));
+
+        Assert.Equal(VideoExportStatus.Cancelled, result.Status);
+        Assert.Equal(0, muxer.Calls);
+        Assert.False(File.Exists(output));
+        AssertNoExportArtifacts(media.RootPath);
+    }
+
+    [Fact]
+    public async Task ExportAsync_CancellationDuringMuxPreservesDestinationAndCleansBothPartials()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-audio-aac.mp4");
+        string output = Path.Combine(media.RootPath, "existing.mp4");
+        await File.WriteAllBytesAsync(output, [6, 6, 6]);
+        FakeAudioMuxer muxer = new() { Cancel = true };
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 2),
+            new RecordingEncoder(writePartial: true),
+            new RecordingPipeline(),
+            new FakeAudioProbe(AudioProbeResult.Present(new AudioStreamInfo("aac", 48_000, 1, null, null))),
+            muxer);
+
+        VideoExportResult result = await service.ExportAsync(Job(
+            input,
+            output,
+            overwrite: true,
+            audioMode: AudioExportMode.KeepAudio));
+
+        Assert.Equal(VideoExportStatus.Cancelled, result.Status);
+        Assert.Equal([6, 6, 6], await File.ReadAllBytesAsync(output));
+        AssertNoExportArtifacts(media.RootPath);
+    }
+
+    [Fact]
+    public async Task ExportAsync_CancellationAfterSuccessfulMuxDoesNotPublishOutput()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-audio-aac.mp4");
+        string output = Path.Combine(media.RootPath, "cancelled.mp4");
+        using CancellationTokenSource cancellation = new();
+        FakeAudioMuxer muxer = new() { BeforeReturn = cancellation.Cancel };
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 2),
+            new RecordingEncoder(writePartial: true),
+            new RecordingPipeline(),
+            new FakeAudioProbe(AudioProbeResult.Present(new AudioStreamInfo("aac", 48_000, 1, null, null))),
+            muxer);
+
+        VideoExportResult result = await service.ExportAsync(
+            Job(input, output, overwrite: false, audioMode: AudioExportMode.KeepAudio),
+            cancellation.Token);
+
+        Assert.Equal(VideoExportStatus.Cancelled, result.Status);
+        Assert.False(File.Exists(output));
+        AssertNoExportArtifacts(media.RootPath);
+    }
+
     private static StreamingVideoExportService CreateService(
         ISequentialVideoFrameReader reader,
         IVideoEncoder encoder,
-        IImagePipelineService pipeline) => new(
+        IImagePipelineService pipeline,
+        IAudioStreamProbe? audioProbe = null,
+        IAudioMuxer? audioMuxer = null) => new(
             reader,
             encoder,
             pipeline,
-            new OutputDimensionResolver());
+            new OutputDimensionResolver(),
+            audioProbe ?? new FakeAudioProbe(AudioProbeResult.Absent()),
+            new Mp4AudioCompatibilityPolicy(),
+            audioMuxer ?? new FakeAudioMuxer());
 
     private static VideoExportJob Job(
         string input,
         string output,
         bool overwrite,
         int width = 64,
-        int height = 48) => new(
+        int height = 48,
+        AudioExportMode audioMode = AudioExportMode.RemoveAudio) => new(
             input,
             output,
             new VideoMetadata(
@@ -270,7 +511,8 @@ public sealed class StreamingVideoExportServiceTests
                 48_000),
             ImageRenderSettings.Default,
             CharacterPresetOption.Default,
-            overwrite);
+            overwrite,
+            audioMode);
 
     private static void AssertNoExportArtifacts(string directory)
     {
@@ -393,6 +635,57 @@ public sealed class StreamingVideoExportServiceTests
 
             BeforeReturn?.Invoke();
             return Result ?? new VideoEncodingResult(true, count);
+        }
+    }
+
+    private sealed class FakeAudioProbe(AudioProbeResult result) : IAudioStreamProbe
+    {
+        public bool Cancel { get; init; }
+
+        public int Calls { get; private set; }
+
+        public Task<AudioProbeResult> ProbeAsync(
+            string inputPath,
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Cancel)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            return Task.FromResult(result);
+        }
+    }
+
+    private sealed class FakeAudioMuxer : IAudioMuxer
+    {
+        public AudioMuxResult? Result { get; init; }
+
+        public bool Cancel { get; init; }
+
+        public Action? BeforeReturn { get; init; }
+
+        public int Calls { get; private set; }
+
+        public AudioMuxJob? LastJob { get; private set; }
+
+        public Task<AudioMuxResult> MuxAsync(
+            AudioMuxJob job,
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            LastJob = job;
+            File.WriteAllBytes(job.OutputPath, [4, 5, 6]);
+            if (Cancel)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            BeforeReturn?.Invoke();
+            AudioMuxResult resolved = Result ?? AudioMuxResult.Completed(job.Strategy);
+            return Task.FromResult(resolved);
         }
     }
 }

@@ -63,6 +63,7 @@ public sealed class MainWindowVideoPreviewTests
             10));
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        viewModel.SelectedAudioMode = AudioExportMode.RemoveAudio;
 
         await viewModel.ExportCommand.ExecuteAsync(null);
 
@@ -70,10 +71,42 @@ public sealed class MainWindowVideoPreviewTests
         Assert.Equal(videoPath, harness.VideoExports.LastJob!.InputPath);
         Assert.Equal(outputPath, harness.VideoExports.LastJob.OutputPath);
         Assert.Equal(viewModel.SelectedPreset, harness.VideoExports.LastJob.CharacterPreset);
+        Assert.Equal(AudioExportMode.RemoveAudio, harness.VideoExports.LastJob.AudioMode);
         Assert.Equal(100, viewModel.ExportProgress);
         Assert.False(viewModel.IsExportActive);
         Assert.Contains("without audio", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(outputPath, viewModel.OutputPathText);
+    }
+
+    [Theory]
+    [InlineData(AudioMuxOutcome.Removed, "without audio")]
+    [InlineData(AudioMuxOutcome.NoSourceAudio, "source contained no audio")]
+    [InlineData(AudioMuxOutcome.StreamCopied, "original audio")]
+    [InlineData(AudioMuxOutcome.TranscodedToAac, "converted to AAC")]
+    public async Task VideoExport_SuccessMessageDistinguishesAudioOutcome(
+        AudioMuxOutcome outcome,
+        string expectedMessage)
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("audio-outcome.mp4");
+        string outputPath = files.PathFor("audio-outcome-output.mp4");
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = outputPath;
+        harness.VideoExports.Handler = (job, _) => Task.FromResult(VideoExportResult.Completed(
+            job.OutputPath,
+            12,
+            new PixelDimensions(64, 48),
+            10,
+            outcome));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+
+        await viewModel.ExportCommand.ExecuteAsync(null);
+
+        Assert.Contains(expectedMessage, viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.False(viewModel.IsExportActive);
+        Assert.True(viewModel.ExportCommand.CanExecute(null));
     }
 
     [Fact]
@@ -135,6 +168,42 @@ public sealed class MainWindowVideoPreviewTests
         await export;
         Assert.False(viewModel.IsExportActive);
         Assert.True(viewModel.ExportCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task VideoExport_CapturesAudioModeBeforeAsynchronousExportBegins()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("capture-audio.mp4");
+        string outputPath = files.PathFor("capture-audio-output.mp4");
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = outputPath;
+        TaskCompletionSource<object?> started = NewCompletion<object?>();
+        TaskCompletionSource<VideoExportResult> completion = NewCompletion<VideoExportResult>();
+        harness.VideoExports.Handler = (_, _) =>
+        {
+            started.TrySetResult(null);
+            return completion.Task;
+        };
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        viewModel.SelectedAudioMode = AudioExportMode.KeepAudio;
+
+        Task export = viewModel.ExportCommand.ExecuteAsync(null);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        viewModel.SelectedAudioMode = AudioExportMode.RemoveAudio;
+
+        Assert.Equal(AudioExportMode.KeepAudio, harness.VideoExports.LastJob!.AudioMode);
+        Assert.False(viewModel.AreSettingsEnabled);
+        completion.SetResult(VideoExportResult.Completed(
+            outputPath,
+            12,
+            new PixelDimensions(64, 48),
+            10,
+            AudioMuxOutcome.StreamCopied));
+        await export;
+        Assert.False(viewModel.IsExportActive);
     }
 
     [Fact]
@@ -556,7 +625,7 @@ public sealed class MainWindowVideoPreviewTests
         public MainWindowViewModel CreateViewModel(
             IVideoFrameReader? videoFrameReader = null,
             bool allowNull = false) => new(
-            ApplicationInfo.Phase9,
+            ApplicationInfo.Phase10,
             new FakeSettingsManager(),
             new FakeSettingsDialogService(),
             new FakeMediaDialogService(),

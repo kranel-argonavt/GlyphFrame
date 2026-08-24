@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 9 — Streaming Video Export. GlyphFrame can export an entire selected video as a symbolized, video-only MP4 while retaining the Phase 8 middle-frame preview, debounced seeking, and symbolized-frame preview. The application uses its validated bundled Windows x64 FFmpeg and ffprobe tools and does not depend on a system media installation.
+Phase 10 — Audio. GlyphFrame can export an entire selected video as a symbolized H.264 MP4 and either remove audio or preserve it through MP4-compatible stream copy with deterministic AAC fallback. Phase 8 preview and Phase 9 bounded streaming behavior remain unchanged. The application uses its validated bundled Windows x64 FFmpeg and ffprobe tools and does not depend on a system media installation.
 
 ## Platform and target framework
 
@@ -25,7 +25,7 @@ Phase 9 — Streaming Video Export. GlyphFrame can export an entire selected vid
 - System.Text.Json
 - MetadataExtractor 2.9.3 for managed image, MP4, MOV, and AVI metadata
 - SkiaSharp 4.150.1 with matching Win32 native assets for image decoding, glyph measurement, symbol rendering, and image encoding
-- FFmpeg and ffprobe 9.0 essentials build for Unicode-safe local frame extraction, metadata probing, and future video phases
+- FFmpeg and ffprobe 9.0 essentials build for Unicode-safe local frame extraction, metadata probing, streaming MP4 encoding, and audio muxing
 - xUnit
 
 MetadataExtractor is an Apache-2.0 package used only by `GlyphFrame.Infrastructure` for header metadata. MKV metadata is read by a bounded internal EBML header reader that skips media clusters. SkiaSharp and its Windows native assets are MIT-licensed and isolated to `GlyphFrame.Rendering`. Video-frame decoding uses the same checksum-verified bundled FFmpeg distribution as the other video infrastructure, with no additional native decoding package.
@@ -134,13 +134,15 @@ GlyphFrame maps the normalized slider value to an invariant FFmpeg timestamp whe
 
 `Preview Symbolized Frame` passes the currently displayed owned frame to the same grid, luminance, character-preset, polarity, and SkiaSharp renderer used for images. Moving the slider, selecting other media, or changing a render setting makes the old symbolized frame stale; output-format-only changes do not. Preview remains intentionally one frame at a time—there is no animated playback.
 
-## Streaming video export
+## Streaming video and audio export
 
-Phase 9 opens one long-lived bundled-FFmpeg decoder for the selected video and reads one display-oriented straight-alpha RGBA frame at a time. Each frame passes through the same character preset, font measurement, symbol grid, luminance mapping, color sampling, polarity, and SkiaSharp renderer used by image export. A second long-lived bundled-FFmpeg process receives rendered RGBA frames through stdin with backpressure and writes H.264 at CRF 20, the `medium` preset, and `yuv420p` into an MP4 container.
+The Phase 9 foundation opens one long-lived bundled-FFmpeg decoder for the selected video and reads one display-oriented straight-alpha RGBA frame at a time. Each frame passes through the same character preset, font measurement, symbol grid, luminance mapping, color sampling, polarity, and SkiaSharp renderer used by image export. A second long-lived bundled-FFmpeg process receives rendered RGBA frames through stdin with backpressure and writes video-only H.264 at CRF 20, the `medium` preset, and `yuv420p` into an MP4 intermediate.
 
 The source FPS is retained when it is finite, positive, and no greater than 240 FPS; otherwise export uses a deterministic 30 FPS fallback. Because `yuv420p` requires even dimensions, an odd trailing row or column is cropped after rendering—never stretched—while preserving the source aspect ratio to within that single-pixel adjustment.
 
-Export creates one unique partial MP4 beside the requested destination and publishes it only after both FFmpeg processes complete successfully. Failure or cancellation removes the partial file, and overwrite confirmation protects an existing destination. Unicode input and output paths are passed through `ArgumentList`; no temporary PNG, raw-frame, or copied-video files are created. Phase 9 deliberately produces video only with no audio stream. Audio handling arrives in Phase 10, and detailed frame progress, remaining-time estimates, and the complete cancellation presentation arrive in Phase 11.
+Phase 10 captures the selected `Keep Audio` or `Remove Audio` mode when export starts. Remove Audio publishes the completed video-only intermediate directly. Keep Audio runs a strict bundled-ffprobe check: a confirmed silent source also publishes video-only, AAC is stream-copied into MP4, and incompatible or unknown codecs are converted to AAC at 192 kb/s, 48 kHz stereo. Muxing always uses `-c:v copy`, so the symbolized H.264 stream is never encoded again.
+
+The rendered frame count and normalized FPS define the authoritative video duration. FFmpeg maps the completed symbolized video plus the original audio, applies that duration as an output cap without `-shortest`, allows shorter audio to end naturally, and prevents longer audio from extending the MP4. Video and audio partials are unique files beside the destination; only a fully completed result is atomically published. Failure or cancellation removes both partials and preserves an existing destination. Unicode paths use `ArgumentList`; no temporary PNG, raw-frame, copied-source, or copied-video files are created. Detailed frame progress, remaining-time estimates, and the complete cancellation presentation remain Phase 11.
 
 ## Bundled FFmpeg tools
 
@@ -164,7 +166,6 @@ GlyphFrame resolves these tools relative to the running application directory, n
 
 ## Upcoming phases
 
-- Phase 10 adds Keep Audio and Remove Audio muxing behavior.
 - Phase 11 adds detailed frame progress, remaining-time estimates, and the complete cancellation experience.
 - Later phases cover error handling, UI polish, comprehensive testing, and portable packaging.
 

@@ -9,7 +9,10 @@ public sealed class StreamingVideoExportService(
     ISequentialVideoFrameReader frameReader,
     IVideoEncoder encoder,
     IImagePipelineService imagePipeline,
-    IOutputDimensionResolver dimensionResolver) : IVideoExportService
+    IOutputDimensionResolver dimensionResolver,
+    IAudioStreamProbe audioProbe,
+    IAudioCompatibilityPolicy audioCompatibilityPolicy,
+    IAudioMuxer audioMuxer) : IVideoExportService
 {
     private readonly ISequentialVideoFrameReader _frameReader = frameReader
         ?? throw new ArgumentNullException(nameof(frameReader));
@@ -18,16 +21,28 @@ public sealed class StreamingVideoExportService(
         ?? throw new ArgumentNullException(nameof(imagePipeline));
     private readonly IOutputDimensionResolver _dimensionResolver = dimensionResolver
         ?? throw new ArgumentNullException(nameof(dimensionResolver));
+    private readonly IAudioCompatibilityPolicy _audioCompatibilityPolicy = audioCompatibilityPolicy
+        ?? throw new ArgumentNullException(nameof(audioCompatibilityPolicy));
+    private readonly IAudioMuxer _audioMuxer = audioMuxer ?? throw new ArgumentNullException(nameof(audioMuxer));
+    private readonly IAudioStreamProbe _audioProbe = audioProbe ?? throw new ArgumentNullException(nameof(audioProbe));
 
     public async Task<VideoExportResult> ExportAsync(
         VideoExportJob job,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(job);
-        string? partialPath = null;
+        string? videoPartialPath = null;
+        string? muxPartialPath = null;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!Enum.IsDefined(job.AudioMode))
+            {
+                throw new VideoExportException(
+                    VideoExportErrorCategory.InvalidInput,
+                    "The selected audio export mode is not supported.");
+            }
+
             (string inputPath, string outputPath) = ValidatePaths(job);
             PixelDimensions sourceDimensions = ResolveSourceDimensions(job.Metadata);
             PixelDimensions requestedDimensions = _dimensionResolver.Resolve(
@@ -35,10 +50,10 @@ public sealed class StreamingVideoExportService(
                 job.RenderSettings.OutputResolution);
             PixelDimensions outputDimensions = VideoExportPolicy.NormalizeForYuv420(requestedDimensions);
             double framesPerSecond = VideoExportPolicy.NormalizeFramesPerSecond(job.Metadata.Fps);
-            partialPath = CreatePartialPath(outputPath);
+            videoPartialPath = CreatePartialPath(outputPath, "video");
 
             SequentialVideoDecodeJob decodeJob = new(inputPath, sourceDimensions);
-            VideoEncodingJob encodingJob = new(partialPath, outputDimensions, framesPerSecond);
+            VideoEncodingJob encodingJob = new(videoPartialPath, outputDimensions, framesPerSecond);
             IAsyncEnumerable<RenderedImage> frames = RenderFramesAsync(
                 decodeJob,
                 outputDimensions,
@@ -61,13 +76,73 @@ public sealed class StreamingVideoExportService(
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            FinalizeOutput(partialPath, outputPath, job.Overwrite);
-            partialPath = null;
+            AudioMuxOutcome audioOutcome = AudioMuxOutcome.Removed;
+            string publicationPath = videoPartialPath;
+            if (job.AudioMode == AudioExportMode.KeepAudio)
+            {
+                AudioProbeResult probe = await _audioProbe.ProbeAsync(inputPath, cancellationToken)
+                    .ConfigureAwait(false);
+                if (!probe.Success)
+                {
+                    return VideoExportResult.Failure(
+                        probe.ErrorCategory == VideoExportErrorCategory.None
+                            ? VideoExportErrorCategory.AudioProbeFailed
+                            : probe.ErrorCategory,
+                        probe.UserMessage,
+                        probe.TechnicalDetail);
+                }
+
+                if (!probe.HasAudio)
+                {
+                    audioOutcome = AudioMuxOutcome.NoSourceAudio;
+                }
+                else
+                {
+                    AudioMuxStrategy strategy = _audioCompatibilityPolicy.ResolveStrategy(probe.Stream?.CodecName);
+                    TimeSpan videoDuration = ResolveEncodedDuration(encoding.FramesWritten, framesPerSecond);
+                    muxPartialPath = CreatePartialPath(outputPath, "audio");
+                    AudioMuxResult mux = await _audioMuxer.MuxAsync(
+                        new AudioMuxJob(
+                            videoPartialPath,
+                            inputPath,
+                            muxPartialPath,
+                            strategy,
+                            videoDuration),
+                        cancellationToken).ConfigureAwait(false);
+                    if (!mux.Success)
+                    {
+                        return VideoExportResult.Failure(
+                            mux.ErrorCategory,
+                            mux.UserMessage,
+                            mux.TechnicalDetail);
+                    }
+
+                    audioOutcome = mux.Outcome ?? throw new VideoExportException(
+                        VideoExportErrorCategory.AudioMuxFailed,
+                        "GlyphFrame could not determine how source audio was preserved.");
+                    publicationPath = muxPartialPath;
+                    DeleteIntermediateOrThrow(videoPartialPath);
+                    videoPartialPath = null;
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            FinalizeOutput(publicationPath, outputPath, job.Overwrite);
+            if (string.Equals(publicationPath, videoPartialPath, StringComparison.OrdinalIgnoreCase))
+            {
+                videoPartialPath = null;
+            }
+            else
+            {
+                muxPartialPath = null;
+            }
+
             return VideoExportResult.Completed(
                 outputPath,
                 encoding.FramesWritten,
                 outputDimensions,
-                framesPerSecond);
+                framesPerSecond,
+                audioOutcome);
         }
         catch (OperationCanceledException)
         {
@@ -101,7 +176,8 @@ public sealed class StreamingVideoExportService(
         }
         finally
         {
-            DeletePartialFile(partialPath);
+            DeletePartialFile(videoPartialPath);
+            DeletePartialFile(muxPartialPath);
         }
     }
 
@@ -236,11 +312,39 @@ public sealed class StreamingVideoExportService(
         }
     }
 
-    private static string CreatePartialPath(string outputPath)
+    private static string CreatePartialPath(string outputPath, string purpose)
     {
         string directory = Path.GetDirectoryName(outputPath)!;
         string name = Path.GetFileName(outputPath);
-        return Path.Combine(directory, $".{name}.{Guid.NewGuid():N}.partial");
+        return Path.Combine(directory, $".{name}.{purpose}.{Guid.NewGuid():N}.partial");
+    }
+
+    private static TimeSpan ResolveEncodedDuration(long framesWritten, double framesPerSecond)
+    {
+        if (framesWritten <= 0 || !double.IsFinite(framesPerSecond) || framesPerSecond <= 0d)
+        {
+            throw new VideoExportException(
+                VideoExportErrorCategory.AudioMuxFailed,
+                "GlyphFrame could not determine the completed symbolized video's duration.");
+        }
+
+        return TimeSpan.FromSeconds(framesWritten / framesPerSecond);
+    }
+
+    private static void DeleteIntermediateOrThrow(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new VideoExportException(
+                VideoExportErrorCategory.OutputFinalizationFailed,
+                "GlyphFrame could not clean the intermediate video before publishing the final output.",
+                exception.Message,
+                exception);
+        }
     }
 
     private static void FinalizeOutput(string partialPath, string outputPath, bool overwrite)

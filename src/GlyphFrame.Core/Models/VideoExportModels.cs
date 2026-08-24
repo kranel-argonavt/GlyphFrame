@@ -27,7 +27,8 @@ public sealed record VideoExportJob(
     VideoMetadata Metadata,
     ImageRenderSettings RenderSettings,
     CharacterPresetOption CharacterPreset,
-    bool Overwrite);
+    bool Overwrite,
+    AudioExportMode AudioMode);
 
 public sealed record VideoExportResult(
     VideoExportStatus Status,
@@ -37,7 +38,8 @@ public sealed record VideoExportResult(
     string? OutputPath,
     long FramesWritten,
     PixelDimensions? OutputDimensions,
-    double? FramesPerSecond)
+    double? FramesPerSecond,
+    AudioMuxOutcome? AudioOutcome = null)
 {
     public bool Success => Status == VideoExportStatus.Completed;
 
@@ -45,15 +47,17 @@ public sealed record VideoExportResult(
         string outputPath,
         long framesWritten,
         PixelDimensions dimensions,
-        double framesPerSecond) => new(
+        double framesPerSecond,
+        AudioMuxOutcome audioOutcome = AudioMuxOutcome.Removed) => new(
             VideoExportStatus.Completed,
             VideoExportErrorCategory.None,
-            "The symbolized video was exported successfully.",
+            GetCompletedMessage(audioOutcome),
             null,
             outputPath,
             framesWritten,
             dimensions,
-            framesPerSecond);
+            framesPerSecond,
+            audioOutcome);
 
     public static VideoExportResult Failure(
         VideoExportErrorCategory category,
@@ -66,6 +70,7 @@ public sealed record VideoExportResult(
             null,
             0,
             null,
+            null,
             null);
 
     public static VideoExportResult Cancelled() => new(
@@ -76,7 +81,17 @@ public sealed record VideoExportResult(
         null,
         0,
         null,
+        null,
         null);
+
+    private static string GetCompletedMessage(AudioMuxOutcome outcome) => outcome switch
+    {
+        AudioMuxOutcome.Removed => "The symbolized video was exported without audio.",
+        AudioMuxOutcome.NoSourceAudio => "The symbolized video was exported; the source contained no audio.",
+        AudioMuxOutcome.StreamCopied => "The symbolized video was exported with its original audio.",
+        AudioMuxOutcome.TranscodedToAac => "The symbolized video was exported with audio converted to AAC.",
+        _ => throw new ArgumentOutOfRangeException(nameof(outcome))
+    };
 }
 
 public sealed class VideoExportException : Exception

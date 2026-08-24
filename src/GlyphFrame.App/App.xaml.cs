@@ -6,6 +6,7 @@ using GlyphFrame.Core.Interfaces;
 using GlyphFrame.Core.Media;
 using GlyphFrame.Core.Models;
 using GlyphFrame.Core.Presets;
+using GlyphFrame.Core.Policies;
 using GlyphFrame.Infrastructure.Media;
 using GlyphFrame.Infrastructure.Ffmpeg;
 using GlyphFrame.Infrastructure.Paths;
@@ -55,7 +56,7 @@ public partial class App : Application
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton(ApplicationInfo.Phase9);
+        services.AddSingleton(ApplicationInfo.Phase10);
         services.AddSingleton<IApplicationPaths, ApplicationPaths>();
         services.AddSingleton<ISettingsService, JsonSettingsService>();
         services.AddSingleton<IFolderLauncher, WindowsFolderLauncher>();
@@ -70,6 +71,9 @@ public partial class App : Application
         services.AddSingleton<IVideoFrameReader, FfmpegVideoFrameReader>();
         services.AddSingleton<ISequentialVideoFrameReader, FfmpegSequentialVideoFrameReader>();
         services.AddSingleton<IVideoEncoder, FfmpegVideoEncoder>();
+        services.AddSingleton<IAudioStreamProbe, FfprobeAudioStreamProbe>();
+        services.AddSingleton<IAudioCompatibilityPolicy, Mp4AudioCompatibilityPolicy>();
+        services.AddSingleton<IAudioMuxer, FfmpegAudioMuxer>();
         services.AddSingleton<IMediaInputService, MediaInputService>();
         services.AddSingleton<ICharacterPresetProvider, CharacterPresetProvider>();
         services.AddSingleton<IImageDecoder, SkiaImageDecoder>();
