@@ -48,13 +48,21 @@ public sealed class StreamingVideoExportIntegrationTests
             preset,
             Overwrite: false,
             AudioMode: AudioExportMode.RemoveAudio);
+        RecordingProgress progress = new();
 
-        VideoExportResult result = await service.ExportAsync(job);
+        VideoExportResult result = await service.ExportAsync(
+            job,
+            CancellationToken.None,
+            progress);
 
         Assert.True(result.Success, result.TechnicalDetail ?? result.UserMessage);
         Assert.Equal(12, result.FramesWritten);
         Assert.Equal(new PixelDimensions(240, 320), result.OutputDimensions);
         Assert.Equal(10, result.FramesPerSecond);
+        Assert.True(progress.Values.Count(update => update.Stage == VideoExportStage.ProcessingFrames) > 2);
+        Assert.Equal(12, progress.Values.Last(update => update.ProcessedFrames > 0).ProcessedFrames);
+        Assert.Equal(VideoExportStage.Completed, progress.Values[^1].Stage);
+        Assert.Equal(100d, progress.Values[^1].Percentage);
         Assert.True(new FileInfo(output).Length > 1_000);
         Assert.Empty(Directory.GetFiles(media.RootPath, "*.partial"));
         Assert.Empty(Directory.GetFiles(media.RootPath, "*.raw"));
@@ -117,6 +125,59 @@ public sealed class StreamingVideoExportIntegrationTests
         using FileStream outputExclusive = new(output, FileMode.Open, FileAccess.Read, FileShare.None);
         Assert.True(inputExclusive.CanRead);
         Assert.True(outputExclusive.CanRead);
+    }
+
+    [Fact]
+    public async Task ExportAsync_RealFfmpegCancellationAfterAcceptedFramesCleansOutputAndReleasesSource()
+    {
+        using TemporaryMediaDirectory media = new("скасування 日本語 测试");
+        string input = media.CopyFixture("video-preview-rotated.mov", "джерело скасування 日本語.MOV");
+        string output = Path.Combine(media.RootPath, "скасований результат 测试.mp4");
+        BundledFfmpegLocator locator = new(RepositoryRoot);
+        ProcessRunner processRunner = new();
+        using FfmpegValidationService validation = new(locator, processRunner);
+        FfprobeVideoMetadataReader metadataReader = new(
+            new MetadataExtractorVideoMetadataReader(),
+            validation,
+            processRunner);
+        VideoMetadata metadata = await metadataReader.ReadAsync(input);
+        StreamingVideoExportService service = new(
+            new FfmpegSequentialVideoFrameReader(locator),
+            new FfmpegVideoEncoder(locator),
+            CreatePipeline(),
+            new OutputDimensionResolver(),
+            new FfprobeAudioStreamProbe(validation, processRunner),
+            new Mp4AudioCompatibilityPolicy(),
+            new FfmpegAudioMuxer(locator));
+        VideoExportJob job = new(
+            input,
+            output,
+            metadata,
+            new ImageRenderSettings("Consolas", 9, OutputResolution.SameAsSource, SymbolPolarity.LightOnDark),
+            new CharacterPresetProvider().Get(CharacterPresetKind.SimpleAscii),
+            Overwrite: false,
+            AudioMode: AudioExportMode.RemoveAudio);
+        using CancellationTokenSource cancellation = new();
+        RecordingProgress progress = new(update =>
+        {
+            if (update.Stage == VideoExportStage.ProcessingFrames && update.ProcessedFrames >= 2)
+            {
+                cancellation.Cancel();
+            }
+        });
+
+        VideoExportResult result = await service.ExportAsync(job, cancellation.Token, progress);
+
+        Assert.Equal(VideoExportStatus.Cancelled, result.Status);
+        Assert.Contains(progress.Values, update => update.ProcessedFrames >= 2);
+        Assert.Equal(VideoExportStage.Cancelling, progress.Values[^1].Stage);
+        Assert.False(File.Exists(output));
+        Assert.Empty(Directory.GetFiles(media.RootPath, "*.partial"));
+        Assert.Empty(Directory.GetFiles(media.RootPath, "*.tmp"));
+        Assert.Empty(Directory.GetFiles(media.RootPath, "*.raw"));
+        Assert.Empty(Directory.GetFiles(media.RootPath, "*.png"));
+        using FileStream inputExclusive = new(input, FileMode.Open, FileAccess.Read, FileShare.None);
+        Assert.True(inputExclusive.CanRead);
     }
 
     private static double RgbMeanAbsoluteError(DecodedImage actual, RenderedImage expected) =>
@@ -201,4 +262,16 @@ public sealed class StreamingVideoExportIntegrationTests
 
     private static string RepositoryRoot => Path.GetFullPath(Path.Combine(
         AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+
+    private sealed class RecordingProgress(Action<VideoExportProgress>? callback = null)
+        : IProgress<VideoExportProgress>
+    {
+        public List<VideoExportProgress> Values { get; } = [];
+
+        public void Report(VideoExportProgress value)
+        {
+            Values.Add(value);
+            callback?.Invoke(value);
+        }
+    }
 }

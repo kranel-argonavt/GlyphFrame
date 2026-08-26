@@ -93,4 +93,14 @@ public sealed class ApplicationInfoTests
         Assert.Equal("Video & Image to Symbol Converter", applicationInfo.Description);
         Assert.Equal("Phase 10 - Audio", applicationInfo.Status);
     }
+
+    [Fact]
+    public void Phase11_ProvidesExpectedApplicationIdentityAndStatus()
+    {
+        ApplicationInfo applicationInfo = ApplicationInfo.Phase11;
+
+        Assert.Equal("GlyphFrame", applicationInfo.Name);
+        Assert.Equal("Video & Image to Symbol Converter", applicationInfo.Description);
+        Assert.Equal("Phase 11 - Progress and Cancellation", applicationInfo.Status);
+    }
 }

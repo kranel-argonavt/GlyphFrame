@@ -229,10 +229,15 @@
                                 <ProgressBar Width="280"
                                              Height="5"
                                              Margin="0,22,0,0"
-                                             IsIndeterminate="True" />
+                                             IsIndeterminate="{Binding IsExportProgressIndeterminate}"
+                                             Maximum="100"
+                                             Value="{Binding ExportProgress, Mode=OneWay}" />
                                 <TextBlock Margin="0,14,0,0"
                                            Style="{StaticResource MutedTextStyle}"
-                                           Text="Processing remains local on this computer" />
+                                           Text="{Binding ExportFrameText}" />
+                                <TextBlock Margin="0,6,0,0"
+                                           Style="{StaticResource MutedTextStyle}"
+                                           Text="{Binding ElapsedText}" />
                             </StackPanel>
                         </Border>
                     </Grid>

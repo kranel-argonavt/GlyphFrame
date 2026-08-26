@@ -32,7 +32,8 @@ public sealed class FfmpegVideoEncoder : IVideoEncoder
     public async Task<VideoEncodingResult> EncodeAsync(
         VideoEncodingJob job,
         IAsyncEnumerable<RenderedImage> frames,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<VideoEncodingProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(job);
         ArgumentNullException.ThrowIfNull(frames);
@@ -80,10 +81,16 @@ public sealed class FfmpegVideoEncoder : IVideoEncoder
                     await process.StandardInput.WriteAsync(frame.RgbaPixels, cancellationToken)
                         .ConfigureAwait(false);
                     framesWritten = checked(framesWritten + 1);
+                    progress?.Report(new VideoEncodingProgress(
+                        VideoEncodingProgressStage.FrameAccepted,
+                        framesWritten));
                 }
 
                 await process.StandardInput.FlushAsync(cancellationToken).ConfigureAwait(false);
                 process.CompleteStandardInput();
+                progress?.Report(new VideoEncodingProgress(
+                    VideoEncodingProgressStage.Finalizing,
+                    framesWritten));
                 using CancellationTokenSource finalizationTimeout = new(_finalizationTimeout);
                 using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken,

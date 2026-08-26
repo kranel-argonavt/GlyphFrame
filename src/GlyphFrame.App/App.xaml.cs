@@ -56,7 +56,7 @@ public partial class App : Application
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton(ApplicationInfo.Phase10);
+        services.AddSingleton(ApplicationInfo.Phase11);
         services.AddSingleton<IApplicationPaths, ApplicationPaths>();
         services.AddSingleton<ISettingsService, JsonSettingsService>();
         services.AddSingleton<IFolderLauncher, WindowsFolderLauncher>();

@@ -62,6 +62,8 @@ public sealed class AudioVideoExportIntegrationTests
             Assert.Equal(
                 await PacketHashesAsync(input, "a:0", context.Locator, context.Runner),
                 await PacketHashesAsync(context.OutputPath, "a:0", context.Locator, context.Runner));
+            Assert.Contains(context.Progress, update => update.Stage == VideoExportStage.InspectingAudio);
+            Assert.Contains(context.Progress, update => update.Stage == VideoExportStage.MergingAudio);
             AssertDurationAligned(video, audio);
             AssertExportSafety(media.RootPath, input, context.OutputPath);
         }
@@ -99,6 +101,8 @@ public sealed class AudioVideoExportIntegrationTests
             JsonElement[] streams = context.Probe.RootElement.GetProperty("streams").EnumerateArray().ToArray();
             Assert.Single(streams);
             AssertVideoStream(streams[0]);
+            Assert.DoesNotContain(context.Progress, update => update.Stage is VideoExportStage.InspectingAudio
+                or VideoExportStage.MergingAudio);
             AssertExportSafety(media.RootPath, input, context.OutputPath);
         }
     }
@@ -115,6 +119,8 @@ public sealed class AudioVideoExportIntegrationTests
             JsonElement[] streams = context.Probe.RootElement.GetProperty("streams").EnumerateArray().ToArray();
             Assert.Single(streams);
             AssertVideoStream(streams[0]);
+            Assert.Contains(context.Progress, update => update.Stage == VideoExportStage.InspectingAudio);
+            Assert.DoesNotContain(context.Progress, update => update.Stage == VideoExportStage.MergingAudio);
             AssertExportSafety(media.RootPath, input, context.OutputPath);
         }
     }
@@ -192,14 +198,15 @@ public sealed class AudioVideoExportIntegrationTests
             Overwrite: false,
             AudioMode: audioMode);
 
-        VideoExportResult result = await service.ExportAsync(job);
+        RecordingProgress progress = new();
+        VideoExportResult result = await service.ExportAsync(job, CancellationToken.None, progress);
         Assert.True(result.Success, result.TechnicalDetail ?? result.UserMessage);
         Assert.Equal(12, result.FramesWritten);
         Assert.Equal(new PixelDimensions(64, 48), result.OutputDimensions);
         Assert.Equal(10, result.FramesPerSecond);
         Assert.True(new FileInfo(output).Length > 1_000);
         JsonDocument probe = await ProbeAsync(output, locator, runner);
-        return new ExportContext(output, result, probe, locator, runner, validation);
+        return new ExportContext(output, result, probe, locator, runner, validation, progress.Values);
     }
 
     private static async Task<JsonDocument> ProbeAsync(
@@ -306,12 +313,20 @@ public sealed class AudioVideoExportIntegrationTests
         JsonDocument Probe,
         BundledFfmpegLocator Locator,
         ProcessRunner Runner,
-        FfmpegValidationService Validation) : IDisposable
+        FfmpegValidationService Validation,
+        IReadOnlyList<VideoExportProgress> Progress) : IDisposable
     {
         public void Dispose()
         {
             Probe.Dispose();
             Validation.Dispose();
         }
+    }
+
+    private sealed class RecordingProgress : IProgress<VideoExportProgress>
+    {
+        public List<VideoExportProgress> Values { get; } = [];
+
+        public void Report(VideoExportProgress value) => Values.Add(value);
     }
 }

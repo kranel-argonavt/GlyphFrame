@@ -7,5 +7,6 @@ public interface IVideoEncoder
     Task<VideoEncodingResult> EncodeAsync(
         VideoEncodingJob job,
         IAsyncEnumerable<RenderedImage> frames,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IProgress<VideoEncodingProgress>? progress = null);
 }

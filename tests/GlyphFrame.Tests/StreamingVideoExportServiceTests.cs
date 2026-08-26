@@ -41,6 +41,134 @@ public sealed class StreamingVideoExportServiceTests
     }
 
     [Fact]
+    public async Task ExportAsync_RemoveAudioReportsAcceptedFramesThenFinalizesAndCompletesAfterPublication()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-preview.mp4");
+        string output = Path.Combine(media.RootPath, "progress.mp4");
+        RecordingProgress<VideoExportProgress> progress = new();
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 3),
+            new RecordingEncoder(writePartial: true),
+            new RecordingPipeline());
+
+        VideoExportResult result = await service.ExportAsync(
+            Job(input, output, overwrite: false),
+            CancellationToken.None,
+            progress);
+
+        Assert.True(result.Success);
+        Assert.Equal(
+            [
+                VideoExportStage.Preparing,
+                VideoExportStage.ProcessingFrames,
+                VideoExportStage.FinishingEncoding,
+                VideoExportStage.Finalizing,
+                VideoExportStage.Completed
+            ],
+            ConsecutiveStages(progress.Values));
+        VideoExportProgress[] frameUpdates = progress.Values
+            .Where(update => update.Stage == VideoExportStage.ProcessingFrames && update.ProcessedFrames > 0)
+            .ToArray();
+        Assert.Equal([1L, 2L, 3L], frameUpdates.Select(update => update.ProcessedFrames));
+        Assert.All(frameUpdates, update => Assert.Equal(12, update.TotalFrames));
+        Assert.Equal(100d, progress.Values[^1].Percentage);
+        Assert.True(File.Exists(output));
+        Assert.DoesNotContain(progress.Values.Take(progress.Values.Count - 1), update => update.Percentage == 100d);
+    }
+
+    [Fact]
+    public async Task ExportAsync_KeepAudioReportsProbeAndMuxStagesWithoutFrameEtaLeakage()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-audio-aac.mp4");
+        string output = Path.Combine(media.RootPath, "progress-audio.mp4");
+        RecordingProgress<VideoExportProgress> progress = new();
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 2),
+            new RecordingEncoder(writePartial: true),
+            new RecordingPipeline(),
+            new FakeAudioProbe(AudioProbeResult.Present(new AudioStreamInfo("aac", 48_000, 1, null, null))),
+            new FakeAudioMuxer());
+
+        VideoExportResult result = await service.ExportAsync(
+            Job(input, output, overwrite: false, audioMode: AudioExportMode.KeepAudio),
+            CancellationToken.None,
+            progress);
+
+        Assert.True(result.Success);
+        Assert.Equal(
+            [
+                VideoExportStage.Preparing,
+                VideoExportStage.ProcessingFrames,
+                VideoExportStage.FinishingEncoding,
+                VideoExportStage.InspectingAudio,
+                VideoExportStage.MergingAudio,
+                VideoExportStage.Finalizing,
+                VideoExportStage.Completed
+            ],
+            ConsecutiveStages(progress.Values));
+        Assert.All(
+            progress.Values.Where(update => update.Stage is VideoExportStage.InspectingAudio
+                or VideoExportStage.MergingAudio
+                or VideoExportStage.Finalizing),
+            update =>
+            {
+                Assert.True(update.IsIndeterminate);
+                Assert.Null(update.EstimatedRemaining);
+            });
+    }
+
+    [Fact]
+    public async Task ExportAsync_SilentKeepAudioReportsProbeButNeverFakeMuxProgress()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-preview.mp4");
+        string output = Path.Combine(media.RootPath, "progress-silent.mp4");
+        RecordingProgress<VideoExportProgress> progress = new();
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 2),
+            new RecordingEncoder(writePartial: true),
+            new RecordingPipeline(),
+            new FakeAudioProbe(AudioProbeResult.Absent()),
+            new FakeAudioMuxer());
+
+        VideoExportResult result = await service.ExportAsync(
+            Job(input, output, overwrite: false, audioMode: AudioExportMode.KeepAudio),
+            CancellationToken.None,
+            progress);
+
+        Assert.True(result.Success);
+        Assert.Contains(progress.Values, update => update.Stage == VideoExportStage.InspectingAudio);
+        Assert.DoesNotContain(progress.Values, update => update.Stage == VideoExportStage.MergingAudio);
+    }
+
+    [Fact]
+    public async Task ExportAsync_CancellationReportsTerminalCancellingAndRejectsLateUpdates()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-preview.mp4");
+        string output = Path.Combine(media.RootPath, "progress-cancel.mp4");
+        RecordingProgress<VideoExportProgress> progress = new();
+        RecordingEncoder encoder = new(writePartial: true) { Cancel = true };
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 2),
+            encoder,
+            new RecordingPipeline());
+
+        VideoExportResult result = await service.ExportAsync(
+            Job(input, output, overwrite: false),
+            CancellationToken.None,
+            progress);
+
+        Assert.Equal(VideoExportStatus.Cancelled, result.Status);
+        Assert.Equal(VideoExportStage.Cancelling, progress.Values[^1].Stage);
+        Assert.DoesNotContain(progress.Values, update => update.Stage == VideoExportStage.Completed);
+        Assert.False(File.Exists(output));
+        AssertNoExportArtifacts(media.RootPath);
+    }
+
+    [Fact]
     public async Task ExportAsync_EncoderFailurePreservesExistingDestinationAndDeletesPartial()
     {
         using TemporaryMediaDirectory media = new();
@@ -81,6 +209,38 @@ public sealed class StreamingVideoExportServiceTests
         Assert.Equal(VideoExportStatus.Cancelled, result.Status);
         Assert.False(File.Exists(output));
         Assert.Empty(Directory.GetFiles(media.RootPath, "*.partial"));
+    }
+
+    [Fact]
+    public async Task ExportAsync_CancellationDuringRenderingCleansPartialAndPreservesDestination()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-preview.mp4");
+        string output = Path.Combine(media.RootPath, "existing-render-cancel.mp4");
+        await File.WriteAllBytesAsync(output, [9, 4, 2]);
+        TaskCompletionSource renderStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource renderRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        RecordingPipeline pipeline = new()
+        {
+            RenderStarted = renderStarted,
+            RenderRelease = renderRelease
+        };
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 2),
+            new RecordingEncoder(writePartial: true),
+            pipeline);
+        using CancellationTokenSource cancellation = new();
+
+        Task<VideoExportResult> export = service.ExportAsync(
+            Job(input, output, overwrite: true),
+            cancellation.Token);
+        await renderStarted.Task;
+        cancellation.Cancel();
+        VideoExportResult result = await export;
+
+        Assert.Equal(VideoExportStatus.Cancelled, result.Status);
+        Assert.Equal([9, 4, 2], await File.ReadAllBytesAsync(output));
+        AssertNoExportArtifacts(media.RootPath);
     }
 
     [Fact]
@@ -168,6 +328,36 @@ public sealed class StreamingVideoExportServiceTests
 
         Assert.Equal(VideoExportStatus.Cancelled, result.Status);
         Assert.Equal([3, 2, 1], await File.ReadAllBytesAsync(output));
+        AssertNoExportArtifacts(media.RootPath);
+    }
+
+    [Fact]
+    public async Task ExportAsync_CancellationAfterAtomicPublicationDoesNotRewriteSuccessAsCancelled()
+    {
+        using TemporaryMediaDirectory media = new();
+        string input = media.CopyFixture("video-preview.mp4");
+        string output = Path.Combine(media.RootPath, "published.mp4");
+        using CancellationTokenSource cancellation = new();
+        CallbackProgress<VideoExportProgress> progress = new(update =>
+        {
+            if (update.Stage == VideoExportStage.Completed)
+            {
+                cancellation.Cancel();
+            }
+        });
+        StreamingVideoExportService service = CreateService(
+            new FakeFrameReader(64, 48, 1),
+            new RecordingEncoder(writePartial: true),
+            new RecordingPipeline());
+
+        VideoExportResult result = await service.ExportAsync(
+            Job(input, output, overwrite: false),
+            cancellation.Token,
+            progress);
+
+        Assert.True(result.Success);
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.True(File.Exists(output));
         AssertNoExportArtifacts(media.RootPath);
     }
 
@@ -522,6 +712,20 @@ public sealed class StreamingVideoExportServiceTests
             path => forbiddenExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase));
     }
 
+    private static VideoExportStage[] ConsecutiveStages(IReadOnlyList<VideoExportProgress> updates)
+    {
+        List<VideoExportStage> stages = [];
+        foreach (VideoExportProgress update in updates)
+        {
+            if (stages.Count == 0 || stages[^1] != update.Stage)
+            {
+                stages.Add(update.Stage);
+            }
+        }
+
+        return stages.ToArray();
+    }
+
     private sealed class FakeFrameReader(int width, int height, int frameCount) : ISequentialVideoFrameReader
     {
         public Exception? Failure { get; init; }
@@ -554,6 +758,18 @@ public sealed class StreamingVideoExportServiceTests
         }
     }
 
+    private sealed class RecordingProgress<T> : IProgress<T>
+    {
+        public List<T> Values { get; } = [];
+
+        public void Report(T value) => Values.Add(value);
+    }
+
+    private sealed class CallbackProgress<T>(Action<T> callback) : IProgress<T>
+    {
+        public void Report(T value) => callback(value);
+    }
+
     private sealed class RecordingPipeline : IImagePipelineService
     {
         private int _activeRenders;
@@ -561,6 +777,10 @@ public sealed class StreamingVideoExportServiceTests
         public int MaximumConcurrentRenders { get; private set; }
 
         public Exception? Failure { get; init; }
+
+        public TaskCompletionSource? RenderStarted { get; init; }
+
+        public TaskCompletionSource? RenderRelease { get; init; }
 
         public Task<DecodedImage> DecodeAsync(
             string inputPath,
@@ -576,6 +796,12 @@ public sealed class StreamingVideoExportServiceTests
             if (Failure is not null)
             {
                 throw Failure;
+            }
+
+            RenderStarted?.TrySetResult();
+            if (RenderRelease is not null)
+            {
+                await RenderRelease.Task.WaitAsync(cancellationToken);
             }
 
             int active = Interlocked.Increment(ref _activeRenders);
@@ -612,7 +838,8 @@ public sealed class StreamingVideoExportServiceTests
         public async Task<VideoEncodingResult> EncodeAsync(
             VideoEncodingJob job,
             IAsyncEnumerable<RenderedImage> frames,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            IProgress<VideoEncodingProgress>? progress = null)
         {
             Calls++;
             if (writePartial)
@@ -631,8 +858,14 @@ public sealed class StreamingVideoExportServiceTests
                 FrameMarkers.Add(frame.RgbaPixels.Span[0]);
                 FrameDimensions.Add(frame.Dimensions);
                 count++;
+                progress?.Report(new VideoEncodingProgress(
+                    VideoEncodingProgressStage.FrameAccepted,
+                    count));
             }
 
+            progress?.Report(new VideoEncodingProgress(
+                VideoEncodingProgressStage.Finalizing,
+                count));
             BeforeReturn?.Invoke();
             return Result ?? new VideoEncodingResult(true, count);
         }

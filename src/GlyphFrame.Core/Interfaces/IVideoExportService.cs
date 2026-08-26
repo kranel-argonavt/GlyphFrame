@@ -6,5 +6,6 @@ public interface IVideoExportService
 {
     Task<VideoExportResult> ExportAsync(
         VideoExportJob job,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IProgress<VideoExportProgress>? progress = null);
 }

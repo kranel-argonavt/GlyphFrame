@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 10 — Audio
+Status: Updated through Phase 11 — Progress and Cancellation
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -1075,18 +1075,22 @@ public interface IVideoEncoder
     Task<VideoEncodingResult> EncodeAsync(
         VideoEncodingJob job,
         IAsyncEnumerable<RenderedImage> frames,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        IProgress<VideoEncodingProgress>? progress);
 }
 ```
 
 ```csharp
 public interface IVideoExportService
 {
-    Task<VideoExportResult> ExportAsync(VideoExportJob job, CancellationToken cancellationToken);
+    Task<VideoExportResult> ExportAsync(
+        VideoExportJob job,
+        CancellationToken cancellationToken,
+        IProgress<VideoExportProgress>? progress);
 }
 ```
 
-`ISequentialVideoFrameReader` is separate from the random-access preview reader. It owns one bundled-FFmpeg decoder for the export lifetime and yields exactly one owned display-oriented RGBA8888 frame at a time. `IVideoEncoder` owns one bundled-FFmpeg encoder and awaits every stdin write so pipe backpressure bounds memory. `IVideoExportService` coordinates those contracts with the shared image pipeline and never exposes processes, WPF, or native rendering types through Core.
+`ISequentialVideoFrameReader` is separate from the random-access preview reader. It owns one bundled-FFmpeg decoder for the export lifetime and yields exactly one owned display-oriented RGBA8888 frame at a time. `IVideoEncoder` owns one bundled-FFmpeg encoder, awaits every stdin write so pipe backpressure bounds memory, and reports a frame only after that write succeeds. `IVideoExportService` coordinates those contracts with the shared image pipeline and reports platform-neutral export snapshots; neither contract exposes processes, WPF, nor native rendering types through Core.
 
 ## 14. Data Models
 
@@ -1365,6 +1369,8 @@ Minimum test matrix:
 - Video symbolization from the displayed frame plus stale identity after frame, media, or render-setting changes.
 - Strict audio-present/no-audio/probe-failure behavior, compatible-codec policy, AAC fallback, mux arguments, process lifecycle, and cleanup.
 - Real bundled-FFmpeg Keep Audio stream-copy, incompatible-audio AAC fallback, Remove Audio, silent-source, short-audio, and long-audio export fixtures.
+- Determinate and indeterminate export progress, accepted-frame counting, monotonic percentages, elapsed/ETA calculation, ordered stage transitions, terminal completion/cancellation, and stale-update rejection.
+- Cancellation during decoding, rendering, encoder writes/finalization, audio probing/muxing, and the pre-publication boundary with process-tree, partial-file, destination, and file-handle verification.
 - Debug, Release, and publish inclusion of FFmpeg, ffprobe, checksums, licenses, and third-party notices with no obsolete video-decoder native assets.
 
 ## 20. Packaging Requirements
@@ -1517,7 +1523,7 @@ Tasks:
 - Unicode input and output paths use `ArgumentList`; neither system `PATH` nor temporary media copies are used.
 - A unique partial MP4 is created in the destination directory, then atomically moved or replaced only after successful completion.
 - Failure and cancellation terminate child processes, preserve an existing destination, and remove partial output.
-- The Phase 9 encoder remains the video-only foundation. Phase 10 muxes audio afterward without re-encoding video; detailed progress and remaining-time UX remain Phase 11.
+- The Phase 9 encoder remains the video-only foundation. Phase 10 muxes audio afterward without re-encoding video, and Phase 11 reports accepted-frame throughput plus every non-frame stage without changing either pipeline.
 
 ### Phase 10 - Audio
 
@@ -1531,14 +1537,15 @@ Tasks:
 
 ### Phase 11 - Progress and Cancellation
 
-- Progress ring.
-- Progress bar.
-- Current frame.
-- Elapsed time.
-- Estimated remaining time.
-- Cancel.
-- Process-tree termination.
-- Temporary file cleanup.
+- Report Preparing, Processing Frames, Finishing Encoding, Inspecting Audio, Merging Audio, Finalizing, Cancelling, and Completed stages through a platform-neutral progress contract.
+- Advance frame counts only after the encoder accepts a complete rendered frame through an awaited write.
+- Use a trustworthy positive source frame count for determinate progress; otherwise show the accepted frame count with indeterminate progress.
+- Keep percentages finite, clamped, and monotonic, cap incomplete work below 100%, and report 100% only after atomic output publication succeeds.
+- Measure elapsed time from export start and estimate remaining time from completed-frame throughput only after at least two frames and one second of determinate progress.
+- Hide frame-based ETA during encoder finalization, audio inspection/muxing, output finalization, and every indeterminate stage.
+- Cancel immediately, disable repeat requests and conflicting actions, and retain the cancelling presentation until cleanup completes.
+- Propagate the same token through decoding, symbol rendering, encoder writes/finalization, strict audio probing, audio muxing, and the pre-publication boundary.
+- Terminate active process trees through bounded cleanup, remove video and audio partials, never publish incomplete output, and preserve an existing destination.
 
 ### Phase 12 - Error Handling
 
@@ -1689,12 +1696,14 @@ MVP is accepted when all criteria below are met.
 
 ### 22.8 Progress and Cancel
 
-- Export progress is visible.
-- Current frame and total frame count are visible for video exports.
-- Elapsed time is visible.
-- Estimated remaining time is visible when available.
-- Cancel stops export.
-- Temporary files are cleaned after success, failure, or cancel.
+- Export stage, accepted current frame, elapsed time, and determinate or indeterminate progress are visible.
+- A trustworthy total frame count is shown when available; unavailable or invalid totals are never fabricated.
+- Percentage is finite and monotonic, remains below 100% until publication, and reaches 100% only for a completed output.
+- Estimated remaining time is derived from accepted-frame throughput only when calculable and is hidden during indeterminate, audio, and finalization stages.
+- Audio inspection, audio merging, encoder finalization, output finalization, cancellation cleanup, and completion have explicit presentation.
+- Cancel responds immediately, cannot be repeated, and keeps conflicting actions disabled until cleanup finishes.
+- Cancellation reaches every active decoding, rendering, encoding, probing, muxing, and pre-publication boundary.
+- Process trees, streams, frames, handles, and temporary files are cleaned after success, failure, or cancel; incomplete output is not published and an existing destination is preserved.
 
 ### 22.9 Settings and Persistence
 

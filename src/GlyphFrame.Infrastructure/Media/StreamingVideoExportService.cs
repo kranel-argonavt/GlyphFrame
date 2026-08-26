@@ -28,9 +28,14 @@ public sealed class StreamingVideoExportService(
 
     public async Task<VideoExportResult> ExportAsync(
         VideoExportJob job,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<VideoExportProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(job);
+        VideoExportProgressTracker progressTracker = new(
+            progress,
+            job.Metadata.FrameCount);
+        progressTracker.ReportStage(VideoExportStage.Preparing);
         string? videoPartialPath = null;
         string? muxPartialPath = null;
         try
@@ -60,10 +65,23 @@ public sealed class StreamingVideoExportService(
                 job.RenderSettings,
                 job.CharacterPreset,
                 cancellationToken);
+            progressTracker.ReportStage(VideoExportStage.ProcessingFrames);
+            CallbackProgress<VideoEncodingProgress> encodingProgress = new(update =>
+            {
+                if (update.Stage == VideoEncodingProgressStage.FrameAccepted)
+                {
+                    progressTracker.ReportFramesAccepted(update.FramesAccepted);
+                }
+                else if (update.Stage == VideoEncodingProgressStage.Finalizing)
+                {
+                    progressTracker.ReportStage(VideoExportStage.FinishingEncoding);
+                }
+            });
             VideoEncodingResult encoding = await _encoder.EncodeAsync(
                 encodingJob,
                 frames,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                encodingProgress).ConfigureAwait(false);
             if (!encoding.Success)
             {
                 VideoExportErrorCategory category = encoding.ErrorCategory == VideoExportErrorCategory.None
@@ -80,6 +98,7 @@ public sealed class StreamingVideoExportService(
             string publicationPath = videoPartialPath;
             if (job.AudioMode == AudioExportMode.KeepAudio)
             {
+                progressTracker.ReportStage(VideoExportStage.InspectingAudio);
                 AudioProbeResult probe = await _audioProbe.ProbeAsync(inputPath, cancellationToken)
                     .ConfigureAwait(false);
                 if (!probe.Success)
@@ -101,6 +120,7 @@ public sealed class StreamingVideoExportService(
                     AudioMuxStrategy strategy = _audioCompatibilityPolicy.ResolveStrategy(probe.Stream?.CodecName);
                     TimeSpan videoDuration = ResolveEncodedDuration(encoding.FramesWritten, framesPerSecond);
                     muxPartialPath = CreatePartialPath(outputPath, "audio");
+                    progressTracker.ReportStage(VideoExportStage.MergingAudio);
                     AudioMuxResult mux = await _audioMuxer.MuxAsync(
                         new AudioMuxJob(
                             videoPartialPath,
@@ -126,6 +146,7 @@ public sealed class StreamingVideoExportService(
                 }
             }
 
+            progressTracker.ReportStage(VideoExportStage.Finalizing);
             cancellationToken.ThrowIfCancellationRequested();
             FinalizeOutput(publicationPath, outputPath, job.Overwrite);
             if (string.Equals(publicationPath, videoPartialPath, StringComparison.OrdinalIgnoreCase))
@@ -137,6 +158,7 @@ public sealed class StreamingVideoExportService(
                 muxPartialPath = null;
             }
 
+            progressTracker.Complete();
             return VideoExportResult.Completed(
                 outputPath,
                 encoding.FramesWritten,
@@ -146,6 +168,7 @@ public sealed class StreamingVideoExportService(
         }
         catch (OperationCanceledException)
         {
+            progressTracker.ReportStage(VideoExportStage.Cancelling);
             return VideoExportResult.Cancelled();
         }
         catch (VideoExportException exception)
@@ -408,5 +431,12 @@ public sealed class StreamingVideoExportService(
         {
             System.Diagnostics.Debug.WriteLine($"Could not remove partial video export '{path}': {exception.Message}");
         }
+    }
+
+    private sealed class CallbackProgress<T>(Action<T> callback) : IProgress<T>
+    {
+        private readonly Action<T> _callback = callback ?? throw new ArgumentNullException(nameof(callback));
+
+        public void Report(T value) => _callback(value);
     }
 }

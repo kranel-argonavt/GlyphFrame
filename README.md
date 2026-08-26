@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 10 — Audio. GlyphFrame can export an entire selected video as a symbolized H.264 MP4 and either remove audio or preserve it through MP4-compatible stream copy with deterministic AAC fallback. Phase 8 preview and Phase 9 bounded streaming behavior remain unchanged. The application uses its validated bundled Windows x64 FFmpeg and ffprobe tools and does not depend on a system media installation.
+Phase 11 — Progress and Cancellation. GlyphFrame reports truthful live stages, encoder-accepted frame counts, elapsed time, and a throughput-based remaining-time estimate during full symbolized-video export. Unknown frame totals remain indeterminate. Cancellation stays active through FFmpeg decoding/encoding, audio probing/muxing, final publication, and partial-file cleanup. Phase 8 preview and the Phase 9/10 streaming and audio behavior remain unchanged.
 
 ## Platform and target framework
 
@@ -142,7 +142,11 @@ The source FPS is retained when it is finite, positive, and no greater than 240 
 
 Phase 10 captures the selected `Keep Audio` or `Remove Audio` mode when export starts. Remove Audio publishes the completed video-only intermediate directly. Keep Audio runs a strict bundled-ffprobe check: a confirmed silent source also publishes video-only, AAC is stream-copied into MP4, and incompatible or unknown codecs are converted to AAC at 192 kb/s, 48 kHz stereo. Muxing always uses `-c:v copy`, so the symbolized H.264 stream is never encoded again.
 
-The rendered frame count and normalized FPS define the authoritative video duration. FFmpeg maps the completed symbolized video plus the original audio, applies that duration as an output cap without `-shortest`, allows shorter audio to end naturally, and prevents longer audio from extending the MP4. Video and audio partials are unique files beside the destination; only a fully completed result is atomically published. Failure or cancellation removes both partials and preserves an existing destination. Unicode paths use `ArgumentList`; no temporary PNG, raw-frame, copied-source, or copied-video files are created. Detailed frame progress, remaining-time estimates, and the complete cancellation presentation remain Phase 11.
+The rendered frame count and normalized FPS define the authoritative video duration. FFmpeg maps the completed symbolized video plus the original audio, applies that duration as an output cap without `-shortest`, allows shorter audio to end naturally, and prevents longer audio from extending the MP4. Video and audio partials are unique files beside the destination; only a fully completed result is atomically published. Failure or cancellation removes both partials and preserves an existing destination. Unicode paths use `ArgumentList`; no temporary PNG, raw-frame, copied-source, or copied-video files are created.
+
+Phase 11 progress moves through Preparing, frame processing, encoder finalization, optional audio inspection and merging, output finalization, and Completed. Frame counts advance only after FFmpeg accepts a rendered frame through its awaited stdin write. A valid source frame count enables finite monotonic progress up to 99%; unavailable totals use an indeterminate bar and never invent a total. Elapsed time is measured from the export start, and remaining time appears only after enough determinate frame throughput exists; it is hidden during audio and finalization stages. The UI reaches 100% only after atomic publication succeeds.
+
+Cancel immediately changes the export state to cleanup, disables repeated cancellation and conflicting actions, and propagates one cancellation token through decoding, rendering, encoding, audio probing, and muxing. Active FFmpeg/ffprobe process trees are terminated through the existing bounded cleanup infrastructure. The UI remains in the cancelling state until streams, frames, processes, and partial files have been released; incomplete output is never published and an existing destination is preserved.
 
 ## Bundled FFmpeg tools
 
@@ -166,8 +170,8 @@ GlyphFrame resolves these tools relative to the running application directory, n
 
 ## Upcoming phases
 
-- Phase 11 adds detailed frame progress, remaining-time estimates, and the complete cancellation experience.
-- Later phases cover error handling, UI polish, comprehensive testing, and portable packaging.
+- Phase 12 adds expanded friendly-error presentation, technical Show Details, and local logging.
+- Later phases cover UI polish, comprehensive testing, and portable packaging.
 
 ## Privacy
 

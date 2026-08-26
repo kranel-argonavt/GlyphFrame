@@ -86,6 +86,41 @@ public sealed class FfmpegVideoEncoderTests
     }
 
     [Fact]
+    public async Task EncodeAsync_ReportsFramesOnlyAfterAcceptedWritesThenReportsFinalization()
+    {
+        TrackingWriteStream input = new();
+        FakeStreamingProcessSession session = new() { StandardInput = input };
+        FfmpegVideoEncoder encoder = CreateEncoder(new FakeStreamingProcessFactory { Session = session });
+        RecordingProgress<VideoEncodingProgress> progress = new();
+
+        VideoEncodingResult result = await encoder.EncodeAsync(
+            Job(),
+            Frames(Frame(1), Frame(2)),
+            CancellationToken.None,
+            progress);
+
+        Assert.True(result.Success);
+        Assert.Collection(
+            progress.Values,
+            update =>
+            {
+                Assert.Equal(VideoEncodingProgressStage.FrameAccepted, update.Stage);
+                Assert.Equal(1, update.FramesAccepted);
+            },
+            update =>
+            {
+                Assert.Equal(VideoEncodingProgressStage.FrameAccepted, update.Stage);
+                Assert.Equal(2, update.FramesAccepted);
+            },
+            update =>
+            {
+                Assert.Equal(VideoEncodingProgressStage.Finalizing, update.Stage);
+                Assert.Equal(2, update.FramesAccepted);
+            });
+        Assert.Equal(2, input.WriteCalls);
+    }
+
+    [Fact]
     public async Task EncodeAsync_IncorrectDimensionsAreRejectedBeforeWriting()
     {
         TrackingWriteStream input = new();
@@ -216,6 +251,34 @@ public sealed class FfmpegVideoEncoderTests
     }
 
     [Fact]
+    public async Task EncodeAsync_CancellationDuringFinalizationTerminatesTreeAndReleasesResources()
+    {
+        TaskCompletionSource finalizationEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeStreamingProcessSession session = new()
+        {
+            WaitForExitHandler = async cancellationToken =>
+            {
+                finalizationEntered.SetResult();
+                TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                await completion.Task.WaitAsync(cancellationToken);
+            }
+        };
+        FfmpegVideoEncoder encoder = CreateEncoder(new FakeStreamingProcessFactory { Session = session });
+        using CancellationTokenSource cancellation = new();
+
+        Task<VideoEncodingResult> encoding = encoder.EncodeAsync(
+            Job(),
+            Frames(Frame(1)),
+            cancellation.Token);
+        await finalizationEntered.Task;
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => encoding);
+        Assert.Equal(1, session.KillCalls);
+        Assert.Equal(1, session.DisposeCalls);
+    }
+
+    [Fact]
     public async Task EncodeAsync_SuccessCompletesInputOnceAwaitsExitAndDoesNotKillExitedProcess()
     {
         FakeStreamingProcessSession session = new();
@@ -269,5 +332,12 @@ public sealed class FfmpegVideoEncoderTests
     private sealed class StaticLocator(BundledFfmpegLocation location) : IBundledFfmpegLocator
     {
         public BundledFfmpegLocation Locate() => location;
+    }
+
+    private sealed class RecordingProgress<T> : IProgress<T>
+    {
+        public List<T> Values { get; } = [];
+
+        public void Report(T value) => Values.Add(value);
     }
 }
