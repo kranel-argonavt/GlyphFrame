@@ -29,6 +29,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly IImageSourceFactory _imageSourceFactory;
     private readonly IUserDialogService _userDialogService;
     private readonly ICharacterPresetProvider _presetProvider;
+    private readonly IExportStatusPresentationService _exportStatusPresentationService;
     private readonly SynchronizationContext? _synchronizationContext;
     private readonly DispatcherTimer _exportElapsedTimer;
     private readonly Stopwatch _exportStopwatch = new();
@@ -47,10 +48,13 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _mediaLoadCancellation;
     private CancellationTokenSource? _videoFrameCancellation;
     private CancellationTokenSource? _imageOperationCancellation;
+    private CancellationTokenSource? _exportCompletionCancellation;
     private readonly SemaphoreSlim _videoReadGate = new(1, 1);
     private long _mediaRequestId;
     private long _videoFrameRequestId;
     private long _imageOperationId;
+    private long _exportCompletionPresentationId;
+    private long _exportPresentationGeneration;
     private string? _pendingFilePath;
     private DecodedImage? _decodedImage;
     private RenderedImage? _renderedImage;
@@ -82,6 +86,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private TimeSpan _lastExportElapsed;
     private string _remainingText = string.Empty;
     private bool _isExportCancellationRequested;
+    private bool _isExportCompletionVisible;
+    private VideoExportStage _exportStage = VideoExportStage.Preparing;
     private bool _isImageProcessing;
     private bool _isVideoFrameLoading;
     private bool _suppressTimelineSeek;
@@ -102,7 +108,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         IImageSaveDialogService imageSaveDialogService,
         IImageSourceFactory imageSourceFactory,
         IUserDialogService userDialogService,
-        ICharacterPresetProvider presetProvider)
+        ICharacterPresetProvider presetProvider,
+        IExportStatusPresentationService exportStatusPresentationService)
     {
         ArgumentNullException.ThrowIfNull(applicationInfo);
         _settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
@@ -117,6 +124,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _imageSourceFactory = imageSourceFactory ?? throw new ArgumentNullException(nameof(imageSourceFactory));
         _userDialogService = userDialogService ?? throw new ArgumentNullException(nameof(userDialogService));
         _presetProvider = presetProvider ?? throw new ArgumentNullException(nameof(presetProvider));
+        _exportStatusPresentationService = exportStatusPresentationService
+            ?? throw new ArgumentNullException(nameof(exportStatusPresentationService));
         _synchronizationContext = SynchronizationContext.Current;
         _exportElapsedTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -262,6 +271,30 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public bool IsBrowseMediaAvailable => !IsExportActive && !IsLoadingMedia;
 
     public bool IsExportActive => _presentationState.IsExportActive;
+
+    public bool IsExportStatusVisible => IsExportActive || IsExportCompletionVisible;
+
+    public bool AreExportAnimationsEnabled => _exportStatusPresentationService.AnimationsEnabled;
+
+    public long ExportPresentationGeneration => _exportPresentationGeneration;
+
+    public VideoExportStage ExportStage
+    {
+        get => _exportStage;
+        private set => SetProperty(ref _exportStage, value);
+    }
+
+    public bool IsExportCompletionVisible
+    {
+        get => _isExportCompletionVisible;
+        private set
+        {
+            if (SetProperty(ref _isExportCompletionVisible, value))
+            {
+                OnPropertyChanged(nameof(IsExportStatusVisible));
+            }
+        }
+    }
 
     public bool CanCancelExport => IsExportActive && !IsExportCancellationRequested;
 
@@ -1145,6 +1178,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         outputPath = NormalizeVideoOutputExtension(outputPath);
         string resolvedInput;
         string resolvedOutput;
+        bool showCompletionPresentation = false;
         try
         {
             resolvedInput = Path.GetFullPath(metadata.FilePath);
@@ -1200,16 +1234,20 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             if (result.Success)
             {
                 _selectedOutputPath = resolvedOutput;
+                ExportStage = VideoExportStage.Completed;
                 ExportProgress = 100;
                 IsExportProgressIndeterminate = false;
+                _activeOperationTitle = "Video export complete";
                 _activeOperationText = "Export completed.";
                 _exportFrameText = result.FramesWritten > 0
                     ? $"Frame {result.FramesWritten:N0} / {result.FramesWritten:N0}"
                     : string.Empty;
                 _remainingText = string.Empty;
                 NotifyExportProgressProperties();
+                OnPropertyChanged(nameof(ExportOperationTitle));
                 OnPropertyChanged(nameof(OutputPathText));
                 StatusMessage = $"{result.UserMessage} Output: {Path.GetFileName(resolvedOutput)}";
+                showCompletionPresentation = true;
             }
             else
             {
@@ -1226,6 +1264,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         finally
         {
             EndImageOperation(operationId);
+        }
+
+        if (showCompletionPresentation)
+        {
+            StartExportCompletionPresentation(operationId);
         }
     }
 
@@ -1268,6 +1311,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         IsExportProgressIndeterminate = true;
         IsExportCancellationRequested = false;
         ExportProgress = 0;
+        ExportStage = VideoExportStage.Preparing;
+        _exportPresentationGeneration++;
+        OnPropertyChanged(nameof(ExportPresentationGeneration));
         _exportStopwatch.Restart();
         _exportElapsedTimer.Start();
         IsImageProcessing = true;
@@ -1310,6 +1356,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         IsExportCancellationRequested = true;
         IsExportProgressIndeterminate = true;
+        ExportStage = VideoExportStage.Cancelling;
         _activeOperationText = IsVideoSelected
             ? "Cancelling export and cleaning partial files..."
             : "Cancelling the current image operation...";
@@ -1325,6 +1372,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void CancelImageOperationCore()
     {
+        CancelExportCompletionPresentationCore();
         CancellationTokenSource? cancellation = Interlocked.Exchange(ref _imageOperationCancellation, null);
         if (cancellation is not null)
         {
@@ -1387,6 +1435,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         _activeOperationText = progress.StageDescription;
+        ExportStage = progress.Stage;
         _exportFrameText = BuildFrameProgressText(progress);
         _lastExportElapsed = progress.Elapsed > _lastExportElapsed
             ? progress.Elapsed
@@ -1417,6 +1466,57 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ElapsedText));
         OnPropertyChanged(nameof(RemainingText));
         OnPropertyChanged(nameof(ExportPercentageText));
+    }
+
+    private void StartExportCompletionPresentation(long operationId)
+    {
+        if (_disposed || operationId != _imageOperationId)
+        {
+            return;
+        }
+
+        CancelExportCompletionPresentationCore();
+        CancellationTokenSource cancellation = new();
+        _exportCompletionCancellation = cancellation;
+        long presentationId = Interlocked.Increment(ref _exportCompletionPresentationId);
+        IsExportCompletionVisible = true;
+        _ = HoldExportCompletionPresentationAsync(presentationId, cancellation);
+    }
+
+    private async Task HoldExportCompletionPresentationAsync(
+        long presentationId,
+        CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await _exportStatusPresentationService.HoldCompletedStateAsync(cancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        finally
+        {
+            if (ReferenceEquals(
+                    Interlocked.CompareExchange(ref _exportCompletionCancellation, null, cancellation),
+                    cancellation))
+            {
+                cancellation.Dispose();
+                if (!_disposed && presentationId == _exportCompletionPresentationId)
+                {
+                    IsExportCompletionVisible = false;
+                }
+            }
+        }
+    }
+
+    private void CancelExportCompletionPresentationCore()
+    {
+        Interlocked.Increment(ref _exportCompletionPresentationId);
+        CancellationTokenSource? cancellation = Interlocked.Exchange(ref _exportCompletionCancellation, null);
+        cancellation?.Cancel();
+        cancellation?.Dispose();
+        IsExportCompletionVisible = false;
     }
 
     private void OnExportElapsedTimerTick(object? sender, EventArgs e)
@@ -1563,6 +1663,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         OnPropertyChanged(nameof(IsExportActive));
+        OnPropertyChanged(nameof(IsExportStatusVisible));
         OnPropertyChanged(nameof(CanCancelExport));
         OnPropertyChanged(nameof(AreSettingsEnabled));
         OnPropertyChanged(nameof(IsBrowseMediaAvailable));
@@ -1752,6 +1853,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        CancelExportCompletionPresentationCore();
         _exportElapsedTimer.Stop();
         _exportElapsedTimer.Tick -= OnExportElapsedTimerTick;
         _exportStopwatch.Stop();

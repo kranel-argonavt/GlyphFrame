@@ -23,6 +23,16 @@ public sealed class MainWindowVideoPreviewTests
     }
 
     [Fact]
+    public void Constructor_RejectsNullExportStatusPresentationService()
+    {
+        TestHarness harness = new();
+
+        Assert.Throws<ArgumentNullException>(() => harness.CreateViewModel(
+            exportStatusPresentationService: null,
+            allowNullExportStatusPresentationService: true));
+    }
+
+    [Fact]
     public async Task SelectingVideo_LoadsMiddleFrameAndEnablesVideoOnlyPositionControls()
     {
         using TestMediaFiles files = new();
@@ -237,6 +247,9 @@ public sealed class MainWindowVideoPreviewTests
         await progressReported.Task;
 
         Assert.False(viewModel.IsExportProgressIndeterminate);
+        Assert.True(viewModel.AreExportAnimationsEnabled);
+        Assert.True(viewModel.IsExportActive);
+        Assert.Equal(VideoExportStage.ProcessingFrames, viewModel.ExportStage);
         Assert.Equal(49.5, viewModel.ExportProgress);
         Assert.Equal("50%", viewModel.ExportPercentageText);
         Assert.Equal("Frame 5 / 10", viewModel.ExportFrameText);
@@ -251,6 +264,188 @@ public sealed class MainWindowVideoPreviewTests
 
         Assert.Equal(100, viewModel.ExportProgress);
         Assert.False(viewModel.IsExportProgressIndeterminate);
+    }
+
+    [Fact]
+    public async Task VideoExport_SuccessShowsPresentationOnlyCompletionAfterResourcesAreReleased()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("completion-state.mp4");
+        string outputPath = files.PathFor("completion-state-output.mp4");
+        TestHarness harness = new();
+        TaskCompletionSource completedStateReleased = NewCompletion();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = outputPath;
+        harness.ExportStatusPresentation.Handler = token => completedStateReleased.Task.WaitAsync(token);
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+
+        await viewModel.ExportCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsExportActive);
+        Assert.True(viewModel.IsExportCompletionVisible);
+        Assert.True(viewModel.IsExportStatusVisible);
+        Assert.Equal(VideoExportStage.Completed, viewModel.ExportStage);
+        Assert.Equal(100, viewModel.ExportProgress);
+        Assert.True(viewModel.AreSettingsEnabled);
+        completedStateReleased.SetResult();
+        await WaitUntilAsync(viewModel, () => !viewModel.IsExportCompletionVisible);
+        Assert.False(viewModel.IsExportStatusVisible);
+    }
+
+    [Fact]
+    public async Task VideoExport_FailureDoesNotEnterCompletedPresentation()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("failed-completion-state.mp4");
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = files.PathFor("failed-completion-state-output.mp4");
+        harness.VideoExports.Handler = (_, _, _) => Task.FromResult(VideoExportResult.Failure(
+            VideoExportErrorCategory.EncoderFailed,
+            "GlyphFrame could not encode the video."));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+
+        await viewModel.ExportCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsExportCompletionVisible);
+        Assert.False(viewModel.IsExportStatusVisible);
+        Assert.Equal(0, harness.ExportStatusPresentation.Calls);
+    }
+
+    [Fact]
+    public async Task VideoExport_NewOperationCancelsCompletionAndResetsVisualProgress()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("completion-reset.mp4");
+        string outputPath = files.PathFor("completion-reset-output.mp4");
+        TestHarness harness = new();
+        TaskCompletionSource firstPresentation = NewCompletion();
+        TaskCompletionSource secondExportStarted = NewCompletion();
+        TaskCompletionSource<VideoExportResult> secondExportFinished = NewCompletion<VideoExportResult>();
+        int exportCall = 0;
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = outputPath;
+        harness.ExportStatusPresentation.Handler = token => firstPresentation.Task.WaitAsync(token);
+        harness.VideoExports.Handler = (job, _, _) => Interlocked.Increment(ref exportCall) == 1
+            ? Task.FromResult(VideoExportResult.Completed(job.OutputPath, 3, new PixelDimensions(64, 48), 10))
+            : WaitForSecondExportAsync();
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await viewModel.ExportCommand.ExecuteAsync(null);
+        long completedGeneration = viewModel.ExportPresentationGeneration;
+
+        Task secondExport = viewModel.ExportCommand.ExecuteAsync(null);
+        await secondExportStarted.Task;
+
+        Assert.False(viewModel.IsExportCompletionVisible);
+        Assert.True(viewModel.IsExportActive);
+        Assert.Equal(VideoExportStage.Preparing, viewModel.ExportStage);
+        Assert.Equal(0, viewModel.ExportProgress);
+        Assert.True(viewModel.ExportPresentationGeneration > completedGeneration);
+        Assert.True(harness.ExportStatusPresentation.LastCancellationToken.IsCancellationRequested);
+
+        secondExportFinished.SetResult(VideoExportResult.Failure(
+            VideoExportErrorCategory.EncoderFailed,
+            "Controlled failure."));
+        await secondExport;
+
+        async Task<VideoExportResult> WaitForSecondExportAsync()
+        {
+            secondExportStarted.SetResult();
+            return await secondExportFinished.Task;
+        }
+    }
+
+    [Fact]
+    public async Task VideoExport_StaleCompletionCallbackCannotHideNewerOperation()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("stale-completion.mp4");
+        string outputPath = files.PathFor("stale-completion-output.mp4");
+        TestHarness harness = new();
+        TaskCompletionSource stalePresentation = NewCompletion();
+        TaskCompletionSource secondExportStarted = NewCompletion();
+        TaskCompletionSource<VideoExportResult> secondExportFinished = NewCompletion<VideoExportResult>();
+        int exportCall = 0;
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = outputPath;
+        harness.ExportStatusPresentation.Handler = _ => stalePresentation.Task;
+        harness.VideoExports.Handler = (job, _, _) => Interlocked.Increment(ref exportCall) == 1
+            ? Task.FromResult(VideoExportResult.Completed(job.OutputPath, 3, new PixelDimensions(64, 48), 10))
+            : WaitForSecondExportAsync();
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await viewModel.ExportCommand.ExecuteAsync(null);
+
+        Task secondExport = viewModel.ExportCommand.ExecuteAsync(null);
+        await secondExportStarted.Task;
+        stalePresentation.SetResult();
+        await Task.Yield();
+
+        Assert.True(viewModel.IsExportActive);
+        Assert.True(viewModel.IsExportStatusVisible);
+        Assert.False(viewModel.IsExportCompletionVisible);
+
+        secondExportFinished.SetResult(VideoExportResult.Failure(
+            VideoExportErrorCategory.EncoderFailed,
+            "Controlled failure."));
+        await secondExport;
+
+        async Task<VideoExportResult> WaitForSecondExportAsync()
+        {
+            secondExportStarted.SetResult();
+            return await secondExportFinished.Task;
+        }
+    }
+
+    [Fact]
+    public async Task VideoExport_DisposeCancelsPendingCompletionPresentation()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("dispose-completion.mp4");
+        TestHarness harness = new();
+        TaskCompletionSource presentationStarted = NewCompletion();
+        TaskCompletionSource never = NewCompletion();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = files.PathFor("dispose-completion-output.mp4");
+        harness.ExportStatusPresentation.Handler = async token =>
+        {
+            presentationStarted.SetResult();
+            await never.Task.WaitAsync(token);
+        };
+        MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await viewModel.ExportCommand.ExecuteAsync(null);
+        await presentationStarted.Task;
+
+        viewModel.Dispose();
+
+        Assert.True(harness.ExportStatusPresentation.LastCancellationToken.CanBeCanceled);
+        Assert.True(harness.ExportStatusPresentation.LastCancellationToken.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task VideoExport_ReducedMotionKeepsCompletionInformationWithoutDecorativeAnimation()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("reduced-motion.mp4");
+        TestHarness harness = new();
+        TaskCompletionSource completedStateReleased = NewCompletion();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(VideoResult(path!));
+        harness.SaveDialogs.VideoOutputPath = files.PathFor("reduced-motion-output.mp4");
+        harness.ExportStatusPresentation.AnimationsEnabled = false;
+        harness.ExportStatusPresentation.Handler = token => completedStateReleased.Task.WaitAsync(token);
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+
+        await viewModel.ExportCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.AreExportAnimationsEnabled);
+        Assert.True(viewModel.IsExportCompletionVisible);
+        Assert.Equal("Export completed.", viewModel.ExportProgressText);
+        completedStateReleased.SetResult();
     }
 
     [Fact]
@@ -337,6 +532,8 @@ public sealed class MainWindowVideoPreviewTests
         Assert.True(viewModel.IsExportCancellationRequested);
         Assert.False(viewModel.CancelExportCommand.CanExecute(null));
         Assert.True(viewModel.IsExportProgressIndeterminate);
+        Assert.Equal(VideoExportStage.Cancelling, viewModel.ExportStage);
+        Assert.False(viewModel.IsExportCompletionVisible);
         Assert.Contains("Cancelling", viewModel.ExportProgressText, StringComparison.OrdinalIgnoreCase);
         Assert.False(viewModel.BrowseMediaCommand.CanExecute(null));
         Assert.False(viewModel.BrowseOutputCommand.CanExecute(null));
@@ -347,6 +544,7 @@ public sealed class MainWindowVideoPreviewTests
 
         Assert.False(viewModel.IsExportActive);
         Assert.False(viewModel.IsExportCancellationRequested);
+        Assert.False(viewModel.IsExportCompletionVisible);
         Assert.True(viewModel.BrowseMediaCommand.CanExecute(null));
         Assert.True(viewModel.BrowseOutputCommand.CanExecute(null));
         Assert.True(viewModel.AreSettingsEnabled);
@@ -896,9 +1094,13 @@ public sealed class MainWindowVideoPreviewTests
 
         public FakeUserDialogService UserDialogs { get; } = new();
 
+        public FakeExportStatusPresentationService ExportStatusPresentation { get; } = new();
+
         public MainWindowViewModel CreateViewModel(
             IVideoFrameReader? videoFrameReader = null,
-            bool allowNull = false) => new(
+            bool allowNull = false,
+            IExportStatusPresentationService? exportStatusPresentationService = null,
+            bool allowNullExportStatusPresentationService = false) => new(
             ApplicationInfo.Phase11,
             new FakeSettingsManager(),
             new FakeSettingsDialogService(),
@@ -911,7 +1113,28 @@ public sealed class MainWindowVideoPreviewTests
             SaveDialogs,
             ImageSources,
             UserDialogs,
-            new CharacterPresetProvider());
+            new CharacterPresetProvider(),
+            allowNullExportStatusPresentationService
+                ? exportStatusPresentationService!
+                : exportStatusPresentationService ?? ExportStatusPresentation);
+    }
+
+    private sealed class FakeExportStatusPresentationService : IExportStatusPresentationService
+    {
+        public bool AnimationsEnabled { get; set; } = true;
+
+        public Func<CancellationToken, Task> Handler { get; set; } = _ => Task.CompletedTask;
+
+        public int Calls { get; private set; }
+
+        public CancellationToken LastCancellationToken { get; private set; }
+
+        public Task HoldCompletedStateAsync(CancellationToken cancellationToken)
+        {
+            Calls++;
+            LastCancellationToken = cancellationToken;
+            return Handler(cancellationToken);
+        }
     }
 
     private sealed class FakeVideoFrameReader : IVideoFrameReader

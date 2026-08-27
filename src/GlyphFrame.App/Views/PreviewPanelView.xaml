@@ -2,6 +2,8 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:behaviors="clr-namespace:GlyphFrame.App.Behaviors"
+             xmlns:presentation="clr-namespace:GlyphFrame.App.Presentation"
+             xmlns:views="clr-namespace:GlyphFrame.App.Views"
              MinHeight="420"
              Focusable="False">
     <Border Style="{StaticResource PreviewCardStyle}">
@@ -214,24 +216,38 @@
                         </Border>
 
                         <Border Background="#D90D0F14"
-                                Visibility="{Binding IsExportActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <StackPanel Width="520"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center"
                                         TextBlock.TextAlignment="Center">
+                                <views:ExportActivityIndicator Width="72"
+                                                               Height="72"
+                                                               Margin="0,0,0,18"
+                                                               HorizontalAlignment="Center"
+                                                               AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                                               IsActive="{Binding IsExportActive}"
+                                                               IsCompleted="{Binding IsExportCompletionVisible}"
+                                                               PercentageText="{Binding ExportPercentageText}" />
                                 <TextBlock FontSize="24"
                                            FontWeight="SemiBold"
                                            Text="{Binding ExportOperationTitle}" />
                                 <TextBlock Margin="0,12,0,0"
                                            FontSize="15"
                                            Foreground="{StaticResource SecondaryTextBrush}"
-                                           Text="{Binding ExportProgressText}" />
+                                           presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                           presentation:ExportStatusAnimation.Stage="{Binding ExportStage}"
+                                           presentation:ExportStatusAnimation.StageText="{Binding ExportProgressText}"
+                                           Text="" />
                                 <ProgressBar Width="280"
                                              Height="5"
                                              Margin="0,22,0,0"
-                                             IsIndeterminate="{Binding IsExportProgressIndeterminate}"
                                              Maximum="100"
-                                             Value="{Binding ExportProgress, Mode=OneWay}" />
+                                             presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                             presentation:ExportStatusAnimation.ProgressGeneration="{Binding ExportPresentationGeneration}"
+                                             presentation:ExportStatusAnimation.ProgressIsIndeterminate="{Binding IsExportProgressIndeterminate}"
+                                             presentation:ExportStatusAnimation.ProgressStage="{Binding ExportStage}"
+                                             presentation:ExportStatusAnimation.ProgressValue="{Binding ExportProgress}" />
                                 <TextBlock Margin="0,14,0,0"
                                            Style="{StaticResource MutedTextStyle}"
                                            Text="{Binding ExportFrameText}" />

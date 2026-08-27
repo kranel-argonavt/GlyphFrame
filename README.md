@@ -148,6 +148,8 @@ Phase 11 progress moves through Preparing, frame processing, encoder finalizatio
 
 Cancel immediately changes the export state to cleanup, disables repeated cancellation and conflicting actions, and propagates one cancellation token through decoding, rendering, encoding, audio probing, and muxing. Active FFmpeg/ffprobe process trees are terminated through the existing bounded cleanup infrastructure. The UI remains in the cancelling state until streams, frames, processes, and partial files have been released; incomplete output is never published and an existing destination is preserved.
 
+Export-status motion is presentation-only: the segmented accent ring rotates and gently pulses, determinate bar changes ease toward the latest truthful value, and meaningful stage changes crossfade. A successfully published video briefly shows a green completion mark after export resources have been released. GlyphFrame honors the Windows client-area animation preference; with reduced motion, these values and states update immediately without changing progress calculation, cancellation, or cleanup.
+
 ## Bundled FFmpeg tools
 
 Development builds and publish output contain:

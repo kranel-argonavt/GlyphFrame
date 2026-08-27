@@ -94,6 +94,7 @@ public partial class App : Application
         services.AddSingleton<IMediaFileDialogService, MediaFileDialogService>();
         services.AddSingleton<IImageSaveDialogService, ImageSaveDialogService>();
         services.AddSingleton<IImageSourceFactory, WpfImageSourceFactory>();
+        services.AddSingleton<IExportStatusPresentationService, ExportStatusPresentationService>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
     }

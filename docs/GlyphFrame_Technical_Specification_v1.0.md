@@ -762,6 +762,8 @@ During export it shows:
 - Estimated remaining time when available.
 - Cancel button.
 
+The segmented accent ring rotates around stationary percentage text and uses a restrained opacity pulse while export or cancellation cleanup is active. Determinate bar values ease monotonically toward the latest reported percentage, and meaningful export-stage changes crossfade without animating frame or timing updates. Successful atomic publication briefly replaces the percentage with a green vector completion mark; failure and cancellation never show success. These effects are presentation-only and are disabled when Windows client-area animations are disabled.
+
 It must not include:
 
 - Pause button.
@@ -1546,6 +1548,7 @@ Tasks:
 - Cancel immediately, disable repeat requests and conflicting actions, and retain the cancelling presentation until cleanup completes.
 - Propagate the same token through decoding, symbol rendering, encoder writes/finalization, strict audio probing, audio muxing, and the pre-publication boundary.
 - Terminate active process trees through bounded cleanup, remove video and audio partials, never publish incomplete output, and preserve an existing destination.
+- Keep export-status motion independent from pipeline semantics: stop decorative clocks when hidden or unloaded, respect the Windows reduced-motion preference, and show the completion mark only after successful publication and resource cleanup.
 
 ### Phase 12 - Error Handling
 
