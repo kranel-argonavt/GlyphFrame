@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 11 — Progress and Cancellation. GlyphFrame reports truthful live stages, encoder-accepted frame counts, elapsed time, and a throughput-based remaining-time estimate during full symbolized-video export. Unknown frame totals remain indeterminate. Cancellation stays active through FFmpeg decoding/encoding, audio probing/muxing, final publication, and partial-file cleanup. Phase 8 preview and the Phase 9/10 streaming and audio behavior remain unchanged.
+Phase 11 — Progress and Cancellation is complete. GlyphFrame reports truthful live stages, encoder-accepted frame counts, elapsed time, and a throughput-based remaining-time estimate during full symbolized-video export. Unknown frame totals remain indeterminate. Cancellation stays active through FFmpeg decoding/encoding, audio probing/muxing, final publication, and partial-file cleanup. The next specified milestone is Phase 11B — Render, Review, and Export Workflow.
 
 ## Platform and target framework
 
@@ -150,6 +150,22 @@ Cancel immediately changes the export state to cleanup, disables repeated cancel
 
 Export-status motion is presentation-only: the segmented accent ring rotates and gently pulses, determinate bar changes ease toward the latest truthful value, and meaningful stage changes crossfade. A successfully published video briefly shows a green completion mark after export resources have been released. GlyphFrame honors the Windows client-area animation preference; with reduced motion, these values and states update immediately without changing progress calculation, cancellation, or cleanup.
 
+## Planned Phase 11B workflow
+
+Phase 11B separates creation from publication:
+
+```text
+Load media -> Render -> Review -> Export
+```
+
+Image mode will remove the redundant symbolized-preview command. `Render Image` will create one reusable full image result, select the existing Symbolized tab, and enable `Export Image` in a persistent result panel. PNG/JPEG selection and destination changes will reuse those rendered pixels instead of rerunning symbolization.
+
+Video mode will keep `Preview Frame` as an optional quick check and add `Render Video` as the primary full-video action. Full rendering will produce one completed MP4 review artifact in an application-managed local cache using the captured Keep Audio or Remove Audio setting. The existing Symbolized tab will play that exact controlled H.264/AAC-or-silent artifact before `Export Video` becomes available. Export will publish the reviewed artifact through a destination-side partial and atomic move or replace without rerunning frame symbolization or H.264 encoding.
+
+The current right-column Output card will be removed. The panel below the preview will become the canonical persistent processing/result surface: it will show truthful progress and Cancel while rendering, then settle into Image Ready, Video Ready, Render Stale, Exported, Cancelled, or Error with the relevant Play, Render Again, Export, and Open Folder actions. A stale result remains reviewable but cannot be exported until rerender succeeds.
+
+Render identity will change for character, font, size, polarity, resolution, and other symbolization settings; video audio-mode changes will also stale the full-video artifact. Image format and destination changes will not stale image rendering, and video slider movement will invalidate only the frame preview. Player handles, partial files, replaced artifacts, and orphaned cache entries will be cleaned on every applicable success, cancellation, failure, media replacement, rerender, exit, and startup-recovery path.
+
 ## Bundled FFmpeg tools
 
 Development builds and publish output contain:
@@ -172,9 +188,10 @@ GlyphFrame resolves these tools relative to the running application directory, n
 
 ## Upcoming phases
 
-- Phase 12 adds expanded friendly-error presentation, technical Show Details, and local logging.
+- Phase 11B implements the specified Render -> Review -> Export workflow, persistent result panel, managed video artifact, and in-app rendered-video playback.
+- Phase 12 then adds expanded friendly-error presentation, technical Show Details, and local logging on top of the final workflow states.
 - Later phases cover UI polish, comprehensive testing, and portable packaging.
 
 ## Privacy
 
-GlyphFrame is local-only software. It does not upload media and includes no telemetry or analytics. Media input is opened read-only and is never copied, renamed, modified, or deleted. Image pixels, preview frames, and sequential video-export frames are processed only in bounded memory; exports write only to the explicitly selected destination. Settings remain on the current device under the user-local application-data directory; media paths, decoded frames, and media content are not stored in preferences.
+GlyphFrame is local-only software. It does not upload media and includes no telemetry or analytics. Media input is opened read-only and is never copied, renamed, modified, or deleted. Image pixels, preview frames, and sequential video-render frames are processed only in bounded memory; exports write only to the explicitly selected destination. Phase 11B permits one generated review MP4 in an application-managed local cache for the active workflow, with deterministic cleanup and no source-media copy. Settings remain on the current device under the user-local application-data directory; media paths, decoded frames, and media content are not stored in preferences.

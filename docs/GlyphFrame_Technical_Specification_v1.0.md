@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 11 — Progress and Cancellation
+Status: Updated through Phase 11 — Progress and Cancellation; Phase 11B specified
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -25,7 +25,7 @@ Media frame
 -> Calculate luminance
 -> Map luminance to a character
 -> Render symbols with SkiaSharp
--> Export symbolized image or frame
+-> Review or export the rendered symbolized result
 ```
 
 GlyphFrame does not implement its own MP4 encoder. Video encoding, audio handling, and metadata probing are delegated to bundled FFmpeg tools.
@@ -41,6 +41,8 @@ GlyphFrame does not implement its own MP4 encoder. Video encoding, audio handlin
 - Drag and drop media input.
 - Original preview.
 - Symbolized preview.
+- Explicit Render -> Review -> Export workflow.
+- In-app playback of a completed GlyphFrame-rendered MP4.
 - Three built-in character presets.
 - Font family selection.
 - Font size selection.
@@ -49,16 +51,16 @@ GlyphFrame does not implement its own MP4 encoder. Video encoding, audio handlin
 - Image export to PNG and JPG/JPEG.
 - Video export to MP4.
 - Keep Audio and Remove Audio modes for video.
-- Progress display during export.
-- Cancel export.
+- Progress display during rendering and export publication.
+- Cancel active rendering or export publication.
 - Local logs.
 - Local settings.
 - Bundled FFmpeg and ffprobe.
 
 ### 2.2 MVP Excludes
 
-- Realtime video playback.
-- Animated symbolized preview.
+- Realtime or on-the-fly video symbolization during playback.
+- Playback of arbitrary input formats beyond the existing original-frame preview.
 - Before/after draggable comparison slider.
 - Batch export.
 - GIF export.
@@ -421,7 +423,7 @@ Default:
 Light on Dark
 ```
 
-Changing polarity invalidates an existing symbolized preview because it changes both character mapping and the canvas background. Selecting the same value again does not invalidate the preview. Changing only PNG/JPEG output format does not invalidate symbol rendering.
+Changing polarity invalidates an existing symbolized render because it changes both character mapping and the canvas background. Selecting the same value again does not invalidate the result. Changing only PNG/JPEG output format does not invalidate symbol rendering.
 
 ## 8. Image Workflow
 
@@ -434,10 +436,12 @@ Changing polarity invalidates an existing symbolized preview because it changes 
 4. App displays the original image preview.
 5. App hides video-only controls.
 6. User adjusts character, polarity, and render settings.
-7. User clicks Preview Symbolized Image.
-8. App generates symbolized preview.
-9. User selects output path and format.
-10. User exports PNG or JPG/JPEG.
+7. User clicks Render Image.
+8. App creates and retains one current full-resolution symbolized image result.
+9. App selects the Symbolized tab and changes the processing panel to Image Ready.
+10. User reviews Original and Symbolized without rerendering.
+11. User chooses PNG or JPG/JPEG and clicks Export Image.
+12. App requests the destination and encodes the current rendered result without rerunning symbolization.
 ```
 
 ### 8.2 Image UI Rules
@@ -446,11 +450,13 @@ When the loaded media is an image:
 
 - Audio section is hidden.
 - Video frame slider is hidden.
+- Image mode has no separate frame-preview command.
+- Primary preview-panel action is `Render Image`, changing to `Render Again` when a current or stale result exists.
 - Export button label is `Export Image`.
-- Preview button label is `Preview Symbolized Image`.
 - Output format choices are `PNG` and `JPG/JPEG`.
 - PNG is selected by default.
 - Metadata row shows image width, height, format, and file size.
+- Export appears in the persistent result panel only after a current render exists.
 
 ### 8.3 Image Acceptance Requirements
 
@@ -458,14 +464,16 @@ GlyphFrame must:
 
 - Open PNG, JPG/JPEG, WebP, and BMP files.
 - Show original image preview.
-- Generate symbolized image preview.
+- Render one reusable symbolized image result and show it in the Symbolized tab.
+- Never expose a redundant image-preview command.
 - Export symbolized PNG.
 - Export symbolized JPG/JPEG.
 - Preserve aspect ratio.
 - Respect selected output resolution.
 - Respect selected symbol polarity in mapping, preview, and export.
 - Composite transparent pixels over the selected polarity background exactly once.
-- Keep UI responsive during preview and export.
+- Keep UI responsive during rendering, review, and export.
+- Reuse the current rendered pixels for PNG/JPEG export; changing only destination or image format must not rerun symbolization.
 - Show friendly errors for invalid or unsupported images.
 
 ## 9. Video Workflow
@@ -481,10 +489,14 @@ GlyphFrame must:
 6. App shows video-only controls.
 7. User selects preview position with a slider.
 8. User adjusts character and render settings.
-9. User clicks Preview Symbolized Frame.
+9. User may click Preview Frame.
 10. App generates symbolized preview frame.
-11. User selects output path.
-12. User exports MP4.
+11. User clicks Render Video to process the complete video.
+12. App creates one managed, completed symbolized MP4 review artifact using the captured audio mode.
+13. App opens the artifact in the Symbolized tab and changes the processing panel to Video Ready.
+14. User reviews the rendered video in the in-app player.
+15. User clicks Export Video and selects a destination.
+16. App atomically publishes the current review artifact without rerunning symbolization or video encoding.
 ```
 
 Phase 8 preview behavior:
@@ -494,32 +506,33 @@ Phase 8 preview behavior:
 - Convert normalized position to an invariant FFmpeg timestamp when duration is known and back the end position away from the duration boundary to request the final available frame.
 - Debounce slider input for 200 ms, cancel superseded requests, serialize extraction processes, and apply latest-request-wins generation checks.
 - Preserve metadata and show a friendly retry state when frame loading fails.
-- `Preview Symbolized Frame` uses the exact owned frame currently displayed in Original mode and the shared image symbolization pipeline.
+- `Preview Frame` uses the exact owned frame currently displayed in Original mode and the shared image symbolization pipeline.
 - Preview identity includes media version, original-frame/source version, and render-settings version. A frame or setting change therefore makes the previous symbolized frame stale.
 - Phase 8 does not implement animated playback, sequential processing, audio work, or full-video export.
 
-### 9.2 Video Export Flow
+### 9.2 Video Render, Review, and Export Flow
 
 ```text
-1. Validate input path.
-2. Validate output path.
-3. Validate ffmpeg.exe and ffprobe.exe.
-4. Read video metadata.
-5. Start sequential frame reading.
-6. For each source frame:
+1. Validate input path and the managed review-artifact location.
+2. Validate ffmpeg.exe and ffprobe.exe.
+3. Read video metadata and capture render settings plus audio mode.
+4. Start sequential frame reading.
+5. For each source frame:
    -> Convert frame to symbol frame.
    -> Render symbolized frame with SkiaSharp.
    -> Send raw frame to FFmpeg through stdin.
-7. Close encoder stdin and verify successful FFmpeg completion.
-8. Apply the captured audio mode.
-9. For Remove Audio or a confirmed silent source, publish the video-only partial.
-10. For Keep Audio, map original audio into a second MP4 partial using video stream copy plus audio copy or AAC fallback.
-11. Publish only the completed final partial to the requested destination.
-12. Clean every intermediate after success, failure, or cancellation.
-13. Show the basic completed or failure status.
+6. Close encoder stdin and verify successful FFmpeg completion.
+7. Apply the captured audio mode.
+8. For Remove Audio or a confirmed silent source, promote the completed video-only partial to the review artifact.
+9. For Keep Audio, map original audio into a second MP4 partial using video stream copy plus audio copy or AAC fallback.
+10. Promote only a complete final MP4 to the managed review-artifact path.
+11. Release render resources, clean intermediates, and retain only the review artifact.
+12. Review that exact artifact through the in-app player.
+13. On Export Video, choose a destination and atomically copy or replace from the review artifact without rerendering.
+14. Preserve the review artifact for repeated export until it becomes stale, is replaced, or its media session ends.
 ```
 
-The Phase 9 encoder continues to pass `-an` and creates an authoritative video-only intermediate. Phase 10 performs its audio decision only after that intermediate completes and never decodes or re-encodes the symbolized H.264 stream during muxing.
+The Phase 9 encoder continues to pass `-an` and creates an authoritative video-only intermediate. Phase 10 performs its audio decision only after that intermediate completes and never decodes or re-encodes the symbolized H.264 stream during muxing. Phase 11B relocates final publication from a user-selected destination to a managed review artifact; later export publishes that already-reviewed artifact.
 
 ### 9.3 Audio Modes
 
@@ -532,7 +545,7 @@ Remove Audio
 
 Rules:
 
-- Audio mode is captured when export begins and settings remain disabled during the operation.
+- Audio mode is captured when full-video rendering begins and settings remain disabled during that operation.
 - `Keep Audio` requires a strict bundled-ffprobe result; unavailable audio metadata fails safely instead of silently dropping a possible stream.
 - AAC is the MVP MP4-compatible stream-copy codec, compared case-insensitively after trimming.
 - If `Keep Audio` is selected and source audio is AAC, use `-c:v copy -c:a copy`.
@@ -542,7 +555,8 @@ Rules:
 - Map the completed symbolized video as `0:v:0` and original source audio as `1:a:0`.
 - The rendered frame count divided by normalized FPS is the authoritative duration. Apply it as the output duration cap without `-shortest`: shorter audio may end naturally, while longer audio must not extend the completed video.
 - Stream-copy, AAC fallback, no-source-audio, and removed-audio outcomes are reported distinctly.
-- Video-only and mux partials live beside the destination, remain unpublished until complete success, and are cleaned on every failure or cancellation path.
+- Video-only and mux partials live beside the managed review artifact, remain unpublished until complete success, and are cleaned on every failure or cancellation path.
+- The audio mode is part of rendered-video identity. Changing it makes an existing full-video artifact stale but does not invalidate an independent frame preview.
 
 ## 10. UI Specification
 
@@ -584,10 +598,11 @@ Reference rules:
 - The product header title is `Video & Image to Symbol Converter`.
 - The product header subtitle is `Transform videos and images into beautiful symbol art`.
 - The preset quick selector remains in the upper-right product header area.
-- The preview and export-progress areas form the left column.
-- Input, Characters, Render, Audio, and Output form the stacked right column.
+- The preview and persistent processing/result areas form the left column.
+- Input, Characters, Render, and conditional Audio form the stacked right column.
 - The loaded-video/exporting state shown in the design reference is the primary desktop reference state.
 - Image mode uses the same shell and spacing while applying the conditional rules in section 8.2.
+- Phase 11B intentionally supersedes the reference's permanent right-column Output card: result format and export actions appear in the processing/result panel only after a current render exists.
 - Later implementation may improve accessibility and DPI behavior, but must preserve the approved hierarchy and recognizable composition.
 
 ### 10.3 Color Palette
@@ -625,15 +640,14 @@ MainWindow
 |   |   +-- Original / Symbolized tabs
 |   |   +-- Preview surface
 |   |   +-- Video frame slider when media is video
-|   |   +-- Metadata row and preview action
-|   |   +-- Export Status Panel
+|   |   +-- Metadata row and render/preview actions
+|   |   +-- Processing and Result Panel
 |   |
 |   +-- Right Column
 |       +-- Input
 |       +-- Characters
 |       +-- Render
 |       +-- Audio when media is video
-|       +-- Output
 |
 +-- Footer
     +-- Version
@@ -647,7 +661,7 @@ Desktop layout constraints:
 - Main content uses two columns with the left column approximately 1.65 times the width of the right column.
 - The left and right columns align at their top edge.
 - Preview is the dominant surface and uses a 16:9 media stage.
-- Export status sits directly below the preview, not across the full window width.
+- The processing/result panel sits directly below the preview, not across the full window width.
 - Settings cards remain compact and vertically stacked with approximately 8-12 px gaps.
 - Main outer spacing is approximately 20-24 px; card radius is no more than 8 px.
 - At narrow window sizes, the layout may reflow vertically without clipping controls or text.
@@ -680,7 +694,8 @@ Preview panel contains:
 - Large media preview surface.
 - Empty state drop area.
 - Metadata row.
-- Preview action button.
+- `Render Image` for images.
+- `Preview Frame` and `Render Video` for videos.
 - Video frame-position slider for videos only.
 - Fit selector and fullscreen preview action.
 
@@ -688,13 +703,18 @@ Preview panel behavior:
 
 - Initial state shows a drop area and `Browse Media`.
 - Original tab becomes available after media load.
-- Symbolized tab becomes available after symbolized preview generation.
-- Changing render settings after preview marks the symbolized preview as stale.
-- Export remains available only when input and output requirements are valid.
+- Symbolized tab becomes available after an image render, video-frame preview, or full-video render succeeds, and is selected automatically for the new result.
+- Image mode never shows a separate preview command; `Render Image` produces the reusable full image result.
+- Video mode presents `Preview Frame` as a secondary action and `Render Video` as the primary action.
+- Before full-video render, Symbolized may show the latest frame preview. After full-video render, the completed video player takes priority.
+- Changing a render-affecting setting marks the relevant rendered result stale. A stale result remains reviewable, but export is disabled until Render Again succeeds.
+- Moving the video frame-position slider invalidates only the frame preview and never the completed full-video artifact.
+- Export becomes available only when a current, non-stale rendered result exists.
 - Video selection loads an original frame near the middle, enables the normalized position slider, and displays current/total time when duration is known.
 - Rapid slider changes are coalesced; a superseded or cancelled read never replaces the newest frame and is not shown as an error.
 - Video frame loading and failure states are visually distinct while retaining successfully loaded metadata.
-- `Preview Symbolized Frame` is enabled only after an owned original frame is available. In Phase 9, video export is enabled when valid video metadata is selected and no conflicting operation is active.
+- `Preview Frame` is enabled only after an owned original frame is available. `Render Video` depends on valid video metadata and bundled tools, not on a frame preview.
+- The rendered-video player supports play/pause, seek, current time/duration, volume/mute, and the existing fit behavior. It releases media handles before artifact replacement or cleanup.
 
 ### 10.7 Settings Panel
 
@@ -705,7 +725,6 @@ Input
 Characters
 Render
 Audio
-Output
 ```
 
 Input:
@@ -735,25 +754,21 @@ Audio:
 - Keep Audio option.
 - Remove Audio option.
 
-Output:
+The right column has no permanent Output card after Phase 11B. Image format selection and export actions belong to the ready-result state below the preview; the destination is requested only when the user invokes Export.
 
-- Output path picker.
-- Output format selector for images.
-- MP4 output indicator for videos.
-- Export button.
+### 10.8 Processing and Result Panel
 
-### 10.8 Export Status Panel
+The panel is the canonical presentation for long-running work and completed results. It must support:
 
-The export status panel must support:
-
-- Ready state.
-- Preview generation state.
+- Rendering state.
+- Render Ready state.
+- Render Stale state.
 - Exporting state.
-- Completed state.
-- Cancelled state.
+- Exported state.
+- Cancelling and Cancelled states.
 - Error state.
 
-During export it shows:
+During full rendering it shows:
 
 - Status text.
 - Progress bar.
@@ -762,7 +777,11 @@ During export it shows:
 - Estimated remaining time when available.
 - Cancel button.
 
-The segmented accent ring rotates around stationary percentage text and uses a restrained opacity pulse while export or cancellation cleanup is active. Determinate bar values ease monotonically toward the latest reported percentage, and meaningful export-stage changes crossfade without animating frame or timing updates. Successful atomic publication briefly replaces the percentage with a green vector completion mark; failure and cancellation never show success. These effects are presentation-only and are disabled when Windows client-area animations are disabled.
+The preview surface may be dimmed and blocked during full rendering, but it must not duplicate the complete progress presentation from this panel.
+
+After a render succeeds, the panel remains visible and settles into `Image Ready` or `Video Ready`. It shows the green completion mark, result summary, `Export Image` or `Export Video`, and `Render Again`. Image Ready also exposes PNG/JPEG selection. Video Ready exposes the action that focuses or plays the rendered video. After export it shows the destination plus `Open Folder` while retaining the reusable render result.
+
+The segmented accent ring rotates around stationary percentage text and uses a restrained opacity pulse while rendering or cancellation cleanup is active. Determinate bar values ease monotonically toward the latest truthful percentage, and meaningful stage changes crossfade without animating frame or timing updates. Successful review-artifact publication replaces the percentage with a green vector completion mark before the panel settles into its persistent ready state; failure and cancellation never show success. These effects are presentation-only and are disabled when Windows client-area animations are disabled.
 
 It must not include:
 
@@ -792,11 +811,15 @@ Footer does not contain:
 Empty
 LoadingMedia
 LoadingVideoFrame
-MediaLoaded
-GeneratingPreview
-PreviewReady
+MediaReady
+PreviewingFrame
+FramePreviewReady
+Rendering
+RenderReady
+RenderStale
 Exporting
-ExportCompleted
+Exported
+Cancelling
 Cancelled
 Error
 ```
@@ -822,43 +845,68 @@ LoadingVideoFrame:
 - Conflicting preview actions are temporarily disabled; the position slider remains available so a newer request can supersede the active read.
 - Superseded frame reads are cancelled without displaying an error.
 
-MediaLoaded:
+MediaReady:
 
 - Original preview visible.
 - Settings enabled.
-- Preview action enabled.
-- Export enabled only when output path is valid.
-- In video mode, the currently resolved original frame and position controls remain available, and Phase 10 enables MP4 export with the captured Keep Audio or Remove Audio choice when prerequisites are valid.
+- Image mode exposes Render Image without a separate preview action.
+- Video mode exposes Preview Frame and Render Video when their independent prerequisites are valid.
+- Export remains unavailable until a current render result exists.
 
-GeneratingPreview:
+PreviewingFrame:
 
-- Preview button disabled.
-- Render settings temporarily disabled.
-- Loading indicator visible in preview panel.
+- Applies only to video-frame preview.
+- The active frame-preview request can be superseded by a newer position.
+- Full render state and rendered-video identity remain independent.
 
-PreviewReady:
+FramePreviewReady:
 
-- Symbolized preview visible.
+- Symbolized video frame visible.
 - Original and Symbolized tabs enabled.
+- Full Render Video remains available.
+
+Rendering:
+
+- Render controls and settings that affect result identity are disabled.
+- Export is unavailable.
+- Processing panel shows truthful progress and Cancel.
+- UI remains responsive.
+
+RenderReady:
+
+- Current image pixels or completed video artifact are reviewable in Symbolized.
+- The persistent result panel exposes Export and Render Again.
+- Image format may change without making the image render stale.
+
+RenderStale:
+
+- The previous result remains reviewable with an explicit stale warning.
+- Export is disabled.
+- Render Again is the primary action.
 
 Exporting:
 
 - Export button disabled.
-- Cancel button enabled.
-- Progress panel active.
+- Current render result remains authoritative and is not regenerated.
+- A destination-side partial is used before atomic move or replacement.
 - UI remains responsive.
 
-ExportCompleted:
+Exported:
 
 - Success status shown.
 - Open output location action available.
-- Temporary files cleaned.
+- Current render result remains available for repeated export.
+
+Cancelling:
+
+- Cancel cannot be repeated.
+- Conflicting operations remain disabled until all active work releases resources.
 
 Cancelled:
 
 - Cancelled status shown.
-- Partial output removed or clearly marked invalid.
-- Temporary files cleaned.
+- Partial render/export output is removed or clearly marked invalid.
+- A previously current result remains intact unless it was explicitly replaced by the cancelled operation.
 
 Error:
 
@@ -1321,6 +1369,7 @@ GlyphFrame must:
 - Stream rendered frames to FFmpeg through stdin.
 - Dispose bitmaps, frames, and process resources correctly.
 - Keep at most the current decoded video frame in memory; do not cache an unbounded frame history.
+- Retain at most one completed full-video review artifact for the active media session, plus bounded in-progress partials.
 - Serialize random-access FFmpeg extractions, debounce slider input, and reject late results with generation identifiers in addition to cancellation.
 - Bound extraction time, RGBA stdout, and stderr; terminate the process tree on timeout or cancellation.
 - Never retain process handles, pipe buffers, or source-file handles after a frame read completes.
@@ -1550,6 +1599,21 @@ Tasks:
 - Terminate active process trees through bounded cleanup, remove video and audio partials, never publish incomplete output, and preserve an existing destination.
 - Keep export-status motion independent from pipeline semantics: stop decorative clocks when hidden or unloaded, respect the Windows reduced-motion preference, and show the completion mark only after successful publication and resource cleanup.
 
+### Phase 11B - Render, Review, and Export Workflow
+
+- Replace image preview generation with an explicit `Render Image` action and retain one reusable rendered-image result.
+- Keep `Preview Frame` only for video and maintain its identity independently from the full-video render result.
+- Add `Render Video` as the primary full-video action and render a complete MP4 review artifact into an application-managed local cache.
+- Include the captured Keep Audio or Remove Audio choice in the review artifact so in-app review matches later export.
+- Show the current image or completed video in the existing Symbolized tab; give a completed full-video artifact priority over a frame preview.
+- Add in-app playback for the controlled H.264/AAC-or-silent MP4 artifact with play/pause, seek, time, volume/mute, fit, and deterministic handle release.
+- Replace the transient export-status card with a persistent processing/result panel that transitions through Rendering, Render Ready, Render Stale, Exporting, Exported, Cancelling, Cancelled, and Error.
+- Remove the permanent right-column Output card. Request the destination only when Export is invoked, and expose image format plus export/result actions in the ready-result panel.
+- Export only a current, non-stale rendered result. Image export encodes retained rendered pixels; video export publishes the reviewed artifact through a destination-side partial and atomic move or replace without rerunning symbolization or video encoding.
+- Keep stale results reviewable but disable export until Render Again succeeds. Render-setting and video-audio changes invalidate the corresponding full result; image format and destination changes do not. Video slider movement invalidates only frame preview.
+- Use unique Unicode-safe artifact paths and clean player handles, render partials, destination partials, and superseded/orphaned artifacts after media replacement, rerender, cancellation, failure, application exit, and subsequent startup recovery.
+- Cover state transitions, result reuse, invalidation boundaries, stale-callback rejection, player disposal, cache cleanup, repeated export, cancellation, Unicode paths, and existing-destination preservation with automated tests.
+
 ### Phase 12 - Error Handling
 
 - Friendly errors.
@@ -1622,25 +1686,28 @@ MVP is accepted when all criteria below are met.
 - Main UI visibly matches `GlyphFrame_Design_Reference.png` in hierarchy, proportions, spacing, and control placement.
 - Native-style title bar shows the GlyphFrame mark, `GlyphFrame`, and window controls.
 - Product header shows `Video & Image to Symbol Converter`, its description, and the upper-right preset selector.
-- Left column contains the preview panel and the export status panel.
-- Right column contains Input, Characters, Render, Audio for video, and Output in that order.
+- Left column contains the preview panel and the persistent processing/result panel.
+- Right column contains Input, Characters, Render, and Audio for video in that order; it has no permanent Output card after Phase 11B.
 - Preview panel uses equal-width Original and Symbolized tabs and a 16:9 media stage.
-- Loaded-video mode shows the frame slider, fit action, fullscreen action, media metadata, and `Preview Symbolized Frame` action.
-- Exporting mode shows the circular percentage indicator, progress bar, frame progress, elapsed time, remaining time, and Cancel action.
+- Loaded-image mode shows `Render Image` and no redundant image-preview action.
+- Loaded-video mode shows the frame slider, fit action, fullscreen action, media metadata, secondary `Preview Frame`, and primary `Render Video` actions.
+- Rendering mode shows the circular percentage indicator, progress bar, frame progress, elapsed time, remaining time, and Cancel action.
+- Render Ready mode persists result and export actions below the preview.
 - Footer is present.
 - Image/video controls appear conditionally.
 - At 100% Windows scaling, all labels and controls fit at the approved desktop viewport without overlap or clipping.
 - Narrow layouts reflow without losing controls or introducing horizontal page scrolling.
-- UI remains responsive during preview generation and export.
+- UI remains responsive during frame preview, full rendering, playback, and export.
 
-### 22.3 Image Input and Preview
+### 22.3 Image Input and Render
 
 - User can select PNG, JPG/JPEG, WebP, and BMP files.
 - User can drag and drop supported image files.
 - App shows original image preview.
 - App shows image metadata.
 - App hides video-only controls for images.
-- App generates symbolized image preview.
+- App exposes Render Image without a separate image-preview command.
+- Render Image creates one reusable symbolized result and selects the Symbolized tab.
 - App preserves source aspect ratio.
 - Light on Dark is the default and maps bright cells to denser symbols on a dark background.
 - Dark on Light maps dark cells to denser symbols on a light background.
@@ -1654,6 +1721,8 @@ MVP is accepted when all criteria below are met.
 - Selected output resolution is respected.
 - Selected symbol polarity is respected and matches the symbolized preview.
 - PNG and JPEG outputs use the same polarity-dependent opaque background.
+- Export uses the current non-stale rendered pixels and never reruns symbolization solely because destination or PNG/JPEG format changed.
+- Export Image is unavailable before a current render exists.
 - Output overwrite requires confirmation.
 - Unsupported or invalid images show friendly errors.
 
@@ -1665,6 +1734,7 @@ MVP is accepted when all criteria below are met.
 - App shows original preview frame.
 - User can select frame position with a slider.
 - App generates symbolized preview frame.
+- Preview Frame remains independent from full Render Video.
 - App shows video-only controls for videos.
 - App automatically requests an original frame near the middle after metadata succeeds.
 - Slider seeking remains responsive, reconciles to the nearest resolved frame, and cannot publish an obsolete result.
@@ -1673,11 +1743,13 @@ MVP is accepted when all criteria below are met.
 - Source videos are not left locked after preview reads, failures, cancellation, or repeated seeking.
 - The symbolized frame uses the exact currently displayed original frame and the shared image pipeline.
 - Frame/media/render-setting changes mark the previous symbolized frame stale; output-format-only changes do not.
+- Moving the frame slider invalidates only the frame preview and never a completed full-video artifact.
 - Missing native dependencies, unsupported codecs, and frame failures remain non-fatal and user-friendly.
 
 ### 22.6 Video Export
 
 - User can export MP4.
+- User must render and review a complete MP4 artifact before Export Video becomes available.
 - MP4 uses H.264.
 - MP4 uses yuv420p pixel format.
 - MP4 uses CRF 20.
@@ -1685,6 +1757,8 @@ MVP is accepted when all criteria below are met.
 - Export uses normalized source FPS.
 - Rendered frames are streamed to FFmpeg through stdin.
 - The app does not create thousands of temporary PNG files.
+- Export Video publishes the exact reviewed artifact without rerunning symbolization or H.264 encoding.
+- Repeated export from one current artifact is supported and uses a destination-side partial before atomic publication.
 
 ### 22.7 Audio
 
@@ -1696,19 +1770,33 @@ MVP is accepted when all criteria below are met.
 - Keep Audio fails safely when bundled ffprobe cannot reliably determine audio presence.
 - Shorter audio does not truncate video; longer audio is capped at the completed symbolized-video duration.
 - Both video-only and mux partials are cleaned and an existing destination survives failure or cancellation.
+- The selected audio mode is captured for Render Video and is reflected in both in-app review and exported output.
 
 ### 22.8 Progress and Cancel
 
-- Export stage, accepted current frame, elapsed time, and determinate or indeterminate progress are visible.
+- Render stage, accepted current frame, elapsed time, and determinate or indeterminate progress are visible.
 - A trustworthy total frame count is shown when available; unavailable or invalid totals are never fabricated.
-- Percentage is finite and monotonic, remains below 100% until publication, and reaches 100% only for a completed output.
+- Percentage is finite and monotonic, remains below 100% until review-artifact publication, and reaches 100% only for a complete reviewable result.
 - Estimated remaining time is derived from accepted-frame throughput only when calculable and is hidden during indeterminate, audio, and finalization stages.
 - Audio inspection, audio merging, encoder finalization, output finalization, cancellation cleanup, and completion have explicit presentation.
 - Cancel responds immediately, cannot be repeated, and keeps conflicting actions disabled until cleanup finishes.
 - Cancellation reaches every active decoding, rendering, encoding, probing, muxing, and pre-publication boundary.
 - Process trees, streams, frames, handles, and temporary files are cleaned after success, failure, or cancel; incomplete output is not published and an existing destination is preserved.
 
-### 22.9 Settings and Persistence
+### 22.9 Render, Review, and Export
+
+- Original and Symbolized remain the canonical review tabs in their current location above the preview surface.
+- A completed image automatically opens in Symbolized and remains available for comparison with Original.
+- A completed video automatically opens in Symbolized and is playable through the in-app result player.
+- The processing panel remains after rendering and exposes result summary, Render Again, and the media-specific Export action.
+- Render-affecting changes produce an explicit stale state, keep the old result reviewable, and disable export until rerender succeeds.
+- Image format and destination changes do not invalidate image rendering; video slider movement does not invalidate full-video rendering.
+- Only one current full-video artifact is retained for the active media session, and superseded or orphaned artifacts are cleaned safely.
+- Player handles are released before artifact deletion or replacement.
+- The selected destination is requested at export time, not before rendering.
+- Existing destinations are confirmed and preserved on publication failure or cancellation.
+
+### 22.10 Settings and Persistence
 
 - Accent color setting is persisted.
 - Default character preset is persisted.
@@ -1719,15 +1807,16 @@ MVP is accepted when all criteria below are met.
 - Default audio mode is persisted.
 - Reset settings works.
 
-### 22.10 Privacy
+### 22.11 Privacy
 
 - No media files are uploaded.
 - No telemetry is sent.
 - No analytics are sent.
 - Logs are local.
 - Logs do not contain image pixels, video frames, or source media content.
+- Completed review artifacts stay in the application-managed local cache only for the active workflow and are never uploaded.
 
-### 22.11 Documentation
+### 22.12 Documentation
 
 - `GlyphFrame Technical Specification v1.0` exists.
 - `docs/design_reference/GlyphFrame_Design_Reference.png` exists.
