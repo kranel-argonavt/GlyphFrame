@@ -28,6 +28,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly IImageSaveDialogService _imageSaveDialogService;
     private readonly IImageSourceFactory _imageSourceFactory;
     private readonly IUserDialogService _userDialogService;
+    private readonly IFolderLauncher _folderLauncher;
     private readonly ICharacterPresetProvider _presetProvider;
     private readonly IExportStatusPresentationService _exportStatusPresentationService;
     private readonly SynchronizationContext? _synchronizationContext;
@@ -36,15 +37,18 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly AsyncRelayCommand _browseMediaCommand;
     private readonly AsyncRelayCommand<IReadOnlyList<string>> _dropMediaCommand;
     private readonly RelayCommand _browseOutputCommand;
-    private readonly AsyncRelayCommand _previewCommand;
-    private readonly AsyncRelayCommand _exportCommand;
+    private readonly AsyncRelayCommand _renderImageCommand;
+    private readonly AsyncRelayCommand _previewFrameCommand;
+    private readonly AsyncRelayCommand _exportImageCommand;
+    private readonly AsyncRelayCommand _exportVideoCommand;
+    private readonly AsyncRelayCommand _openExportFolderCommand;
     private readonly RelayCommand _cancelExportCommand;
     private readonly RelayCommand _selectOriginalCommand;
     private readonly RelayCommand _selectSymbolizedCommand;
     private readonly RelayCommand _fullscreenCommand;
     private UiPresentationState _presentationState = UiPresentationState.Empty;
     private MediaInputState _mediaInputState = MediaInputState.Empty;
-    private ImageWorkflowState _imageWorkflowState = ImageWorkflowState.Empty;
+    private RenderWorkflowState _renderWorkflowState = RenderWorkflowState.Empty;
     private CancellationTokenSource? _mediaLoadCancellation;
     private CancellationTokenSource? _videoFrameCancellation;
     private CancellationTokenSource? _imageOperationCancellation;
@@ -61,6 +65,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private ImageSource? _originalImageSource;
     private ImageSource? _symbolizedImageSource;
     private string? _selectedOutputPath;
+    private string? _lastImageExportPath;
     private CharacterPresetOption _selectedPreset = CharacterPresetOption.Default;
     private string _selectedFont = "Cascadia Mono";
     private int _selectedFontSize = 10;
@@ -74,6 +79,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private string _activeOperationTitle = "Processing image...";
     private string _activeOperationText = "Preparing local image processing";
     private string _lastGridSummary = string.Empty;
+    private string _lastGridDimensions = string.Empty;
+    private string _lastOutputDimensions = string.Empty;
     private double _timelinePosition;
     private double _resolvedVideoPosition;
     private TimeSpan? _resolvedVideoTimestamp;
@@ -108,6 +115,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         IImageSaveDialogService imageSaveDialogService,
         IImageSourceFactory imageSourceFactory,
         IUserDialogService userDialogService,
+        IFolderLauncher folderLauncher,
         ICharacterPresetProvider presetProvider,
         IExportStatusPresentationService exportStatusPresentationService)
     {
@@ -123,6 +131,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _imageSaveDialogService = imageSaveDialogService ?? throw new ArgumentNullException(nameof(imageSaveDialogService));
         _imageSourceFactory = imageSourceFactory ?? throw new ArgumentNullException(nameof(imageSourceFactory));
         _userDialogService = userDialogService ?? throw new ArgumentNullException(nameof(userDialogService));
+        _folderLauncher = folderLauncher ?? throw new ArgumentNullException(nameof(folderLauncher));
         _presetProvider = presetProvider ?? throw new ArgumentNullException(nameof(presetProvider));
         _exportStatusPresentationService = exportStatusPresentationService
             ?? throw new ArgumentNullException(nameof(exportStatusPresentationService));
@@ -151,8 +160,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             paths => IsBrowseMediaAvailable && paths is not null,
             AsyncRelayCommandOptions.AllowConcurrentExecutions);
         _browseOutputCommand = new RelayCommand(BrowseOutput, CanBrowseOutput);
-        _previewCommand = new AsyncRelayCommand(GeneratePreviewAsync, CanGeneratePreview);
-        _exportCommand = new AsyncRelayCommand(ExportAsync, CanExportMedia);
+        _renderImageCommand = new AsyncRelayCommand(RenderImageAsync, CanRenderImage);
+        _previewFrameCommand = new AsyncRelayCommand(PreviewFrameAsync, CanPreviewFrame);
+        _exportImageCommand = new AsyncRelayCommand(ExportImageAsync, CanExportImage);
+        _exportVideoCommand = new AsyncRelayCommand(ExportVideoAsync, CanExportVideo);
+        _openExportFolderCommand = new AsyncRelayCommand(OpenExportFolderAsync, CanOpenExportFolderAction);
         _cancelExportCommand = new RelayCommand(CancelActiveImageOperation, () => CanCancelExport);
         _selectOriginalCommand = new RelayCommand(
             () => PreviewMode = PreviewMode.Original,
@@ -197,9 +209,15 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public IRelayCommand BrowseOutputCommand => _browseOutputCommand;
 
-    public IAsyncRelayCommand PreviewCommand => _previewCommand;
+    public IAsyncRelayCommand RenderImageCommand => _renderImageCommand;
 
-    public IAsyncRelayCommand ExportCommand => _exportCommand;
+    public IAsyncRelayCommand PreviewFrameCommand => _previewFrameCommand;
+
+    public IAsyncRelayCommand ExportImageCommand => _exportImageCommand;
+
+    public IAsyncRelayCommand ExportVideoCommand => _exportVideoCommand;
+
+    public IAsyncRelayCommand OpenExportFolderCommand => _openExportFolderCommand;
 
     public IRelayCommand CancelExportCommand => _cancelExportCommand;
 
@@ -274,6 +292,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public bool IsExportStatusVisible => IsExportActive || IsExportCompletionVisible;
 
+    public bool IsProcessingResultPanelVisible => IsExportStatusVisible || ShowImageResultPanel;
+
     public bool AreExportAnimationsEnabled => _exportStatusPresentationService.AnimationsEnabled;
 
     public long ExportPresentationGeneration => _exportPresentationGeneration;
@@ -292,6 +312,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _isExportCompletionVisible, value))
             {
                 OnPropertyChanged(nameof(IsExportStatusVisible));
+                OnPropertyChanged(nameof(IsProcessingResultPanelVisible));
             }
         }
     }
@@ -316,13 +337,99 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _isImageProcessing, value);
     }
 
-    public bool CanUseMediaActions => CanGeneratePreview();
+    public bool CanUseMediaActions => CanRenderImage() || CanPreviewFrame();
 
-    public bool HasSymbolizedPreview => _imageWorkflowState.HasSymbolizedPreview
+    public RenderWorkflowStatus WorkflowStatus => _renderWorkflowState.Status;
+
+    public bool HasSymbolizedPreview => _renderWorkflowState.HasSymbolizedPreview
         && _renderedImage is not null
         && _symbolizedImageSource is not null;
 
-    public bool IsSymbolizedPreviewStale => HasSymbolizedPreview && _imageWorkflowState.IsPreviewStale;
+    public bool IsSymbolizedPreviewStale => HasSymbolizedPreview && _renderWorkflowState.IsPreviewStale;
+
+    public bool HasImageRender => IsImageSelected
+        && _renderWorkflowState.HasImageRender
+        && _renderedImage is not null
+        && _symbolizedImageSource is not null;
+
+    public bool IsImageRenderStale => HasImageRender && _renderWorkflowState.IsImageRenderStale;
+
+    public bool ShowImageResultPanel => IsImageSelected
+        && _renderWorkflowState.Status is RenderWorkflowStatus.RenderReady
+            or RenderWorkflowStatus.RenderStale
+            or RenderWorkflowStatus.Exported
+            or RenderWorkflowStatus.Cancelled
+            or RenderWorkflowStatus.Failed;
+
+    public bool ShowImageExportControls => HasImageRender;
+
+    public bool ShowImageRenderMetrics => HasImageRender
+        && !string.IsNullOrWhiteSpace(_lastGridDimensions)
+        && !string.IsNullOrWhiteSpace(_lastOutputDimensions);
+
+    public string ImageGridDimensionsText => _lastGridDimensions;
+
+    public string ImageOutputDimensionsText => _lastOutputDimensions;
+
+    public bool IsImageResultSuccess => _renderWorkflowState.Status is
+        RenderWorkflowStatus.RenderReady or RenderWorkflowStatus.Exported;
+
+    public bool IsImageResultWarning => _renderWorkflowState.Status is
+        RenderWorkflowStatus.RenderStale or RenderWorkflowStatus.Cancelled;
+
+    public bool IsImageResultFailure => _renderWorkflowState.Status == RenderWorkflowStatus.Failed;
+
+    public bool IsImageExported => _renderWorkflowState.Status == RenderWorkflowStatus.Exported;
+
+    public bool CanOpenExportFolder => IsImageExported
+        && !string.IsNullOrWhiteSpace(_lastImageExportPath)
+        && !IsExportActive;
+
+    public string ImageRenderActionLabel => HasImageRender ? "Render Again" : "Render Image";
+
+    public string ImageExportActionLabel => IsImageExported ? "Export Again" : "Export Image";
+
+    public string ImageResultTitle => _renderWorkflowState.Status switch
+    {
+        RenderWorkflowStatus.Exported => "Image Exported",
+        RenderWorkflowStatus.RenderStale => "Render Stale",
+        RenderWorkflowStatus.Cancelled
+            when _renderWorkflowState.OutcomeOperation == RenderWorkflowOperation.ExportImage
+            => "Image Export Cancelled",
+        RenderWorkflowStatus.Cancelled => "Image Rendering Cancelled",
+        RenderWorkflowStatus.Failed
+            when _renderWorkflowState.OutcomeOperation == RenderWorkflowOperation.ExportImage
+            => "Image Export Failed",
+        RenderWorkflowStatus.Failed => "Image Render Failed",
+        _ => "Image Ready"
+    };
+
+    public string ImageResultSummary => _renderWorkflowState.Status switch
+    {
+        RenderWorkflowStatus.Exported when !string.IsNullOrWhiteSpace(_lastImageExportPath)
+            => $"Saved {Path.GetFileName(_lastImageExportPath)}. The rendered image remains ready for another export.",
+        RenderWorkflowStatus.RenderStale
+            => "Render settings changed. Review the previous result or render again before exporting.",
+        RenderWorkflowStatus.Cancelled
+            when _renderWorkflowState.OutcomeOperation == RenderWorkflowOperation.ExportImage
+            => "Image export was cancelled. The rendered image remains ready for another export.",
+        RenderWorkflowStatus.Cancelled when HasImageRender
+            => "Image rendering was cancelled. Your previous rendered image is still available.",
+        RenderWorkflowStatus.Cancelled
+            => "Rendering was cancelled. The original image remains available.",
+        RenderWorkflowStatus.Failed
+            when _renderWorkflowState.OutcomeOperation == RenderWorkflowOperation.ExportImage
+            => "GlyphFrame could not export the image. The rendered image remains ready to try again.",
+        RenderWorkflowStatus.Failed when HasImageRender
+            => "GlyphFrame could not render the image. Your previous rendered image is still available.",
+        RenderWorkflowStatus.Failed
+            => "GlyphFrame could not render this image. You can try again.",
+        _ => string.IsNullOrWhiteSpace(_lastGridSummary)
+            ? "The symbolized image is ready for review and export."
+            : "Ready for review and export."
+    };
+
+    public bool ShowOutputCard => IsVideoSelected;
 
     public bool AreSettingsEnabled => !IsExportActive && !IsLoadingMedia && !IsVideoFrameLoading;
 
@@ -351,19 +458,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _ => "Media File"
     };
 
-    public string PreviewActionLabel => _mediaInputState.SelectedMediaType switch
-    {
-        MediaSelectionKind.Image => "Preview Symbolized Image",
-        MediaSelectionKind.Video => "Preview Symbolized Frame",
-        _ => "Preview Symbolized"
-    };
+    public string PreviewFrameActionLabel => "Preview Frame";
 
-    public string ExportActionLabel => _mediaInputState.SelectedMediaType switch
-    {
-        MediaSelectionKind.Image => "Export Image",
-        MediaSelectionKind.Video => "Export Video",
-        _ => "Export"
-    };
+    public string ExportActionLabel => IsVideoSelected ? "Export Video" : "Export";
 
     public string SelectedFileName => IsLoadingMedia
         ? _mediaInputState.PendingFileName ?? "Reading media"
@@ -501,7 +598,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public string PreviewStaleMessage => IsSymbolizedPreviewStale
         ? IsVideoSelected
             ? "Frame position or settings changed - generate a new symbolized frame."
-            : "Settings changed - generate a new preview before export."
+            : "Render settings changed - review the previous result or render again before export."
         : _lastGridSummary;
 
     public CharacterPresetOption SelectedPreset
@@ -575,10 +672,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref _selectedImageOutputFormat, value))
             {
-                _imageWorkflowState = _imageWorkflowState.OutputFormatChanged();
-                _selectedOutputPath = null;
+                _renderWorkflowState = _renderWorkflowState.OutputFormatChanged();
                 OnPropertyChanged(nameof(OutputPathText));
                 OnPropertyChanged(nameof(OutputFormatText));
+                NotifyImageProperties();
             }
         }
     }
@@ -777,7 +874,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             ApplyPresentationState(UiPresentationState.ForMedia(result.MediaType));
             PreviewMode = PreviewMode.Original;
             _selectedOutputPath = null;
-            _imageWorkflowState = _imageWorkflowState.SelectMedia(
+            _renderWorkflowState = _renderWorkflowState.SelectMedia(
                 result.MediaType,
                 requestId,
                 result.MediaType == MediaSelectionKind.Image && decodedImage is not null);
@@ -831,7 +928,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _ = LoadVideoFrameAsync(
             VideoMetadata.FilePath,
             normalizedPosition,
-            _imageWorkflowState.MediaVersion,
+            _renderWorkflowState.MediaVersion,
             debounce: true);
     }
 
@@ -848,7 +945,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         previous?.Dispose();
 
         long requestId = Interlocked.Increment(ref _videoFrameRequestId);
-        _imageWorkflowState = _imageWorkflowState.SourceChanged();
+        _renderWorkflowState = _renderWorkflowState.SourceChanged();
         _videoFrameError = null;
         _videoFrameTechnicalDetail = null;
         IsVideoFrameLoading = true;
@@ -888,7 +985,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             {
                 _decodedImage = result.Frame;
                 _originalImageSource = _imageSourceFactory.Create(result.Frame);
-                _imageWorkflowState = _imageWorkflowState.OriginalAvailable(mediaVersion);
+                _renderWorkflowState = _renderWorkflowState.OriginalAvailable(mediaVersion);
                 _resolvedVideoPosition = result.ActualNormalizedPosition ?? normalizedPosition;
                 _resolvedVideoTimestamp = result.ActualTimestamp
                     ?? ResolveTimelineTimestamp(_resolvedVideoPosition, result.Duration ?? VideoMetadata?.Duration);
@@ -958,89 +1055,115 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private bool IsCurrentVideoFrameRequest(long requestId, long mediaVersion, string inputPath) =>
         !_disposed
         && requestId == _videoFrameRequestId
-        && mediaVersion == _imageWorkflowState.MediaVersion
+        && mediaVersion == _renderWorkflowState.MediaVersion
         && IsVideoSelected
         && VideoMetadata?.FilePath.Equals(inputPath, StringComparison.OrdinalIgnoreCase) == true;
 
-    private async Task GeneratePreviewAsync()
+    private Task RenderImageAsync() => RenderCurrentSourceAsync(RenderWorkflowOperation.RenderImage);
+
+    private Task PreviewFrameAsync() => RenderCurrentSourceAsync(RenderWorkflowOperation.PreviewVideoFrame);
+
+    private async Task RenderCurrentSourceAsync(RenderWorkflowOperation operation)
     {
+        bool imageRender = operation == RenderWorkflowOperation.RenderImage;
         if (_decodedImage is null
-            || _imageWorkflowState.CurrentIdentity is not PreviewIdentity identity)
+            || _renderWorkflowState.CurrentIdentity is not PreviewIdentity identity
+            || imageRender != IsImageSelected)
         {
             return;
         }
 
-        string? inputPath = ImageMetadata?.FilePath ?? VideoMetadata?.FilePath;
+        string? inputPath = imageRender ? ImageMetadata?.FilePath : VideoMetadata?.FilePath;
         if (string.IsNullOrWhiteSpace(inputPath) || !File.Exists(inputPath))
         {
-            StatusMessage = IsVideoSelected
-                ? "The selected video no longer exists. Choose the video again to continue."
-                : "The selected image no longer exists. Choose the image again to continue.";
+            StatusMessage = imageRender
+                ? "The selected image no longer exists. Choose the image again to continue."
+                : "The selected video no longer exists. Choose the video again to continue.";
             return;
         }
 
         DecodedImage source = _decodedImage;
         (long operationId, CancellationToken token) = BeginImageOperation(
-            "Generating preview...",
+            operation,
+            imageRender ? "Rendering image..." : "Previewing frame...",
             "Measuring glyphs and rendering symbol art");
 
         Stopwatch stopwatch = Stopwatch.StartNew();
+        ImagePipelineResult? result = null;
         try
         {
-            ImagePipelineResult result = await _imagePipelineService.RenderAsync(
+            result = await _imagePipelineService.RenderAsync(
                 source,
                 CaptureRenderSettings(),
                 SelectedPreset,
                 token);
 
-            if (!IsCurrentImageOperation(operationId, identity, source))
+            if (!IsCurrentImageOperation(operationId, identity, source, operation))
             {
+                result.RenderedImage.Dispose();
                 return;
             }
 
-            ApplyRenderedResult(result, identity);
+            GlyphMetrics glyphMetrics = result.GlyphMetrics;
+            ApplyRenderedResult(result, identity, operation);
+            result = null;
             PreviewMode = PreviewMode.Symbolized;
             ExportProgress = 100;
-            StatusMessage = result.GlyphMetrics.UsedFallback
-                ? $"Symbolized preview generated in {stopwatch.Elapsed.TotalSeconds:0.##} seconds. {result.GlyphMetrics.DiagnosticMessage}"
-                : $"Symbolized preview generated in {stopwatch.Elapsed.TotalSeconds:0.##} seconds.";
+            StatusMessage = imageRender
+                ? BuildImageRenderSuccessMessage(stopwatch.Elapsed, _lastGridSummary, glyphMetrics)
+                : $"Symbolized frame generated in {stopwatch.Elapsed.TotalSeconds:0.##} seconds.";
         }
         catch (OperationCanceledException)
         {
+            result?.RenderedImage.Dispose();
             if (operationId == _imageOperationId)
             {
-                StatusMessage = "Symbolized preview generation was cancelled. The original preview remains available.";
+                _renderWorkflowState = _renderWorkflowState.CancelActiveOperation();
+                StatusMessage = imageRender
+                    ? "Image rendering was cancelled. Any previous rendered result remains available."
+                    : "Frame preview was cancelled. The original frame remains available.";
             }
         }
         catch (ImageProcessingException exception)
         {
+            result?.RenderedImage.Dispose();
             if (operationId == _imageOperationId)
             {
+                _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
                 StatusMessage = exception.UserMessage;
-                PreviewMode = PreviewMode.Original;
+                if (!HasSymbolizedPreview)
+                {
+                    PreviewMode = PreviewMode.Original;
+                }
             }
         }
         catch (Exception)
         {
+            result?.RenderedImage.Dispose();
             if (operationId == _imageOperationId)
             {
-                StatusMessage = "GlyphFrame could not generate the symbolized preview.";
-                PreviewMode = PreviewMode.Original;
+                _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
+                StatusMessage = imageRender
+                    ? "GlyphFrame could not render this image."
+                    : "GlyphFrame could not generate the symbolized frame.";
+                if (!HasSymbolizedPreview)
+                {
+                    PreviewMode = PreviewMode.Original;
+                }
             }
         }
         finally
         {
             EndImageOperation(operationId);
+            NotifyImageProperties();
         }
     }
 
-    private Task ExportAsync() => IsVideoSelected ? ExportVideoAsync() : ExportImageAsync();
-
     private async Task ExportImageAsync()
     {
-        if (_decodedImage is null
+        if (_renderedImage is not RenderedImage rendered
             || ImageMetadata is null
-            || _imageWorkflowState.CurrentIdentity is not PreviewIdentity identity)
+            || !_renderWorkflowState.CanExportImage)
         {
             return;
         }
@@ -1052,7 +1175,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         ImageExportFormat format = ResolveImageExportFormat();
-        string? outputPath = _selectedOutputPath ?? SelectOutputPath(format);
+        string? outputPath = SelectOutputPath(format);
         if (string.IsNullOrWhiteSpace(outputPath))
         {
             return;
@@ -1086,53 +1209,35 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        DecodedImage source = _decodedImage;
         (long operationId, CancellationToken token) = BeginImageOperation(
+            RenderWorkflowOperation.ExportImage,
             "Exporting image...",
-            "Rendering symbol art with the current settings");
+            $"Encoding {AppSettingsCatalog.GetDisplayName(format)} from the current rendered image");
 
         try
         {
-            RenderedImage rendered;
-            if (_renderedImage is null || IsSymbolizedPreviewStale)
-            {
-                ImagePipelineResult result = await _imagePipelineService.RenderAsync(
-                    source,
-                    CaptureRenderSettings(),
-                    SelectedPreset,
-                    token);
-
-                if (!IsCurrentImageOperation(operationId, identity, source))
-                {
-                    return;
-                }
-
-                ApplyRenderedResult(result, identity);
-                rendered = result.RenderedImage;
-            }
-            else
-            {
-                rendered = _renderedImage;
-            }
-
-            _activeOperationText = $"Encoding {AppSettingsCatalog.GetDisplayName(format)} output";
-            OnPropertyChanged(nameof(ExportProgressText));
             await _imageExporter.ExportAsync(rendered, outputPath, format, overwrite, token);
 
-            if (!IsCurrentImageOperation(operationId, identity, source))
+            if (operationId != _imageOperationId
+                || !ReferenceEquals(rendered, _renderedImage)
+                || !_renderWorkflowState.CanAcceptResult(
+                    operationId,
+                    _renderWorkflowState.ImageRenderIdentity!,
+                    RenderWorkflowOperation.ExportImage))
             {
                 return;
             }
 
-            _selectedOutputPath = outputPath;
+            _lastImageExportPath = outputPath;
+            _renderWorkflowState = _renderWorkflowState.CompleteExport(operationId);
             ExportProgress = 100;
-            OnPropertyChanged(nameof(OutputPathText));
             StatusMessage = $"Symbolized image exported to {Path.GetFileName(outputPath)}.";
         }
         catch (OperationCanceledException)
         {
             if (operationId == _imageOperationId)
             {
+                _renderWorkflowState = _renderWorkflowState.CancelActiveOperation();
                 StatusMessage = "Image export was cancelled. No partial output was kept.";
             }
         }
@@ -1140,6 +1245,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (operationId == _imageOperationId)
             {
+                _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
                 StatusMessage = exception.UserMessage;
             }
         }
@@ -1147,12 +1253,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (operationId == _imageOperationId)
             {
+                _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
                 StatusMessage = "GlyphFrame could not export the image.";
             }
         }
         finally
         {
             EndImageOperation(operationId);
+            NotifyImageProperties();
         }
     }
 
@@ -1208,6 +1316,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         (long operationId, CancellationToken token) = BeginImageOperation(
+            RenderWorkflowOperation.ExportVideo,
             "Exporting video...",
             SelectedAudioMode == AudioExportMode.KeepAudio
                 ? "Streaming symbolized frames and preserving source audio locally"
@@ -1233,6 +1342,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
             if (result.Success)
             {
+                _renderWorkflowState = _renderWorkflowState.CompleteExport(operationId);
                 _selectedOutputPath = resolvedOutput;
                 ExportStage = VideoExportStage.Completed;
                 ExportProgress = 100;
@@ -1251,6 +1361,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             }
             else
             {
+                _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
                 StatusMessage = result.UserMessage;
             }
         }
@@ -1258,6 +1369,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (operationId == _imageOperationId)
             {
+                _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
                 StatusMessage = "GlyphFrame could not export the symbolized video.";
             }
         }
@@ -1274,20 +1386,16 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void BrowseOutput()
     {
-        string? selected = IsVideoSelected
-            ? VideoMetadata is null ? null : _imageSaveDialogService.SelectVideoOutputFile(VideoMetadata.FilePath)
-            : SelectOutputPath(ResolveImageExportFormat());
+        string? selected = IsVideoSelected && VideoMetadata is not null
+            ? _imageSaveDialogService.SelectVideoOutputFile(VideoMetadata.FilePath)
+            : null;
         if (!string.IsNullOrWhiteSpace(selected))
         {
-            _selectedOutputPath = IsVideoSelected
-                ? NormalizeVideoOutputExtension(selected)
-                : NormalizeOutputExtension(selected, ResolveImageExportFormat());
+            _selectedOutputPath = NormalizeVideoOutputExtension(selected);
             OnPropertyChanged(nameof(OutputPathText));
-            StatusMessage = IsVideoSelected
-                ? SelectedAudioMode == AudioExportMode.KeepAudio
-                    ? "Video output destination selected. Source audio will be preserved when available."
-                    : "Video output destination selected. The exported video will not contain audio."
-                : "Image output destination selected.";
+            StatusMessage = SelectedAudioMode == AudioExportMode.KeepAudio
+                ? "Video output destination selected. Source audio will be preserved when available."
+                : "Video output destination selected. The exported video will not contain audio.";
         }
     }
 
@@ -1295,13 +1403,16 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         ? null
         : _imageSaveDialogService.SelectOutputFile(ImageMetadata.FilePath, format);
 
-    private (long OperationId, CancellationToken Token) BeginImageOperation(string title, string text)
+    private (long OperationId, CancellationToken Token) BeginImageOperation(
+        RenderWorkflowOperation operation,
+        string title,
+        string text)
     {
         CancelImageOperationCore();
         CancellationTokenSource cancellation = new();
         _imageOperationCancellation = cancellation;
         long operationId = Interlocked.Increment(ref _imageOperationId);
-        _imageWorkflowState = _imageWorkflowState.BeginOperation(operationId);
+        _renderWorkflowState = _renderWorkflowState.BeginOperation(operationId, operation);
         _activeOperationTitle = title;
         _activeOperationText = text;
         _exportFrameText = string.Empty;
@@ -1325,6 +1436,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ElapsedText));
         OnPropertyChanged(nameof(RemainingText));
         NotifyCommandStates();
+        NotifyImageProperties();
         return (operationId, cancellation.Token);
     }
 
@@ -1339,10 +1451,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         cancellation?.Dispose();
         _exportElapsedTimer.Stop();
         _exportStopwatch.Stop();
-        _imageWorkflowState = _imageWorkflowState.EndOperation(operationId);
+        _renderWorkflowState = _renderWorkflowState.EndOperation(operationId);
         IsImageProcessing = false;
         IsExportCancellationRequested = false;
         ApplyPresentationState(_presentationState.EndExport());
+        NotifyImageProperties();
         NotifyCommandStates();
     }
 
@@ -1355,6 +1468,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         IsExportCancellationRequested = true;
+        _renderWorkflowState = _renderWorkflowState.BeginCancellation();
         IsExportProgressIndeterminate = true;
         ExportStage = VideoExportStage.Cancelling;
         _activeOperationText = IsVideoSelected
@@ -1363,6 +1477,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _remainingText = string.Empty;
         OnPropertyChanged(nameof(ExportProgressText));
         OnPropertyChanged(nameof(RemainingText));
+        NotifyImageProperties();
         NotifyCommandStates();
         cancellation.Cancel();
         StatusMessage = IsVideoSelected
@@ -1379,7 +1494,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             cancellation.Cancel();
             cancellation.Dispose();
             Interlocked.Increment(ref _imageOperationId);
-            _imageWorkflowState = _imageWorkflowState.CancelActiveOperation();
+            _renderWorkflowState = _renderWorkflowState.CancelActiveOperation();
         }
 
         if (IsImageProcessing)
@@ -1557,35 +1672,54 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private bool IsCurrentImageOperation(
         long operationId,
         PreviewIdentity identity,
-        DecodedImage source) =>
+        DecodedImage source,
+        RenderWorkflowOperation operation) =>
         operationId == _imageOperationId
-        && _imageWorkflowState.CanAcceptResult(operationId, identity)
+        && _renderWorkflowState.CanAcceptResult(operationId, identity, operation)
         && ReferenceEquals(source, _decodedImage);
 
-    private void ApplyRenderedResult(ImagePipelineResult result, PreviewIdentity identity)
+    private void ApplyRenderedResult(
+        ImagePipelineResult result,
+        PreviewIdentity identity,
+        RenderWorkflowOperation operation)
     {
+        ImageSource imageSource = _imageSourceFactory.Create(result.RenderedImage);
+        RenderedImage? previous = _renderedImage;
         _renderedImage = result.RenderedImage;
-        _symbolizedImageSource = _imageSourceFactory.Create(result.RenderedImage);
-        _imageWorkflowState = _imageWorkflowState.CompletePreview(
-            _imageWorkflowState.ActiveOperationId,
-            identity);
-        _lastGridSummary = $"{result.Grid.Columns} x {result.Grid.Rows} symbols  -  {result.RenderedImage.Dimensions.Width} x {result.RenderedImage.Dimensions.Height} output";
+        _symbolizedImageSource = imageSource;
+        _renderWorkflowState = operation == RenderWorkflowOperation.RenderImage
+            ? _renderWorkflowState.CompleteImageRender(_renderWorkflowState.ActiveOperationId, identity)
+            : _renderWorkflowState.CompleteVideoFramePreview(_renderWorkflowState.ActiveOperationId, identity);
+        previous?.Dispose();
+        _lastGridDimensions = $"{result.Grid.Columns} × {result.Grid.Rows}";
+        _lastOutputDimensions = $"{result.RenderedImage.Dimensions.Width} × {result.RenderedImage.Dimensions.Height}";
+        _lastGridSummary = $"{_lastGridDimensions} symbols  •  {_lastOutputDimensions} output";
+        if (operation == RenderWorkflowOperation.RenderImage)
+        {
+            _lastImageExportPath = null;
+        }
+
         NotifyImageProperties();
     }
 
     private void ClearSymbolizedPreview()
     {
+        RenderedImage? previous = _renderedImage;
         _renderedImage = null;
         _symbolizedImageSource = null;
-        _imageWorkflowState = _imageWorkflowState.ClearPreview();
+        _renderWorkflowState = _renderWorkflowState.ClearResult();
+        previous?.Dispose();
         _lastGridSummary = string.Empty;
+        _lastGridDimensions = string.Empty;
+        _lastOutputDimensions = string.Empty;
+        _lastImageExportPath = null;
         PreviewMode = PreviewMode.Original;
         NotifyImageProperties();
     }
 
     private void InvalidateSymbolizedPreview(ImageRenderSetting setting)
     {
-        _imageWorkflowState = _imageWorkflowState.RenderingSettingChanged(setting);
+        _renderWorkflowState = _renderWorkflowState.RenderingSettingChanged(setting);
         if (HasSymbolizedPreview)
         {
             OnPropertyChanged(nameof(IsSymbolizedPreviewStale));
@@ -1593,6 +1727,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             StatusMessage = "Render settings changed. The symbolized preview is now stale.";
         }
 
+        NotifyImageProperties();
         NotifyCommandStates();
     }
 
@@ -1614,20 +1749,79 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             ?.Value
         ?? ImageExportFormat.Png;
 
-    private bool CanGeneratePreview() =>
-        _imageWorkflowState.CanPreview
+    private bool CanRenderImage() =>
+        IsImageSelected
+        && _renderWorkflowState.CanRenderImage
         && _decodedImage is not null
         && !IsLoadingMedia
         && !IsVideoFrameLoading
         && !IsExportActive;
 
-    private bool CanExportMedia() => IsVideoSelected
-        ? VideoMetadata is not null && !IsLoadingMedia && !IsVideoFrameLoading && !IsExportActive
-        : IsImageSelected && _imageWorkflowState.CanExport && CanGeneratePreview();
+    private bool CanPreviewFrame() =>
+        IsVideoSelected
+        && _renderWorkflowState.CanPreviewVideoFrame
+        && _decodedImage is not null
+        && !IsLoadingMedia
+        && !IsVideoFrameLoading
+        && !IsExportActive;
 
-    private bool CanBrowseOutput() => (IsImageSelected || IsVideoSelected)
+    private bool CanExportImage() => IsImageSelected
+        && _renderWorkflowState.CanExportImage
+        && _renderedImage is not null
         && !IsLoadingMedia
         && !IsExportActive;
+
+    private bool CanExportVideo() => IsVideoSelected
+        && VideoMetadata is not null
+        && !IsLoadingMedia
+        && !IsVideoFrameLoading
+        && !IsExportActive;
+
+    private bool CanBrowseOutput() => IsVideoSelected
+        && !IsLoadingMedia
+        && !IsExportActive;
+
+    private bool CanOpenExportFolderAction() => CanOpenExportFolder;
+
+    private async Task OpenExportFolderAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_lastImageExportPath))
+        {
+            return;
+        }
+
+        string? folder = Path.GetDirectoryName(_lastImageExportPath);
+        if (string.IsNullOrWhiteSpace(folder))
+        {
+            StatusMessage = "GlyphFrame could not resolve the exported image folder.";
+            return;
+        }
+
+        try
+        {
+            await _folderLauncher.OpenFolderAsync(folder);
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or InvalidOperationException
+            or Win32Exception)
+        {
+            StatusMessage = "GlyphFrame could not open the exported image folder.";
+        }
+    }
+
+    private static string BuildImageRenderSuccessMessage(
+        TimeSpan elapsed,
+        string summary,
+        GlyphMetrics glyphMetrics)
+    {
+        string message = string.IsNullOrWhiteSpace(summary)
+            ? $"Image rendered in {elapsed.TotalSeconds:0.##} seconds."
+            : $"Image rendered in {elapsed.TotalSeconds:0.##} seconds. {summary}.";
+        return glyphMetrics is { UsedFallback: true, DiagnosticMessage.Length: > 0 }
+            ? $"{message} {glyphMetrics.DiagnosticMessage}"
+            : message;
+    }
 
     private void ApplyImmediateFailure(MediaInputResult failure)
     {
@@ -1664,6 +1858,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         OnPropertyChanged(nameof(IsExportActive));
         OnPropertyChanged(nameof(IsExportStatusVisible));
+        OnPropertyChanged(nameof(IsProcessingResultPanelVisible));
         OnPropertyChanged(nameof(CanCancelExport));
         OnPropertyChanged(nameof(AreSettingsEnabled));
         OnPropertyChanged(nameof(IsBrowseMediaAvailable));
@@ -1682,7 +1877,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(VideoFrameStatusMessage), nameof(VideoFrameTechnicalDetail), nameof(ShowVideoFrameLoading),
             nameof(ShowVideoFrameError), nameof(ShowMediaPlaceholder), nameof(ShowImagePreview),
             nameof(ShowErrorPreview), nameof(IsBrowseMediaAvailable), nameof(IsVideoSeekEnabled),
-            nameof(AreSettingsEnabled), nameof(InputLabel), nameof(PreviewActionLabel), nameof(ExportActionLabel),
+            nameof(AreSettingsEnabled), nameof(InputLabel), nameof(PreviewFrameActionLabel), nameof(ExportActionLabel),
             nameof(SelectedFileName), nameof(SelectedFilePath), nameof(MediaTypeText), nameof(MetadataPrimaryText),
             nameof(MetadataSecondaryText), nameof(FormattedFileSize), nameof(FormattedDimensions),
             nameof(FormattedDuration), nameof(FormattedFps), nameof(FormattedFrameCount),
@@ -1690,7 +1885,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(InputStatusMessage), nameof(InputMetadataSummary), nameof(TimelineText),
             nameof(VideoFramePositionText), nameof(OutputPathText),
             nameof(OutputFormatText), nameof(IsOriginalPreviewSelected), nameof(IsSymbolizedPreviewSelected),
-            nameof(ShowResolutionWarning), nameof(CurrentPreviewImageSource)
+            nameof(ShowResolutionWarning), nameof(CurrentPreviewImageSource), nameof(ShowOutputCard),
+            nameof(WorkflowStatus), nameof(ShowImageResultPanel), nameof(ShowImageExportControls),
+            nameof(IsProcessingResultPanelVisible)
         ];
 
         foreach (string propertyName in propertyNames)
@@ -1708,6 +1905,24 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(HasVideoFrame));
         OnPropertyChanged(nameof(HasSymbolizedPreview));
         OnPropertyChanged(nameof(IsSymbolizedPreviewStale));
+        OnPropertyChanged(nameof(HasImageRender));
+        OnPropertyChanged(nameof(IsImageRenderStale));
+        OnPropertyChanged(nameof(WorkflowStatus));
+        OnPropertyChanged(nameof(ShowImageResultPanel));
+        OnPropertyChanged(nameof(ShowImageExportControls));
+        OnPropertyChanged(nameof(ShowImageRenderMetrics));
+        OnPropertyChanged(nameof(ImageGridDimensionsText));
+        OnPropertyChanged(nameof(ImageOutputDimensionsText));
+        OnPropertyChanged(nameof(IsProcessingResultPanelVisible));
+        OnPropertyChanged(nameof(IsImageResultSuccess));
+        OnPropertyChanged(nameof(IsImageResultWarning));
+        OnPropertyChanged(nameof(IsImageResultFailure));
+        OnPropertyChanged(nameof(IsImageExported));
+        OnPropertyChanged(nameof(CanOpenExportFolder));
+        OnPropertyChanged(nameof(ImageRenderActionLabel));
+        OnPropertyChanged(nameof(ImageExportActionLabel));
+        OnPropertyChanged(nameof(ImageResultTitle));
+        OnPropertyChanged(nameof(ImageResultSummary));
         OnPropertyChanged(nameof(PreviewStaleMessage));
         OnPropertyChanged(nameof(OutputPathText));
         NotifyCommandStates();
@@ -1736,8 +1951,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _browseMediaCommand.NotifyCanExecuteChanged();
         _dropMediaCommand.NotifyCanExecuteChanged();
         _browseOutputCommand.NotifyCanExecuteChanged();
-        _previewCommand.NotifyCanExecuteChanged();
-        _exportCommand.NotifyCanExecuteChanged();
+        _renderImageCommand.NotifyCanExecuteChanged();
+        _previewFrameCommand.NotifyCanExecuteChanged();
+        _exportImageCommand.NotifyCanExecuteChanged();
+        _exportVideoCommand.NotifyCanExecuteChanged();
+        _openExportFolderCommand.NotifyCanExecuteChanged();
         _cancelExportCommand.NotifyCanExecuteChanged();
         _selectOriginalCommand.NotifyCanExecuteChanged();
         _selectSymbolizedCommand.NotifyCanExecuteChanged();
@@ -1867,6 +2085,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         CancellationTokenSource? imageCancellation = Interlocked.Exchange(ref _imageOperationCancellation, null);
         imageCancellation?.Cancel();
         imageCancellation?.Dispose();
+        RenderedImage? rendered = Interlocked.Exchange(ref _renderedImage, null);
+        rendered?.Dispose();
+        _symbolizedImageSource = null;
         Interlocked.Increment(ref _mediaRequestId);
         Interlocked.Increment(ref _videoFrameRequestId);
         Interlocked.Increment(ref _imageOperationId);

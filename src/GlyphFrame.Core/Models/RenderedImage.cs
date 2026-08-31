@@ -4,9 +4,9 @@ namespace GlyphFrame.Core.Models;
 /// An opaque rendered symbol-art image stored as tightly packed RGBA8888 pixels.
 /// Every alpha byte is expected to be 255.
 /// </summary>
-public sealed class RenderedImage
+public sealed class RenderedImage : IDisposable
 {
-    private readonly byte[] _rgbaPixels;
+    private byte[]? _rgbaPixels;
 
     public RenderedImage(int width, int height, byte[] rgbaPixels)
     {
@@ -24,5 +24,10 @@ public sealed class RenderedImage
 
     public PixelDimensions Dimensions { get; }
 
-    public ReadOnlyMemory<byte> RgbaPixels => _rgbaPixels;
+    public bool IsDisposed => _rgbaPixels is null;
+
+    public ReadOnlyMemory<byte> RgbaPixels => _rgbaPixels
+        ?? throw new ObjectDisposedException(nameof(RenderedImage));
+
+    public void Dispose() => Interlocked.Exchange(ref _rgbaPixels, null);
 }

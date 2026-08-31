@@ -33,6 +33,16 @@ public sealed class MainWindowVideoPreviewTests
     }
 
     [Fact]
+    public void Constructor_RejectsNullFolderLauncher()
+    {
+        TestHarness harness = new();
+
+        Assert.Throws<ArgumentNullException>(() => harness.CreateViewModel(
+            folderLauncher: null,
+            allowNullFolderLauncher: true));
+    }
+
+    [Fact]
     public async Task SelectingVideo_LoadsMiddleFrameAndEnablesVideoOnlyPositionControls()
     {
         using TestMediaFiles files = new();
@@ -52,8 +62,12 @@ public sealed class MainWindowVideoPreviewTests
         Assert.True(viewModel.IsVideoSeekEnabled);
         Assert.Equal(VideoPreviewDefaults.MiddlePosition, viewModel.TimelinePosition, 3);
         Assert.Equal(middleFrame, harness.ImageSources.LastDecodedImage);
-        Assert.True(viewModel.PreviewCommand.CanExecute(null));
-        Assert.True(viewModel.ExportCommand.CanExecute(null));
+        Assert.False(viewModel.RenderImageCommand.CanExecute(null));
+        Assert.True(viewModel.PreviewFrameCommand.CanExecute(null));
+        Assert.False(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.True(viewModel.ExportVideoCommand.CanExecute(null));
+        Assert.True(viewModel.ShowOutputCard);
+        Assert.Equal("Preview Frame", viewModel.PreviewFrameActionLabel);
         Assert.Contains("0:05", viewModel.TimelineText, StringComparison.Ordinal);
     }
 
@@ -75,7 +89,7 @@ public sealed class MainWindowVideoPreviewTests
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
         viewModel.SelectedAudioMode = AudioExportMode.RemoveAudio;
 
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
 
         Assert.NotNull(harness.VideoExports.LastJob);
         Assert.Equal(videoPath, harness.VideoExports.LastJob!.InputPath);
@@ -112,11 +126,11 @@ public sealed class MainWindowVideoPreviewTests
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
 
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
 
         Assert.Contains(expectedMessage, viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
         Assert.False(viewModel.IsExportActive);
-        Assert.True(viewModel.ExportCommand.CanExecute(null));
+        Assert.True(viewModel.ExportVideoCommand.CanExecute(null));
     }
 
     [Fact]
@@ -134,10 +148,10 @@ public sealed class MainWindowVideoPreviewTests
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
 
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.IsExportActive);
-        Assert.True(viewModel.ExportCommand.CanExecute(null));
+        Assert.True(viewModel.ExportVideoCommand.CanExecute(null));
         Assert.Contains("could not finish", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("raw encoder detail", viewModel.StatusMessage, StringComparison.Ordinal);
     }
@@ -161,11 +175,11 @@ public sealed class MainWindowVideoPreviewTests
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
 
-        Task export = viewModel.ExportCommand.ExecuteAsync(null);
+        Task export = viewModel.ExportVideoCommand.ExecuteAsync(null);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
 
         Assert.True(viewModel.IsExportActive);
-        Assert.False(viewModel.ExportCommand.CanExecute(null));
+        Assert.False(viewModel.ExportVideoCommand.CanExecute(null));
         Assert.False(viewModel.BrowseMediaCommand.CanExecute(null));
         Assert.False(viewModel.BrowseOutputCommand.CanExecute(null));
         Assert.False(viewModel.AreSettingsEnabled);
@@ -177,7 +191,7 @@ public sealed class MainWindowVideoPreviewTests
             10));
         await export;
         Assert.False(viewModel.IsExportActive);
-        Assert.True(viewModel.ExportCommand.CanExecute(null));
+        Assert.True(viewModel.ExportVideoCommand.CanExecute(null));
     }
 
     [Fact]
@@ -200,7 +214,7 @@ public sealed class MainWindowVideoPreviewTests
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
         viewModel.SelectedAudioMode = AudioExportMode.KeepAudio;
 
-        Task export = viewModel.ExportCommand.ExecuteAsync(null);
+        Task export = viewModel.ExportVideoCommand.ExecuteAsync(null);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
         viewModel.SelectedAudioMode = AudioExportMode.RemoveAudio;
 
@@ -243,7 +257,7 @@ public sealed class MainWindowVideoPreviewTests
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
 
-        Task export = viewModel.ExportCommand.ExecuteAsync(null);
+        Task export = viewModel.ExportVideoCommand.ExecuteAsync(null);
         await progressReported.Task;
 
         Assert.False(viewModel.IsExportProgressIndeterminate);
@@ -280,7 +294,7 @@ public sealed class MainWindowVideoPreviewTests
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
 
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.IsExportActive);
         Assert.True(viewModel.IsExportCompletionVisible);
@@ -307,7 +321,7 @@ public sealed class MainWindowVideoPreviewTests
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
 
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.IsExportCompletionVisible);
         Assert.False(viewModel.IsExportStatusVisible);
@@ -333,10 +347,10 @@ public sealed class MainWindowVideoPreviewTests
             : WaitForSecondExportAsync();
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
         long completedGeneration = viewModel.ExportPresentationGeneration;
 
-        Task secondExport = viewModel.ExportCommand.ExecuteAsync(null);
+        Task secondExport = viewModel.ExportVideoCommand.ExecuteAsync(null);
         await secondExportStarted.Task;
 
         Assert.False(viewModel.IsExportCompletionVisible);
@@ -377,9 +391,9 @@ public sealed class MainWindowVideoPreviewTests
             : WaitForSecondExportAsync();
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
 
-        Task secondExport = viewModel.ExportCommand.ExecuteAsync(null);
+        Task secondExport = viewModel.ExportVideoCommand.ExecuteAsync(null);
         await secondExportStarted.Task;
         stalePresentation.SetResult();
         await Task.Yield();
@@ -417,7 +431,7 @@ public sealed class MainWindowVideoPreviewTests
         };
         MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
         await presentationStarted.Task;
 
         viewModel.Dispose();
@@ -440,7 +454,7 @@ public sealed class MainWindowVideoPreviewTests
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
 
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.AreExportAnimationsEnabled);
         Assert.True(viewModel.IsExportCompletionVisible);
@@ -475,7 +489,7 @@ public sealed class MainWindowVideoPreviewTests
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
 
-        Task export = viewModel.ExportCommand.ExecuteAsync(null);
+        Task export = viewModel.ExportVideoCommand.ExecuteAsync(null);
         await stageReported.Task;
 
         Assert.True(viewModel.IsExportProgressIndeterminate);
@@ -523,7 +537,7 @@ public sealed class MainWindowVideoPreviewTests
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
 
-        Task export = viewModel.ExportCommand.ExecuteAsync(null);
+        Task export = viewModel.ExportVideoCommand.ExecuteAsync(null);
         await started.Task;
         viewModel.CancelExportCommand.Execute(null);
         await cancellationObserved.Task;
@@ -580,7 +594,7 @@ public sealed class MainWindowVideoPreviewTests
         };
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
         string completedStatus = viewModel.StatusMessage;
 
         capturedProgress!.Report(ExportProgress(
@@ -635,9 +649,9 @@ public sealed class MainWindowVideoPreviewTests
         };
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
 
-        Task secondExport = viewModel.ExportCommand.ExecuteAsync(null);
+        Task secondExport = viewModel.ExportVideoCommand.ExecuteAsync(null);
         await secondStarted.Task;
         oldProgress!.Report(ExportProgress(
             VideoExportStage.Completed,
@@ -672,7 +686,7 @@ public sealed class MainWindowVideoPreviewTests
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
 
-        await viewModel.ExportCommand.ExecuteAsync(null);
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
 
         Assert.Equal(0, harness.VideoExports.Calls);
         Assert.Equal(original, await File.ReadAllBytesAsync(outputPath));
@@ -801,7 +815,7 @@ public sealed class MainWindowVideoPreviewTests
         viewModel.SelectedOutputResolution = "720p";
         viewModel.SelectedSymbolPolarity = SymbolPolarity.DarkOnLight;
 
-        await viewModel.PreviewCommand.ExecuteAsync(null);
+        await viewModel.PreviewFrameCommand.ExecuteAsync(null);
 
         Assert.Equal(firstFrame, harness.ImagePipeline.LastRenderedSource);
         Assert.Equal(CharacterPresetKind.Blocks, harness.ImagePipeline.LastRenderedPreset?.Kind);
@@ -818,7 +832,7 @@ public sealed class MainWindowVideoPreviewTests
         Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
         await WaitUntilAsync(viewModel, () => !viewModel.IsVideoFrameLoading);
 
-        await viewModel.PreviewCommand.ExecuteAsync(null);
+        await viewModel.PreviewFrameCommand.ExecuteAsync(null);
 
         Assert.Equal(secondFrame, harness.ImagePipeline.LastRenderedSource);
         Assert.False(viewModel.IsSymbolizedPreviewStale);
@@ -833,12 +847,12 @@ public sealed class MainWindowVideoPreviewTests
         TestHarness harness = ReadyVideoHarness();
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
-        await viewModel.PreviewCommand.ExecuteAsync(null);
+        await viewModel.PreviewFrameCommand.ExecuteAsync(null);
 
         viewModel.SelectedFontSize = 12;
 
         Assert.True(viewModel.IsSymbolizedPreviewStale);
-        await viewModel.PreviewCommand.ExecuteAsync(null);
+        await viewModel.PreviewFrameCommand.ExecuteAsync(null);
         Assert.False(viewModel.IsSymbolizedPreviewStale);
 
         viewModel.SelectedImageOutputFormat = "JPG/JPEG";
@@ -862,7 +876,7 @@ public sealed class MainWindowVideoPreviewTests
             return oldRender.Task;
         };
 
-        Task preview = viewModel.PreviewCommand.ExecuteAsync(null);
+        Task preview = viewModel.PreviewFrameCommand.ExecuteAsync(null);
         await renderStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
         viewModel.TimelinePosition = 0.8d;
         await WaitUntilAsync(viewModel, () => !viewModel.IsVideoFrameLoading);
@@ -871,6 +885,374 @@ public sealed class MainWindowVideoPreviewTests
 
         Assert.False(viewModel.HasSymbolizedPreview);
         Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
+    }
+
+    [Fact]
+    public async Task ImageRender_UsesDedicatedCommandStoresResultAndSelectsSymbolizedReview()
+    {
+        using TestMediaFiles files = new();
+        string imagePath = files.Create("render.png");
+        TestHarness harness = ReadyImageHarness();
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+
+        Assert.True(viewModel.RenderImageCommand.CanExecute(null));
+        Assert.False(viewModel.PreviewFrameCommand.CanExecute(null));
+        Assert.False(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.False(viewModel.HasSymbolizedPreview);
+        Assert.Equal("Render Image", viewModel.ImageRenderActionLabel);
+        Assert.False(viewModel.ShowImageExportControls);
+
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+
+        Assert.Equal(RenderWorkflowStatus.RenderReady, viewModel.WorkflowStatus);
+        Assert.True(viewModel.HasImageRender);
+        Assert.True(viewModel.HasSymbolizedPreview);
+        Assert.Equal(PreviewMode.Symbolized, viewModel.PreviewMode);
+        Assert.True(viewModel.ShowImageResultPanel);
+        Assert.True(viewModel.ShowImageExportControls);
+        Assert.True(viewModel.ShowImageRenderMetrics);
+        Assert.Equal("1 × 1", viewModel.ImageGridDimensionsText);
+        Assert.Equal("2 × 1", viewModel.ImageOutputDimensionsText);
+        Assert.True(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.Equal("Render Again", viewModel.ImageRenderActionLabel);
+        Assert.False(viewModel.ShowOutputCard);
+    }
+
+    [Fact]
+    public async Task ImageRender_SettingsMakeResultStaleButExportOnlyAndReviewChangesDoNot()
+    {
+        using TestMediaFiles files = new();
+        string imagePath = files.Create("stale.png");
+        TestHarness harness = ReadyImageHarness();
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+
+        viewModel.SelectedFontSize = viewModel.SelectedFontSize;
+        viewModel.SelectedImageOutputFormat = "JPG/JPEG";
+        viewModel.SelectedFitMode = "100%";
+        viewModel.SelectOriginalCommand.Execute(null);
+
+        Assert.False(viewModel.IsImageRenderStale);
+        Assert.Equal(RenderWorkflowStatus.RenderReady, viewModel.WorkflowStatus);
+        Assert.True(viewModel.ExportImageCommand.CanExecute(null));
+
+        viewModel.SelectedFontSize = 12;
+
+        Assert.Equal(RenderWorkflowStatus.RenderStale, viewModel.WorkflowStatus);
+        Assert.True(viewModel.IsImageRenderStale);
+        Assert.True(viewModel.HasSymbolizedPreview);
+        Assert.True(viewModel.ShowImageExportControls);
+        Assert.True(viewModel.ShowImageRenderMetrics);
+        Assert.True(viewModel.SelectSymbolizedCommand.CanExecute(null));
+        Assert.False(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.Contains("settings changed", viewModel.ImageResultSummary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ImageExport_ReusesRetainedRenderAcrossFormatsWithoutRerendering()
+    {
+        using TestMediaFiles files = new();
+        string imagePath = files.Create("reuse.png");
+        TestHarness harness = ReadyImageHarness();
+        harness.SaveDialogs.ImageOutputPaths.Enqueue(files.PathFor("first.png"));
+        harness.SaveDialogs.ImageOutputPaths.Enqueue(files.PathFor("second.jpg"));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+        int renderCalls = harness.ImagePipeline.RenderCalls;
+
+        await viewModel.ExportImageCommand.ExecuteAsync(null);
+        RenderedImage firstExport = harness.ImageExporter.LastImage!;
+        viewModel.SelectedImageOutputFormat = "JPG/JPEG";
+        await viewModel.ExportImageCommand.ExecuteAsync(null);
+
+        Assert.Equal(renderCalls, harness.ImagePipeline.RenderCalls);
+        Assert.Equal(2, harness.ImageExporter.Calls);
+        Assert.Same(firstExport, harness.ImageExporter.LastImage);
+        Assert.False(firstExport.IsDisposed);
+        Assert.Equal(ImageExportFormat.Jpeg, harness.ImageExporter.LastFormat);
+        Assert.Equal(RenderWorkflowStatus.Exported, viewModel.WorkflowStatus);
+        Assert.True(viewModel.CanOpenExportFolder);
+        Assert.True(viewModel.ExportImageCommand.CanExecute(null));
+
+        await viewModel.OpenExportFolderCommand.ExecuteAsync(null);
+        Assert.Equal(Path.GetDirectoryName(files.PathFor("second.jpg")), harness.FolderLauncher.LastFolder);
+    }
+
+    [Fact]
+    public async Task ImageExport_CancelledDialogAndFailurePreserveRetainedRenderForRetry()
+    {
+        using TestMediaFiles files = new();
+        string imagePath = files.Create("failure.png");
+        TestHarness harness = ReadyImageHarness();
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+
+        await viewModel.ExportImageCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, harness.ImageExporter.Calls);
+        Assert.Equal(RenderWorkflowStatus.RenderReady, viewModel.WorkflowStatus);
+        Assert.True(viewModel.ExportImageCommand.CanExecute(null));
+
+        harness.SaveDialogs.ImageOutputPaths.Enqueue(files.PathFor("failure-output.png"));
+        harness.ImageExporter.Handler = (_, _, _, _, _) => throw new IOException("raw export failure");
+        await viewModel.ExportImageCommand.ExecuteAsync(null);
+
+        Assert.Equal(RenderWorkflowStatus.Failed, viewModel.WorkflowStatus);
+        Assert.Equal("Image Export Failed", viewModel.ImageResultTitle);
+        Assert.True(viewModel.HasImageRender);
+        Assert.True(viewModel.ShowImageExportControls);
+        Assert.True(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.DoesNotContain("raw export failure", viewModel.StatusMessage, StringComparison.Ordinal);
+
+        harness.SaveDialogs.ImageOutputPaths.Enqueue(files.PathFor("retry-output.png"));
+        harness.ImageExporter.Handler = (_, _, _, _, _) => Task.CompletedTask;
+        int renderCalls = harness.ImagePipeline.RenderCalls;
+
+        await viewModel.ExportImageCommand.ExecuteAsync(null);
+
+        Assert.Equal(RenderWorkflowStatus.Exported, viewModel.WorkflowStatus);
+        Assert.Equal(renderCalls, harness.ImagePipeline.RenderCalls);
+        Assert.Equal(2, harness.ImageExporter.Calls);
+    }
+
+    [Fact]
+    public async Task InitialRenderFailure_ShowsRenderOutcomeWithoutExportControls()
+    {
+        using TestMediaFiles files = new();
+        string imagePath = files.Create("initial-render-failure.png");
+        TestHarness harness = ReadyImageHarness();
+        harness.ImagePipeline.RenderHandler = (_, _, _, _) => throw new InvalidOperationException("raw render failure");
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+
+        Assert.Equal(RenderWorkflowStatus.Failed, viewModel.WorkflowStatus);
+        Assert.Equal("Image Render Failed", viewModel.ImageResultTitle);
+        Assert.True(viewModel.ShowImageResultPanel);
+        Assert.False(viewModel.HasImageRender);
+        Assert.False(viewModel.ShowImageExportControls);
+        Assert.False(viewModel.ShowImageRenderMetrics);
+        Assert.False(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.Equal("Render Image", viewModel.ImageRenderActionLabel);
+        Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
+        Assert.DoesNotContain("raw render failure", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FailedRenderAgain_PreservesPreviousRenderedResultAndCurrentExportability()
+    {
+        using TestMediaFiles files = new();
+        string imagePath = files.Create("rerender-failure.png");
+        TestHarness harness = ReadyImageHarness();
+        RenderedImage retained = new(2, 1, [31, 32, 33, 255, 31, 32, 33, 255]);
+        int call = 0;
+        harness.ImagePipeline.RenderHandler = (_, _, _, _) => Interlocked.Increment(ref call) == 1
+            ? Task.FromResult(RenderResult(retained))
+            : throw new InvalidOperationException("raw rerender failure");
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+
+        Assert.Equal(RenderWorkflowStatus.Failed, viewModel.WorkflowStatus);
+        Assert.Equal("Image Render Failed", viewModel.ImageResultTitle);
+        Assert.True(viewModel.HasImageRender);
+        Assert.True(viewModel.ShowImageExportControls);
+        Assert.True(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.False(retained.IsDisposed);
+        Assert.Equal("Render Again", viewModel.ImageRenderActionLabel);
+    }
+
+    [Fact]
+    public async Task InitialRenderCancellation_ShowsRenderOutcomeWithoutExportControls()
+    {
+        using TestMediaFiles files = new();
+        string imagePath = files.Create("initial-render-cancel.png");
+        TestHarness harness = ReadyImageHarness();
+        TaskCompletionSource started = NewCompletion();
+        harness.ImagePipeline.RenderHandler = async (_, _, _, cancellationToken) =>
+        {
+            started.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("Unreachable");
+        };
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+
+        Task render = viewModel.RenderImageCommand.ExecuteAsync(null);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        viewModel.CancelExportCommand.Execute(null);
+        await render;
+
+        Assert.Equal(RenderWorkflowStatus.Cancelled, viewModel.WorkflowStatus);
+        Assert.Equal("Image Rendering Cancelled", viewModel.ImageResultTitle);
+        Assert.True(viewModel.ShowImageResultPanel);
+        Assert.False(viewModel.HasImageRender);
+        Assert.False(viewModel.ShowImageExportControls);
+        Assert.False(viewModel.ShowImageRenderMetrics);
+        Assert.False(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.Equal("Render Image", viewModel.ImageRenderActionLabel);
+    }
+
+    [Fact]
+    public async Task CancelledImageExport_PreservesRetainedRenderAndAllowsRetry()
+    {
+        using TestMediaFiles files = new();
+        string imagePath = files.Create("export-cancel.png");
+        TestHarness harness = ReadyImageHarness();
+        harness.SaveDialogs.ImageOutputPaths.Enqueue(files.PathFor("cancelled-output.png"));
+        harness.SaveDialogs.ImageOutputPaths.Enqueue(files.PathFor("retry-output.png"));
+        TaskCompletionSource started = NewCompletion();
+        harness.ImageExporter.Handler = async (_, _, _, _, cancellationToken) =>
+        {
+            started.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        };
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+        int renderCalls = harness.ImagePipeline.RenderCalls;
+
+        Task export = viewModel.ExportImageCommand.ExecuteAsync(null);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        viewModel.CancelExportCommand.Execute(null);
+        await export;
+
+        Assert.Equal(RenderWorkflowStatus.Cancelled, viewModel.WorkflowStatus);
+        Assert.Equal("Image Export Cancelled", viewModel.ImageResultTitle);
+        Assert.True(viewModel.HasImageRender);
+        Assert.True(viewModel.ShowImageExportControls);
+        Assert.True(viewModel.ExportImageCommand.CanExecute(null));
+
+        harness.ImageExporter.Handler = (_, _, _, _, _) => Task.CompletedTask;
+        await viewModel.ExportImageCommand.ExecuteAsync(null);
+
+        Assert.Equal(RenderWorkflowStatus.Exported, viewModel.WorkflowStatus);
+        Assert.Equal(renderCalls, harness.ImagePipeline.RenderCalls);
+    }
+
+    [Fact]
+    public async Task RenderAgain_DisposesPreviousResultExactlyOnceAndMediaReplacementDisposesCurrent()
+    {
+        using TestMediaFiles files = new();
+        string firstPath = files.Create("first.png");
+        string secondPath = files.Create("second.png");
+        TestHarness harness = ReadyImageHarness();
+        RenderedImage first = new(2, 1, [1, 2, 3, 255, 1, 2, 3, 255]);
+        RenderedImage second = new(2, 1, [4, 5, 6, 255, 4, 5, 6, 255]);
+        Queue<RenderedImage> results = new([first, second]);
+        harness.ImagePipeline.RenderHandler = (_, _, _, _) => Task.FromResult(RenderResult(results.Dequeue()));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([firstPath]);
+
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+
+        Assert.True(first.IsDisposed);
+        Assert.False(second.IsDisposed);
+
+        await viewModel.DropMediaCommand.ExecuteAsync([secondPath]);
+
+        Assert.True(second.IsDisposed);
+        Assert.False(viewModel.HasImageRender);
+        Assert.False(viewModel.ShowImageRenderMetrics);
+        Assert.Equal(string.Empty, viewModel.ImageGridDimensionsText);
+        Assert.Equal(string.Empty, viewModel.ImageOutputDimensionsText);
+    }
+
+    [Fact]
+    public async Task CancellingRenderAgain_PreservesPreviousReviewUntilCleanupCompletes()
+    {
+        using TestMediaFiles files = new();
+        string imagePath = files.Create("cancel-rerender.png");
+        TestHarness harness = ReadyImageHarness();
+        RenderedImage retained = new(2, 1, [11, 12, 13, 255, 11, 12, 13, 255]);
+        int call = 0;
+        TaskCompletionSource started = NewCompletion();
+        harness.ImagePipeline.RenderHandler = async (_, _, _, cancellationToken) =>
+        {
+            if (Interlocked.Increment(ref call) == 1)
+            {
+                return RenderResult(retained);
+            }
+
+            started.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("Unreachable");
+        };
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+
+        Task rerender = viewModel.RenderImageCommand.ExecuteAsync(null);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.True(viewModel.IsExportActive);
+
+        viewModel.CancelExportCommand.Execute(null);
+
+        Assert.True(viewModel.IsExportCancellationRequested);
+        Assert.False(viewModel.CancelExportCommand.CanExecute(null));
+        await rerender;
+
+        Assert.Equal(RenderWorkflowStatus.Cancelled, viewModel.WorkflowStatus);
+        Assert.Equal("Image Rendering Cancelled", viewModel.ImageResultTitle);
+        Assert.False(viewModel.IsExportActive);
+        Assert.True(viewModel.HasImageRender);
+        Assert.True(viewModel.ShowImageExportControls);
+        Assert.False(retained.IsDisposed);
+        Assert.True(viewModel.ExportImageCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task SupersededImageRender_DisposesLateResultWithoutReplacingCurrentReview()
+    {
+        using TestMediaFiles files = new();
+        string imagePath = files.Create("late.png");
+        TestHarness harness = ReadyImageHarness();
+        TaskCompletionSource<ImagePipelineResult> pending = NewCompletion<ImagePipelineResult>();
+        TaskCompletionSource started = NewCompletion();
+        harness.ImagePipeline.RenderHandler = (_, _, _, _) =>
+        {
+            started.TrySetResult();
+            return pending.Task;
+        };
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+
+        Task render = viewModel.RenderImageCommand.ExecuteAsync(null);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        viewModel.SelectedFontSize = 12;
+        RenderedImage late = new(2, 1, [7, 8, 9, 255, 7, 8, 9, 255]);
+        pending.SetResult(RenderResult(late));
+        await render;
+
+        Assert.True(late.IsDisposed);
+        Assert.False(viewModel.HasImageRender);
+        Assert.False(viewModel.ExportImageCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task DisposingViewModel_ReleasesRetainedImageRender()
+    {
+        using TestMediaFiles files = new();
+        string imagePath = files.Create("dispose-render.png");
+        TestHarness harness = ReadyImageHarness();
+        RenderedImage retained = new(2, 1, [21, 22, 23, 255, 21, 22, 23, 255]);
+        harness.ImagePipeline.RenderHandler = (_, _, _, _) => Task.FromResult(RenderResult(retained));
+        MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+
+        viewModel.Dispose();
+
+        Assert.True(retained.IsDisposed);
     }
 
     [Fact]
@@ -889,7 +1271,7 @@ public sealed class MainWindowVideoPreviewTests
         using MainWindowViewModel viewModel = harness.CreateViewModel();
 
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
-        await viewModel.PreviewCommand.ExecuteAsync(null);
+        await viewModel.PreviewFrameCommand.ExecuteAsync(null);
         await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
 
         Assert.True(viewModel.IsImageSelected);
@@ -898,8 +1280,10 @@ public sealed class MainWindowVideoPreviewTests
         Assert.Equal(0d, viewModel.TimelinePosition);
         Assert.False(viewModel.IsVideoSeekEnabled);
         Assert.Equal(image, harness.ImageSources.LastDecodedImage);
-        Assert.True(viewModel.PreviewCommand.CanExecute(null));
-        Assert.True(viewModel.ExportCommand.CanExecute(null));
+        Assert.True(viewModel.RenderImageCommand.CanExecute(null));
+        Assert.False(viewModel.PreviewFrameCommand.CanExecute(null));
+        Assert.False(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.False(viewModel.ShowOutputCard);
     }
 
     [Fact]
@@ -974,6 +1358,14 @@ public sealed class MainWindowVideoPreviewTests
         return harness;
     }
 
+    private static TestHarness ReadyImageHarness()
+    {
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(ImageResult(path!));
+        harness.ImagePipeline.DecodeResult = SolidFrame(25, 50, 75);
+        return harness;
+    }
+
     private static MediaInputResult VideoResult(string path) => MediaInputResult.ForVideo(VideoMetadataFor(path));
 
     private static VideoMetadata VideoMetadataFor(string path) => new(
@@ -1025,6 +1417,11 @@ public sealed class MainWindowVideoPreviewTests
     private static ImagePipelineResult RenderResult() => new(
         new RenderedImage(2, 1, [10, 20, 30, 255, 10, 20, 30, 255]),
         new SymbolGrid(1, 1, new PixelDimensions(2, 1)),
+        new GlyphMetrics("Cascadia Mono", "Cascadia Mono", 10, 5, 10, 8, false));
+
+    private static ImagePipelineResult RenderResult(RenderedImage image) => new(
+        image,
+        new SymbolGrid(1, 1, image.Dimensions),
         new GlyphMetrics("Cascadia Mono", "Cascadia Mono", 10, 5, 10, 8, false));
 
     private static VideoExportProgress ExportProgress(
@@ -1092,6 +1489,10 @@ public sealed class MainWindowVideoPreviewTests
 
         public FakeImageSaveDialogService SaveDialogs { get; } = new();
 
+        public FakeImageExporter ImageExporter { get; } = new();
+
+        public FakeFolderLauncher FolderLauncher { get; } = new();
+
         public FakeUserDialogService UserDialogs { get; } = new();
 
         public FakeExportStatusPresentationService ExportStatusPresentation { get; } = new();
@@ -1100,7 +1501,9 @@ public sealed class MainWindowVideoPreviewTests
             IVideoFrameReader? videoFrameReader = null,
             bool allowNull = false,
             IExportStatusPresentationService? exportStatusPresentationService = null,
-            bool allowNullExportStatusPresentationService = false) => new(
+            bool allowNullExportStatusPresentationService = false,
+            IFolderLauncher? folderLauncher = null,
+            bool allowNullFolderLauncher = false) => new(
             ApplicationInfo.Phase11,
             new FakeSettingsManager(),
             new FakeSettingsDialogService(),
@@ -1109,10 +1512,11 @@ public sealed class MainWindowVideoPreviewTests
             allowNull ? videoFrameReader! : videoFrameReader ?? VideoFrames,
             VideoExports,
             ImagePipeline,
-            new FakeImageExporter(),
+            ImageExporter,
             SaveDialogs,
             ImageSources,
             UserDialogs,
+            allowNullFolderLauncher ? folderLauncher! : folderLauncher ?? FolderLauncher,
             new CharacterPresetProvider(),
             allowNullExportStatusPresentationService
                 ? exportStatusPresentationService!
@@ -1193,6 +1597,8 @@ public sealed class MainWindowVideoPreviewTests
 
         public CharacterPresetOption? LastRenderedPreset { get; private set; }
 
+        public int RenderCalls { get; private set; }
+
         public Func<DecodedImage, ImageRenderSettings, CharacterPresetOption, CancellationToken, Task<ImagePipelineResult>> RenderHandler { get; set; } =
             (_, _, _, _) => Task.FromResult(RenderResult());
 
@@ -1207,6 +1613,7 @@ public sealed class MainWindowVideoPreviewTests
             CharacterPresetOption preset,
             CancellationToken cancellationToken = default)
         {
+            RenderCalls++;
             LastRenderedSource = source;
             LastRenderSettings = settings;
             LastRenderedPreset = preset;
@@ -1266,19 +1673,37 @@ public sealed class MainWindowVideoPreviewTests
 
     private sealed class FakeImageExporter : IImageExporter
     {
+        public Func<RenderedImage, string, ImageExportFormat, bool, CancellationToken, Task> Handler { get; set; } =
+            (_, _, _, _, _) => Task.CompletedTask;
+
+        public RenderedImage? LastImage { get; private set; }
+
+        public ImageExportFormat? LastFormat { get; private set; }
+
+        public int Calls { get; private set; }
+
         public Task ExportAsync(
             RenderedImage image,
             string outputPath,
             ImageExportFormat format,
             bool overwrite,
-            CancellationToken cancellationToken = default) => Task.CompletedTask;
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            LastImage = image;
+            LastFormat = format;
+            return Handler(image, outputPath, format, overwrite, cancellationToken);
+        }
     }
 
     private sealed class FakeImageSaveDialogService : IImageSaveDialogService
     {
+        public Queue<string?> ImageOutputPaths { get; } = new();
+
         public string? VideoOutputPath { get; set; }
 
-        public string? SelectOutputFile(string sourcePath, ImageExportFormat format) => null;
+        public string? SelectOutputFile(string sourcePath, ImageExportFormat format) =>
+            ImageOutputPaths.Count > 0 ? ImageOutputPaths.Dequeue() : null;
 
         public string? SelectVideoOutputFile(string sourcePath) => VideoOutputPath;
     }
@@ -1292,6 +1717,17 @@ public sealed class MainWindowVideoPreviewTests
             string message,
             string confirmButtonText = "Confirm",
             string cancelButtonText = "Cancel") => ConfirmResult;
+    }
+
+    private sealed class FakeFolderLauncher : IFolderLauncher
+    {
+        public string? LastFolder { get; private set; }
+
+        public Task OpenFolderAsync(string folderPath, CancellationToken cancellationToken = default)
+        {
+            LastFolder = folderPath;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class TestMediaFiles : IDisposable

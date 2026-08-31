@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 11 — Progress and Cancellation; Phase 11B specified
+Status: Updated through Phase 11B.1 — Workflow Foundation and Image Render Flow; later Phase 11B work specified
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -456,7 +456,8 @@ When the loaded media is an image:
 - Output format choices are `PNG` and `JPG/JPEG`.
 - PNG is selected by default.
 - Metadata row shows image width, height, format, and file size.
-- Export appears in the persistent result panel only after a current render exists.
+- Image output format and export actions appear in the persistent result panel only after a rendered image exists. Export remains disabled while that retained result is stale.
+- Render and export failures or cancellations remain visible in the result panel with operation-specific status text; they do not discard an earlier retained render.
 
 ### 8.3 Image Acceptance Requirements
 
@@ -779,7 +780,9 @@ During full rendering it shows:
 
 The preview surface may be dimmed and blocked during full rendering, but it must not duplicate the complete progress presentation from this panel.
 
-After a render succeeds, the panel remains visible and settles into `Image Ready` or `Video Ready`. It shows the green completion mark, result summary, `Export Image` or `Export Video`, and `Render Again`. Image Ready also exposes PNG/JPEG selection. Video Ready exposes the action that focuses or plays the rendered video. After export it shows the destination plus `Open Folder` while retaining the reusable render result.
+After a render succeeds, the panel remains visible and settles into `Image Ready` or `Video Ready`. It shows the green completion mark, result summary, and `Export Image` or `Export Video`. Image Ready also exposes PNG/JPEG selection. Video Ready exposes the action that focuses or plays the rendered video. The media action row above the preview remains the single location for `Render Image` / `Render Again` and future `Render Video` actions. After export the panel shows the destination plus `Open Folder` while retaining the reusable render result.
+
+Before an image render exists, the result panel may remain visible to report a failed or cancelled render, but it hides the output-format selector and all export-related action containers. A stale retained render keeps the format selector visible and Export disabled while the preview-panel `Render Again` action remains primary. Failed and cancelled states identify whether rendering or exporting was affected; export failure or cancellation preserves a current retained render for retry without rerendering.
 
 The segmented accent ring rotates around stationary percentage text and uses a restrained opacity pulse while rendering or cancellation cleanup is active. Determinate bar values ease monotonically toward the latest truthful percentage, and meaningful stage changes crossfade without animating frame or timing updates. Successful review-artifact publication replaces the percentage with a green vector completion mark before the panel settles into its persistent ready state; failure and cancellation never show success. These effects are presentation-only and are disabled when Windows client-area animations are disabled.
 
@@ -875,14 +878,15 @@ Rendering:
 RenderReady:
 
 - Current image pixels or completed video artifact are reviewable in Symbolized.
-- The persistent result panel exposes Export and Render Again.
+- The persistent result panel exposes format and Export actions.
+- The preview-panel media action row exposes the single Render Again action.
 - Image format may change without making the image render stale.
 
 RenderStale:
 
 - The previous result remains reviewable with an explicit stale warning.
 - Export is disabled.
-- Render Again is the primary action.
+- The preview-panel Render Again action is the primary enabled action.
 
 Exporting:
 
@@ -1608,9 +1612,9 @@ Tasks:
 - Show the current image or completed video in the existing Symbolized tab; give a completed full-video artifact priority over a frame preview.
 - Add in-app playback for the controlled H.264/AAC-or-silent MP4 artifact with play/pause, seek, time, volume/mute, fit, and deterministic handle release.
 - Replace the transient export-status card with a persistent processing/result panel that transitions through Rendering, Render Ready, Render Stale, Exporting, Exported, Cancelling, Cancelled, and Error.
-- Remove the permanent right-column Output card. Request the destination only when Export is invoked, and expose image format plus export/result actions in the ready-result panel.
+- Remove the permanent right-column Output card. Request the destination only when Export is invoked, expose image format plus export/result actions in the ready-result panel, and retain Render / Render Again in the preview-panel media action row without duplication.
 - Export only a current, non-stale rendered result. Image export encodes retained rendered pixels; video export publishes the reviewed artifact through a destination-side partial and atomic move or replace without rerunning symbolization or video encoding.
-- Keep stale results reviewable but disable export until Render Again succeeds. Render-setting and video-audio changes invalidate the corresponding full result; image format and destination changes do not. Video slider movement invalidates only frame preview.
+- Keep stale results reviewable but disable export until the preview-panel Render Again action succeeds. Render-setting and video-audio changes invalidate the corresponding full result; image format and destination changes do not. Video slider movement invalidates only frame preview.
 - Use unique Unicode-safe artifact paths and clean player handles, render partials, destination partials, and superseded/orphaned artifacts after media replacement, rerender, cancellation, failure, application exit, and subsequent startup recovery.
 - Cover state transitions, result reuse, invalidation boundaries, stale-callback rejection, player disposal, cache cleanup, repeated export, cancellation, Unicode paths, and existing-destination preservation with automated tests.
 
@@ -1708,6 +1712,7 @@ MVP is accepted when all criteria below are met.
 - App hides video-only controls for images.
 - App exposes Render Image without a separate image-preview command.
 - Render Image creates one reusable symbolized result and selects the Symbolized tab.
+- Render Image / Render Again stays in the preview-panel media action row throughout the image workflow and is not duplicated in the result panel.
 - App preserves source aspect ratio.
 - Light on Dark is the default and maps bright cells to denser symbols on a dark background.
 - Dark on Light maps dark cells to denser symbols on a light background.
@@ -1723,6 +1728,8 @@ MVP is accepted when all criteria below are met.
 - PNG and JPEG outputs use the same polarity-dependent opaque background.
 - Export uses the current non-stale rendered pixels and never reruns symbolization solely because destination or PNG/JPEG format changed.
 - Export Image is unavailable before a current render exists.
+- Export controls are hidden when no rendered image exists; a stale retained image keeps its format selector visible while Export remains disabled.
+- Render and export failures and cancellations have distinct result-panel presentation. Export failure or cancellation preserves the retained pixels for another export attempt.
 - Output overwrite requires confirmation.
 - Unsupported or invalid images show friendly errors.
 
@@ -1788,7 +1795,7 @@ MVP is accepted when all criteria below are met.
 - Original and Symbolized remain the canonical review tabs in their current location above the preview surface.
 - A completed image automatically opens in Symbolized and remains available for comparison with Original.
 - A completed video automatically opens in Symbolized and is playable through the in-app result player.
-- The processing panel remains after rendering and exposes result summary, Render Again, and the media-specific Export action.
+- The processing panel remains after rendering and exposes result summary plus media-specific format, Export, and Open Folder actions; Render / Render Again remains solely in the preview-panel media action row.
 - Render-affecting changes produce an explicit stale state, keep the old result reviewable, and disable export until rerender succeeds.
 - Image format and destination changes do not invalidate image rendering; video slider movement does not invalidate full-video rendering.
 - Only one current full-video artifact is retained for the active media session, and superseded or orphaned artifacts are cleaned safely.

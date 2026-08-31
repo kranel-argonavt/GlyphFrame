@@ -33,12 +33,9 @@ public sealed record UiPresentationState
         _ => "Media File"
     };
 
-    public string PreviewActionLabel => MediaType switch
-    {
-        MediaSelectionKind.Image => "Preview Symbolized Image",
-        MediaSelectionKind.Video => "Preview Symbolized Frame",
-        _ => "Preview Symbolized"
-    };
+    public string ImageRenderActionLabel => IsImageSelected ? "Render Image" : string.Empty;
+
+    public string VideoFramePreviewActionLabel => IsVideoSelected ? "Preview Frame" : string.Empty;
 
     public string ExportActionLabel => MediaType switch
     {

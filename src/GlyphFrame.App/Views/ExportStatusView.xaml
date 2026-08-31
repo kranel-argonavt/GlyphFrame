@@ -5,66 +5,189 @@
              xmlns:views="clr-namespace:GlyphFrame.App.Views"
              Margin="0,10,0,0"
              Focusable="False"
-             Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-    <Border Style="{StaticResource CardStyle}">
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="86" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+             Visibility="{Binding IsProcessingResultPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+    <Grid>
+        <Border Style="{StaticResource CardStyle}"
+                Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="86" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <views:ExportActivityIndicator Width="72"
-                                           Height="72"
-                                           HorizontalAlignment="Left"
-                                           VerticalAlignment="Center"
-                                           AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                                           IsActive="{Binding IsExportActive}"
-                                           IsCompleted="{Binding IsExportCompletionVisible}"
-                                           PercentageText="{Binding ExportPercentageText}" />
+                <views:ExportActivityIndicator Width="72"
+                                               Height="72"
+                                               HorizontalAlignment="Left"
+                                               VerticalAlignment="Center"
+                                               AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                               IsActive="{Binding IsExportActive}"
+                                               IsCompleted="{Binding IsExportCompletionVisible}"
+                                               PercentageText="{Binding ExportPercentageText}" />
 
-            <Grid Grid.Column="1" Margin="0,0,18,0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <TextBlock Style="{StaticResource SectionHeaderTextStyle}"
-                           Text="{Binding ExportOperationTitle}" />
-                <TextBlock Grid.Row="1"
-                           Margin="0,4,0,0"
-                           presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                           presentation:ExportStatusAnimation.Stage="{Binding ExportStage}"
-                           presentation:ExportStatusAnimation.StageText="{Binding ExportProgressText}"
-                           Style="{StaticResource SecondaryTextStyle}"
-                           Text="" />
-                <TextBlock Grid.Row="2"
-                           Margin="0,4,0,0"
-                           Style="{StaticResource MutedTextStyle}"
-                           Text="{Binding ExportFrameText}" />
-                <ProgressBar Grid.Row="3"
-                             Margin="0,10,0,0"
-                             Maximum="100"
-                             presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                             presentation:ExportStatusAnimation.ProgressGeneration="{Binding ExportPresentationGeneration}"
-                             presentation:ExportStatusAnimation.ProgressIsIndeterminate="{Binding IsExportProgressIndeterminate}"
-                             presentation:ExportStatusAnimation.ProgressStage="{Binding ExportStage}"
-                             presentation:ExportStatusAnimation.ProgressValue="{Binding ExportProgress}" />
-                <StackPanel Grid.Row="4" Margin="0,9,0,0" Orientation="Horizontal">
-                    <TextBlock Style="{StaticResource MutedTextStyle}" Text="{Binding ElapsedText}" />
-                    <TextBlock Margin="24,0,0,0" Style="{StaticResource MutedTextStyle}" Text="{Binding RemainingText}" />
+                <Grid Grid.Column="1" Margin="0,0,18,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource SectionHeaderTextStyle}"
+                               Text="{Binding ExportOperationTitle}" />
+                    <TextBlock Grid.Row="1"
+                               Margin="0,4,0,0"
+                               presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                               presentation:ExportStatusAnimation.Stage="{Binding ExportStage}"
+                               presentation:ExportStatusAnimation.StageText="{Binding ExportProgressText}"
+                               Style="{StaticResource SecondaryTextStyle}"
+                               Text="" />
+                    <TextBlock Grid.Row="2"
+                               Margin="0,4,0,0"
+                               Style="{StaticResource MutedTextStyle}"
+                               Text="{Binding ExportFrameText}" />
+                    <ProgressBar Grid.Row="3"
+                                 Margin="0,10,0,0"
+                                 Maximum="100"
+                                 presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                 presentation:ExportStatusAnimation.ProgressGeneration="{Binding ExportPresentationGeneration}"
+                                 presentation:ExportStatusAnimation.ProgressIsIndeterminate="{Binding IsExportProgressIndeterminate}"
+                                 presentation:ExportStatusAnimation.ProgressStage="{Binding ExportStage}"
+                                 presentation:ExportStatusAnimation.ProgressValue="{Binding ExportProgress}" />
+                    <StackPanel Grid.Row="4" Margin="0,9,0,0" Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource MutedTextStyle}" Text="{Binding ElapsedText}" />
+                        <TextBlock Margin="24,0,0,0" Style="{StaticResource MutedTextStyle}" Text="{Binding RemainingText}" />
+                    </StackPanel>
+                </Grid>
+
+                <Button Grid.Column="2"
+                        Width="96"
+                        VerticalAlignment="Center"
+                        Command="{Binding CancelExportCommand}"
+                        Content="Cancel"
+                        Style="{StaticResource DangerButtonStyle}"
+                        Visibility="{Binding IsExportActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            </Grid>
+        </Border>
+
+        <Border Style="{StaticResource CardStyle}"
+                Visibility="{Binding ShowImageResultPanel, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="64" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Grid Width="46" Height="46" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Ellipse Fill="{DynamicResource AccentSubtleBrush}"
+                             Stroke="{DynamicResource AccentBrush}"
+                             StrokeThickness="1" />
+                    <Path Width="22"
+                          Height="16"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Data="M 1,8 L 7,14 L 21,1"
+                          Stroke="{StaticResource SuccessBrush}"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round"
+                          StrokeStartLineCap="Round"
+                          StrokeThickness="3"
+                          Stretch="Fill"
+                          Visibility="{Binding IsImageResultSuccess, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Path Width="4"
+                          Height="20"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Data="M 2,0 L 2,12 M 2,18 L 2,20"
+                          Stroke="{StaticResource WarningBrush}"
+                          StrokeEndLineCap="Round"
+                          StrokeThickness="3"
+                          Visibility="{Binding IsImageResultWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Path Width="20"
+                          Height="20"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Data="M 1,1 L 19,19 M 19,1 L 1,19"
+                          Stroke="{StaticResource ErrorBrush}"
+                          StrokeEndLineCap="Round"
+                          StrokeThickness="2.5"
+                          Visibility="{Binding IsImageResultFailure, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                </Grid>
+
+                <Grid Grid.Column="1" Margin="0,0,24,0" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock HorizontalAlignment="Left"
+                                   Style="{StaticResource SectionHeaderTextStyle}"
+                                   Text="{Binding ImageResultTitle}" />
+                        <TextBlock Margin="0,5,0,0"
+                                   HorizontalAlignment="Left"
+                                   MaxWidth="360"
+                                   Style="{StaticResource SecondaryTextStyle}"
+                                   Text="{Binding ImageResultSummary}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Margin="24,0,0,0"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Visibility="{Binding ShowImageRenderMetrics, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Border MinWidth="112"
+                                Padding="12,8"
+                                Background="{DynamicResource ElevatedBackgroundBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource MutedTextStyle}" Text="SYMBOL GRID" />
+                                <TextBlock Margin="0,3,0,0"
+                                           Style="{StaticResource MonospaceTextStyle}"
+                                           Text="{Binding ImageGridDimensionsText}" />
+                            </StackPanel>
+                        </Border>
+                        <Border MinWidth="132"
+                                Margin="10,0,0,0"
+                                Padding="12,8"
+                                Background="{DynamicResource ElevatedBackgroundBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource MutedTextStyle}" Text="OUTPUT" />
+                                <TextBlock Margin="0,3,0,0"
+                                           Style="{StaticResource MonospaceTextStyle}"
+                                           Text="{Binding ImageOutputDimensionsText}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Visibility="{Binding ShowImageExportControls, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ComboBox MinWidth="150"
+                              ItemsSource="{Binding ImageOutputFormats}"
+                              SelectedItem="{Binding SelectedImageOutputFormat}"
+                              ToolTip="Choose the image format used by Export Image" />
+                    <StackPanel Margin="0,10,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                        <Button Margin="0,0,8,0"
+                                Command="{Binding OpenExportFolderCommand}"
+                                Content="Open Folder"
+                                Visibility="{Binding CanOpenExportFolder, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <Button MinWidth="112"
+                                Command="{Binding ExportImageCommand}"
+                                Content="{Binding ImageExportActionLabel}"
+                                Style="{StaticResource PrimaryButtonStyle}" />
+                    </StackPanel>
                 </StackPanel>
             </Grid>
-
-            <Button Grid.Column="2"
-                    Width="96"
-                    VerticalAlignment="Center"
-                    Command="{Binding CancelExportCommand}"
-                    Content="Cancel"
-                    Style="{StaticResource DangerButtonStyle}"
-                    Visibility="{Binding IsExportActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
-        </Grid>
-    </Border>
+        </Border>
+    </Grid>
 </UserControl>

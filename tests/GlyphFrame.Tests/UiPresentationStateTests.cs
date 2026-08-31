@@ -20,11 +20,12 @@ public sealed class UiPresentationStateTests
     }
 
     [Theory]
-    [InlineData(MediaSelectionKind.Image, "Preview Symbolized Image", "Export Image")]
-    [InlineData(MediaSelectionKind.Video, "Preview Symbolized Frame", "Export Video")]
+    [InlineData(MediaSelectionKind.Image, "Render Image", "", "Export Image")]
+    [InlineData(MediaSelectionKind.Video, "", "Preview Frame", "Export Video")]
     public void MediaState_ProvidesModeSpecificRules(
         MediaSelectionKind mediaType,
-        string previewLabel,
+        string imageRenderLabel,
+        string videoPreviewLabel,
         string exportLabel)
     {
         UiPresentationState state = UiPresentationState.ForMedia(mediaType);
@@ -33,7 +34,8 @@ public sealed class UiPresentationStateTests
         Assert.True(state.CanUseMediaActions);
         Assert.Equal(mediaType == MediaSelectionKind.Image, state.IsImageSelected);
         Assert.Equal(mediaType == MediaSelectionKind.Video, state.IsVideoSelected);
-        Assert.Equal(previewLabel, state.PreviewActionLabel);
+        Assert.Equal(imageRenderLabel, state.ImageRenderActionLabel);
+        Assert.Equal(videoPreviewLabel, state.VideoFramePreviewActionLabel);
         Assert.Equal(exportLabel, state.ExportActionLabel);
     }
 

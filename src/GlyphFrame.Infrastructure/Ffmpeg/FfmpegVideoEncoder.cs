@@ -77,13 +77,20 @@ public sealed class FfmpegVideoEncoder : IVideoEncoder
             {
                 await foreach (RenderedImage frame in frames.WithCancellation(cancellationToken).ConfigureAwait(false))
                 {
-                    ValidateFrame(frame, job.FrameDimensions, framesWritten);
-                    await process.StandardInput.WriteAsync(frame.RgbaPixels, cancellationToken)
-                        .ConfigureAwait(false);
-                    framesWritten = checked(framesWritten + 1);
-                    progress?.Report(new VideoEncodingProgress(
-                        VideoEncodingProgressStage.FrameAccepted,
-                        framesWritten));
+                    try
+                    {
+                        ValidateFrame(frame, job.FrameDimensions, framesWritten);
+                        await process.StandardInput.WriteAsync(frame.RgbaPixels, cancellationToken)
+                            .ConfigureAwait(false);
+                        framesWritten = checked(framesWritten + 1);
+                        progress?.Report(new VideoEncodingProgress(
+                            VideoEncodingProgressStage.FrameAccepted,
+                            framesWritten));
+                    }
+                    finally
+                    {
+                        frame.Dispose();
+                    }
                 }
 
                 await process.StandardInput.FlushAsync(cancellationToken).ConfigureAwait(false);

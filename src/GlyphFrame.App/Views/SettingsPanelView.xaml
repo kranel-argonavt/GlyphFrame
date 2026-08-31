@@ -242,6 +242,7 @@
         </Border>
 
         <Border IsEnabled="{Binding AreSettingsEnabled}"
+                Visibility="{Binding ShowOutputCard, Converter={StaticResource BooleanToVisibilityConverter}}"
                 Style="{StaticResource CardStyle}">
             <StackPanel>
                 <StackPanel Margin="0,0,0,14" Orientation="Horizontal">
@@ -281,27 +282,15 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Style="{StaticResource LabelTextStyle}" Text="Format" />
-                    <ComboBox Grid.Column="1"
-                              ItemsSource="{Binding ImageOutputFormats}"
-                              SelectedItem="{Binding SelectedImageOutputFormat}"
-                              Visibility="{Binding IsImageSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <Border Grid.Column="1"
-                            Style="{StaticResource ReadOnlySurfaceStyle}"
-                            Visibility="{Binding IsVideoSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Style="{StaticResource ReadOnlySurfaceStyle}">
                         <TextBlock VerticalAlignment="Center" Text="MP4" />
-                    </Border>
-                    <Border Grid.Column="1"
-                            Style="{StaticResource ReadOnlySurfaceStyle}"
-                            Visibility="{Binding IsNoMediaSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedTextBrush}"
-                                   Text="Select media" />
                     </Border>
                 </Grid>
 
                 <Button Margin="82,12,0,0"
-                        Command="{Binding ExportCommand}"
-                        Content="{Binding ExportActionLabel}"
+                        Command="{Binding ExportVideoCommand}"
+                        Content="Export Video"
                         Style="{StaticResource PrimaryButtonStyle}" />
             </StackPanel>
         </Border>

@@ -333,13 +333,18 @@
                                    Text="Same as source is above 1080p; preview and export remain available."
                                    Visibility="{Binding ShowResolutionWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
-                    <Button Grid.Column="1"
-                            MinWidth="188"
-                            Margin="16,0,0,0"
-                            VerticalAlignment="Center"
-                            Command="{Binding PreviewCommand}"
-                            Content="{Binding PreviewActionLabel}"
-                            Style="{StaticResource PrimaryButtonStyle}" />
+                    <Grid Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
+                        <Button MinWidth="188"
+                                Command="{Binding RenderImageCommand}"
+                                Content="{Binding ImageRenderActionLabel}"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Visibility="{Binding IsImageSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <Button MinWidth="188"
+                                Command="{Binding PreviewFrameCommand}"
+                                Content="{Binding PreviewFrameActionLabel}"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Visibility="{Binding IsVideoSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </Grid>
                 </Grid>
             </Border>
         </Grid>

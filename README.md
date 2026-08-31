@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 11 — Progress and Cancellation is complete. GlyphFrame reports truthful live stages, encoder-accepted frame counts, elapsed time, and a throughput-based remaining-time estimate during full symbolized-video export. Unknown frame totals remain indeterminate. Cancellation stays active through FFmpeg decoding/encoding, audio probing/muxing, final publication, and partial-file cleanup. The next specified milestone is Phase 11B — Render, Review, and Export Workflow.
+Phase 11B.1 — Workflow Foundation and Image Render Flow is complete. Image mode now follows an explicit Render → Review → Export workflow: `Render Image` retains one symbolized result for review, render-setting changes mark it stale without discarding it, and PNG/JPEG exports reuse the exact retained pixels without rerendering. Video frame preview and direct streaming video export remain available while the later Phase 11B video-artifact work is pending.
 
 ## Platform and target framework
 
@@ -115,14 +115,15 @@ Select or drop image
 → sample visible cell colors and Rec. 709 luminance
 → map luminance to the selected character ramp and polarity
 → render colored glyphs on the polarity's opaque background
-→ preview or export the symbolized image
+→ retain the symbolized image for review
+→ export the retained result as PNG or JPEG
 ```
 
 Built-in character presets are Simple ASCII, Detailed ASCII, and Unicode Blocks. Their ramps stay ordered from sparse to dense. Supported fonts are Cascadia Mono, Consolas, Courier New, and Lucida Console at sizes 9, 10, and 12. Missing fonts fall back safely, and the output modes are Same as source, 720p, and 1080p while preserving the normalized source aspect ratio.
 
-`Light on Dark` is the default polarity: bright areas use denser symbols on the dark GlyphFrame background, making pale subjects on dark scenes remain visually bright. `Dark on Light` maps dark areas to denser symbols on a neutral near-white background for a traditional printed-ASCII appearance. Changing polarity marks the symbolized preview stale, and preview plus export always regenerate from the current polarity.
+`Light on Dark` is the default polarity: bright areas use denser symbols on the dark GlyphFrame background, making pale subjects on dark scenes remain visually bright. `Dark on Light` maps dark areas to denser symbols on a neutral near-white background for a traditional printed-ASCII appearance. Changing polarity marks the retained symbolized image stale; `Render Again` must create a current result before export becomes available.
 
-PNG is the default output format; JPG/JPEG is also supported at a centralized quality of 90. Export uses an atomic temporary-file strategy, confirms before replacing an existing file, never overwrites the input image, and removes partial files after failure or cancellation. Changing a render setting marks an existing symbolized preview as stale, and export always renders with the current settings.
+PNG is the default output format; JPG/JPEG is also supported at a centralized quality of 90. Export uses an atomic temporary-file strategy, confirms before replacing an existing file, never overwrites the input image, and removes partial files after failure or cancellation. Changing a render setting retains the previous review but marks it stale and disables export. Output-format, destination, tab, and fit changes do not invalidate rendering. Repeated PNG/JPEG exports encode the retained result directly and never rerun symbolization.
 
 Transparent source pixels use straight alpha and are composited exactly once over the selected opaque polarity background before color and luminance sampling. Preview, PNG export, and JPEG export therefore use the same visible-color and background rules.
 
@@ -132,7 +133,7 @@ MP4, MOV, MKV, and AVI selections load one original frame near the 50% position 
 
 GlyphFrame maps the normalized slider value to an invariant FFmpeg timestamp when duration is known and backs the `1.0` position away from the duration boundary to request the final available frame. Input paths are passed as individual Unicode-safe process arguments, including spaces, Cyrillic, and mixed-language filenames. FFmpeg selects the first video stream, decodes exactly one display-oriented frame, and writes tightly packed straight-alpha RGBA8888 bytes through an in-memory binary pipe. GlyphFrame validates the exact byte count and takes ownership of the managed buffer; it creates no copied videos or temporary frame files.
 
-`Preview Symbolized Frame` passes the currently displayed owned frame to the same grid, luminance, character-preset, polarity, and SkiaSharp renderer used for images. Moving the slider, selecting other media, or changing a render setting makes the old symbolized frame stale; output-format-only changes do not. Preview remains intentionally one frame at a time—there is no animated playback.
+`Preview Frame` passes the currently displayed owned frame to the same grid, luminance, character-preset, polarity, and SkiaSharp renderer used for images. Moving the slider, selecting other media, or changing a render setting makes the old symbolized frame stale; output-format-only changes do not. Preview remains intentionally one frame at a time—there is no animated playback.
 
 ## Streaming video and audio export
 
@@ -150,7 +151,7 @@ Cancel immediately changes the export state to cleanup, disables repeated cancel
 
 Export-status motion is presentation-only: the segmented accent ring rotates and gently pulses, determinate bar changes ease toward the latest truthful value, and meaningful stage changes crossfade. A successfully published video briefly shows a green completion mark after export resources have been released. GlyphFrame honors the Windows client-area animation preference; with reduced motion, these values and states update immediately without changing progress calculation, cancellation, or cleanup.
 
-## Planned Phase 11B workflow
+## Phase 11B workflow
 
 Phase 11B separates creation from publication:
 
@@ -158,11 +159,11 @@ Phase 11B separates creation from publication:
 Load media -> Render -> Review -> Export
 ```
 
-Image mode will remove the redundant symbolized-preview command. `Render Image` will create one reusable full image result, select the existing Symbolized tab, and enable `Export Image` in a persistent result panel. PNG/JPEG selection and destination changes will reuse those rendered pixels instead of rerunning symbolization.
+Phase 11B.1 completes the image half of this workflow. Image mode has no separate symbolized-preview command: one stable preview-panel action starts as `Render Image` and becomes `Render Again` after a result exists. Rendering creates one reusable full image result, selects the existing Symbolized tab, and enables `Export Image` in the persistent result panel. A stale result remains reviewable until that single `Render Again` action safely replaces it, and successful export retains it for further PNG/JPEG exports. The image Output card is removed; the transitional card remains video-only.
 
-Video mode will keep `Preview Frame` as an optional quick check and add `Render Video` as the primary full-video action. Full rendering will produce one completed MP4 review artifact in an application-managed local cache using the captured Keep Audio or Remove Audio setting. The existing Symbolized tab will play that exact controlled H.264/AAC-or-silent artifact before `Export Video` becomes available. Export will publish the reviewed artifact through a destination-side partial and atomic move or replace without rerunning frame symbolization or H.264 encoding.
+Later Phase 11B work will keep `Preview Frame` as an optional quick check and add `Render Video` as the primary full-video action. Full rendering will produce one completed MP4 review artifact in an application-managed local cache using the captured Keep Audio or Remove Audio setting. The existing Symbolized tab will play that exact controlled H.264/AAC-or-silent artifact before `Export Video` becomes available. Export will publish the reviewed artifact through a destination-side partial and atomic move or replace without rerunning frame symbolization or H.264 encoding.
 
-The current right-column Output card will be removed. The panel below the preview will become the canonical persistent processing/result surface: it will show truthful progress and Cancel while rendering, then settle into Image Ready, Video Ready, Render Stale, Exported, Cancelled, or Error with the relevant Play, Render Again, Export, and Open Folder actions. A stale result remains reviewable but cannot be exported until rerender succeeds.
+The panel below the preview is now the canonical image processing/result surface: it shows truthful activity and Cancel while rendering, then settles into Image Ready, Render Stale, Exported, or operation-specific Failed/Cancelled states. Once rendered pixels exist, the panel owns PNG/JPEG selection, `Export Image` / `Export Again`, and `Open Folder`; it does not duplicate the preview-panel render action. Failed or cancelled export keeps the retained pixels available for retry, and repeated export never reruns symbolization. Later work will extend the same model to managed video artifacts and remove the transitional video Output card.
 
 Render identity will change for character, font, size, polarity, resolution, and other symbolization settings; video audio-mode changes will also stale the full-video artifact. Image format and destination changes will not stale image rendering, and video slider movement will invalidate only the frame preview. Player handles, partial files, replaced artifacts, and orphaned cache entries will be cleaned on every applicable success, cancellation, failure, media replacement, rerender, exit, and startup-recovery path.
 
@@ -188,7 +189,7 @@ GlyphFrame resolves these tools relative to the running application directory, n
 
 ## Upcoming phases
 
-- Phase 11B implements the specified Render -> Review -> Export workflow, persistent result panel, managed video artifact, and in-app rendered-video playback.
+- Later Phase 11B subphases add the managed full-video review artifact, in-app rendered-video playback, and export reuse for video.
 - Phase 12 then adds expanded friendly-error presentation, technical Show Details, and local logging on top of the final workflow states.
 - Later phases cover UI polish, comprehensive testing, and portable packaging.
 

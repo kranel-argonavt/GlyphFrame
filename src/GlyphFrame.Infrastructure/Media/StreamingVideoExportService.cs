@@ -230,7 +230,23 @@ public sealed class StreamingVideoExportService(
                 renderSettings,
                 preset,
                 cancellationToken).ConfigureAwait(false);
-            yield return CropToDimensions(rendered.RenderedImage, outputDimensions);
+            RenderedImage normalized;
+            try
+            {
+                normalized = CropToDimensions(rendered.RenderedImage, outputDimensions);
+            }
+            catch
+            {
+                rendered.RenderedImage.Dispose();
+                throw;
+            }
+
+            if (!ReferenceEquals(normalized, rendered.RenderedImage))
+            {
+                rendered.RenderedImage.Dispose();
+            }
+
+            yield return normalized;
             expectedSequence = checked(expectedSequence + 1);
         }
     }
