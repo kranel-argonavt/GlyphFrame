@@ -5,7 +5,7 @@ namespace GlyphFrame.Core.Models;
 /// <summary>
 /// Coordinates platform-neutral media render, review, and export transitions.
 /// Image render identity is deliberately separate from video-frame preview identity so
-/// a managed full-video artifact can be introduced later without fabricating one here.
+/// a managed full-video artifact remains independent from the currently previewed frame.
 /// </summary>
 public sealed record RenderWorkflowState
 {
@@ -16,6 +16,9 @@ public sealed record RenderWorkflowState
         long settingsVersion,
         PreviewIdentity? imageRenderIdentity,
         PreviewIdentity? videoFramePreviewIdentity,
+        FullVideoRenderIdentity? videoArtifactIdentity,
+        FullVideoRenderIdentity? activeVideoRenderIdentity,
+        AudioExportMode videoAudioMode,
         long activeOperationId,
         RenderWorkflowOperation activeOperation,
         RenderWorkflowOperation outcomeOperation,
@@ -28,6 +31,9 @@ public sealed record RenderWorkflowState
         SettingsVersion = settingsVersion;
         ImageRenderIdentity = imageRenderIdentity;
         VideoFramePreviewIdentity = videoFramePreviewIdentity;
+        VideoArtifactIdentity = videoArtifactIdentity;
+        ActiveVideoRenderIdentity = activeVideoRenderIdentity;
+        VideoAudioMode = videoAudioMode;
         ActiveOperationId = activeOperationId;
         ActiveOperation = activeOperation;
         OutcomeOperation = outcomeOperation;
@@ -42,6 +48,9 @@ public sealed record RenderWorkflowState
         0,
         null,
         null,
+        null,
+        null,
+        AudioExportMode.KeepAudio,
         0,
         RenderWorkflowOperation.None,
         RenderWorkflowOperation.None,
@@ -59,6 +68,12 @@ public sealed record RenderWorkflowState
     public PreviewIdentity? ImageRenderIdentity { get; private init; }
 
     public PreviewIdentity? VideoFramePreviewIdentity { get; private init; }
+
+    public FullVideoRenderIdentity? VideoArtifactIdentity { get; private init; }
+
+    public FullVideoRenderIdentity? ActiveVideoRenderIdentity { get; private init; }
+
+    public AudioExportMode VideoAudioMode { get; private init; }
 
     public PreviewIdentity? SymbolizedPreviewIdentity => MediaType == MediaSelectionKind.Image
         ? ImageRenderIdentity
@@ -84,6 +99,8 @@ public sealed record RenderWorkflowState
 
     public bool HasVideoFramePreview => VideoFramePreviewIdentity is not null;
 
+    public bool HasVideoArtifact => VideoArtifactIdentity is not null;
+
     public bool HasSymbolizedPreview => SymbolizedPreviewIdentity is not null;
 
     public PreviewIdentity? CurrentIdentity => HasOriginal
@@ -93,6 +110,12 @@ public sealed record RenderWorkflowState
     public bool IsImageRenderStale => HasImageRender && ImageRenderIdentity != CurrentIdentity;
 
     public bool IsVideoFramePreviewStale => HasVideoFramePreview && VideoFramePreviewIdentity != CurrentIdentity;
+
+    public bool IsVideoArtifactStale => VideoArtifactIdentity is not null
+        && (VideoArtifactIdentity.MediaVersion != MediaVersion
+            || VideoArtifactIdentity.SourceIdentityVersion != MediaVersion
+            || VideoArtifactIdentity.RenderSettingsVersion != SettingsVersion
+            || VideoArtifactIdentity.AudioMode != VideoAudioMode);
 
     public bool IsPreviewStale => MediaType == MediaSelectionKind.Image
         ? IsImageRenderStale
@@ -127,6 +150,9 @@ public sealed record RenderWorkflowState
             SettingsVersion,
             null,
             null,
+            null,
+            null,
+            AudioExportMode.KeepAudio,
             0,
             RenderWorkflowOperation.None,
             RenderWorkflowOperation.None,
@@ -144,9 +170,14 @@ public sealed record RenderWorkflowState
         return this with
         {
             SourceVersion = checked(SourceVersion + 1),
-            Status = MediaType == MediaSelectionKind.Image && HasImageRender
-                ? RenderWorkflowStatus.RenderStale
-                : RenderWorkflowStatus.MediaReady
+            Status = MediaType switch
+            {
+                MediaSelectionKind.Image when HasImageRender => RenderWorkflowStatus.RenderStale,
+                MediaSelectionKind.Video when HasVideoArtifact => IsVideoArtifactStale
+                    ? RenderWorkflowStatus.RenderStale
+                    : RenderWorkflowStatus.RenderReady,
+                _ => RenderWorkflowStatus.MediaReady
+            }
         };
     }
 
@@ -162,7 +193,7 @@ public sealed record RenderWorkflowState
             SourceVersion = SourceVersion == 0 ? 1 : SourceVersion,
             HasOriginal = true,
             Status = MediaType == MediaSelectionKind.Video
-                ? RenderWorkflowStatus.MediaReady
+                ? ResolveVideoReviewStatus()
                 : Status
         };
     }
@@ -177,10 +208,58 @@ public sealed record RenderWorkflowState
         return this with
         {
             SettingsVersion = checked(SettingsVersion + 1),
-            Status = MediaType == MediaSelectionKind.Image && HasImageRender
+            Status = MediaType switch
+            {
+                MediaSelectionKind.Image when HasImageRender => RenderWorkflowStatus.RenderStale,
+                MediaSelectionKind.Video when HasVideoArtifact => RenderWorkflowStatus.RenderStale,
+                _ => Status
+            }
+        };
+    }
+
+    public RenderWorkflowState VideoAudioModeChanged(AudioExportMode audioMode)
+    {
+        if (!Enum.IsDefined(audioMode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(audioMode));
+        }
+
+        if (audioMode == VideoAudioMode)
+        {
+            return this;
+        }
+
+        return this with
+        {
+            VideoAudioMode = audioMode,
+            Status = MediaType == MediaSelectionKind.Video && HasVideoArtifact
                 ? RenderWorkflowStatus.RenderStale
                 : Status
         };
+    }
+
+    public FullVideoRenderIdentity CreateFullVideoRenderIdentity(
+        ImageRenderSettings settings,
+        CharacterPresetOption preset)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(preset);
+        if (MediaType != MediaSelectionKind.Video)
+        {
+            throw new InvalidOperationException("A full-video identity requires selected video media.");
+        }
+
+        return new FullVideoRenderIdentity(
+            MediaVersion,
+            MediaVersion,
+            SettingsVersion,
+            preset.Kind,
+            preset.Characters,
+            settings.FontFamily,
+            settings.FontSize,
+            settings.OutputResolution,
+            settings.SymbolPolarity,
+            VideoAudioMode);
     }
 
     public RenderWorkflowState OutputFormatChanged() => this;
@@ -201,6 +280,7 @@ public sealed record RenderWorkflowState
         {
             RenderWorkflowOperation.RenderImage => MediaType == MediaSelectionKind.Image && HasOriginal,
             RenderWorkflowOperation.PreviewVideoFrame => MediaType == MediaSelectionKind.Video && HasOriginal,
+            RenderWorkflowOperation.RenderVideo => false,
             RenderWorkflowOperation.ExportImage => CanExportImage,
             RenderWorkflowOperation.ExportVideo => MediaType == MediaSelectionKind.Video,
             _ => false
@@ -224,6 +304,29 @@ public sealed record RenderWorkflowState
             ActiveOperation = operation,
             OutcomeOperation = RenderWorkflowOperation.None,
             Status = nextStatus
+        };
+    }
+
+    public RenderWorkflowState BeginVideoRender(long operationId, FullVideoRenderIdentity identity)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        if (operationId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(operationId));
+        }
+
+        if (MediaType != MediaSelectionKind.Video || !HasOriginal || !IsCurrentVideoRenderIdentity(identity))
+        {
+            throw new InvalidOperationException("The full-video render identity is not current.");
+        }
+
+        return this with
+        {
+            ActiveOperationId = operationId,
+            ActiveOperation = RenderWorkflowOperation.RenderVideo,
+            ActiveVideoRenderIdentity = identity,
+            OutcomeOperation = RenderWorkflowOperation.None,
+            Status = RenderWorkflowStatus.Rendering
         };
     }
 
@@ -251,7 +354,21 @@ public sealed record RenderWorkflowState
             {
                 VideoFramePreviewIdentity = identity,
                 OutcomeOperation = RenderWorkflowOperation.PreviewVideoFrame,
-                Status = RenderWorkflowStatus.FramePreviewReady
+                Status = ResolveVideoReviewStatus(framePreviewReady: true)
+            }
+            : this;
+
+    public RenderWorkflowState CompleteVideoRender(long operationId, FullVideoRenderIdentity identity) =>
+        operationId == ActiveOperationId
+        && ActiveOperation == RenderWorkflowOperation.RenderVideo
+        && Status != RenderWorkflowStatus.Cancelling
+        && identity == ActiveVideoRenderIdentity
+        && IsCurrentVideoRenderIdentity(identity)
+            ? this with
+            {
+                VideoArtifactIdentity = identity,
+                OutcomeOperation = RenderWorkflowOperation.RenderVideo,
+                Status = RenderWorkflowStatus.RenderReady
             }
             : this;
 
@@ -291,6 +408,7 @@ public sealed record RenderWorkflowState
             ActiveOperationId = 0,
             OutcomeOperation = ActiveOperation,
             ActiveOperation = RenderWorkflowOperation.None,
+            ActiveVideoRenderIdentity = null,
             Status = RenderWorkflowStatus.Cancelled
         };
 
@@ -316,6 +434,7 @@ public sealed record RenderWorkflowState
                 ? ActiveOperation
                 : OutcomeOperation,
             ActiveOperation = RenderWorkflowOperation.None,
+            ActiveVideoRenderIdentity = null,
             Status = restingStatus
         };
     }
@@ -324,6 +443,8 @@ public sealed record RenderWorkflowState
     {
         ImageRenderIdentity = null,
         VideoFramePreviewIdentity = null,
+        VideoArtifactIdentity = null,
+        ActiveVideoRenderIdentity = null,
         OutcomeOperation = RenderWorkflowOperation.None,
         Status = MediaType == MediaSelectionKind.None
             ? RenderWorkflowStatus.Empty
@@ -339,8 +460,31 @@ public sealed record RenderWorkflowState
                 : HasImageRender ? RenderWorkflowStatus.RenderReady : RenderWorkflowStatus.MediaReady;
         }
 
+        if (HasVideoArtifact)
+        {
+            return IsVideoArtifactStale ? RenderWorkflowStatus.RenderStale : RenderWorkflowStatus.RenderReady;
+        }
+
         return HasVideoFramePreview && !IsVideoFramePreviewStale
             ? RenderWorkflowStatus.FramePreviewReady
             : RenderWorkflowStatus.MediaReady;
     }
+
+    private RenderWorkflowStatus ResolveVideoReviewStatus(bool framePreviewReady = false)
+    {
+        if (HasVideoArtifact)
+        {
+            return IsVideoArtifactStale ? RenderWorkflowStatus.RenderStale : RenderWorkflowStatus.RenderReady;
+        }
+
+        return framePreviewReady || HasVideoFramePreview && !IsVideoFramePreviewStale
+            ? RenderWorkflowStatus.FramePreviewReady
+            : RenderWorkflowStatus.MediaReady;
+    }
+
+    private bool IsCurrentVideoRenderIdentity(FullVideoRenderIdentity identity) =>
+        identity.MediaVersion == MediaVersion
+        && identity.SourceIdentityVersion == MediaVersion
+        && identity.RenderSettingsVersion == SettingsVersion
+        && identity.AudioMode == VideoAudioMode;
 }

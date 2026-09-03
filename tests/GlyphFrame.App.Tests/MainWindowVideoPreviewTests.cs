@@ -43,6 +43,16 @@ public sealed class MainWindowVideoPreviewTests
     }
 
     [Fact]
+    public void Constructor_RejectsNullManagedVideoArtifactSession()
+    {
+        TestHarness harness = new();
+
+        Assert.Throws<ArgumentNullException>(() => harness.CreateViewModel(
+            managedVideoArtifactSession: null,
+            allowNullManagedVideoArtifactSession: true));
+    }
+
+    [Fact]
     public async Task SelectingVideo_LoadsMiddleFrameAndEnablesVideoOnlyPositionControls()
     {
         using TestMediaFiles files = new();
@@ -69,6 +79,29 @@ public sealed class MainWindowVideoPreviewTests
         Assert.True(viewModel.ShowOutputCard);
         Assert.Equal("Preview Frame", viewModel.PreviewFrameActionLabel);
         Assert.Contains("0:05", viewModel.TimelineText, StringComparison.Ordinal);
+        Assert.Equal(1, harness.ManagedArtifacts.ClearCalls);
+    }
+
+    [Fact]
+    public async Task FailedMediaReplacement_DoesNotClearManagedArtifactSession()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("current.mp4");
+        string invalidPath = files.Create("unsupported.txt");
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(
+            path == videoPath
+                ? VideoResult(path)
+                : MediaInputResult.Failure(
+                    MediaInputErrorCategory.UnsupportedExtension,
+                    "Choose a supported media file."));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await viewModel.DropMediaCommand.ExecuteAsync([invalidPath]);
+
+        Assert.Equal(1, harness.ManagedArtifacts.ClearCalls);
+        Assert.Equal(videoPath, viewModel.VideoMetadata?.FilePath);
     }
 
     [Fact]
@@ -1487,6 +1520,8 @@ public sealed class MainWindowVideoPreviewTests
 
         public FakeVideoExportService VideoExports { get; } = new();
 
+        public FakeManagedVideoArtifactSession ManagedArtifacts { get; } = new();
+
         public FakeImageSaveDialogService SaveDialogs { get; } = new();
 
         public FakeImageExporter ImageExporter { get; } = new();
@@ -1503,14 +1538,19 @@ public sealed class MainWindowVideoPreviewTests
             IExportStatusPresentationService? exportStatusPresentationService = null,
             bool allowNullExportStatusPresentationService = false,
             IFolderLauncher? folderLauncher = null,
-            bool allowNullFolderLauncher = false) => new(
-            ApplicationInfo.Phase11,
+            bool allowNullFolderLauncher = false,
+            IManagedVideoArtifactSession? managedVideoArtifactSession = null,
+            bool allowNullManagedVideoArtifactSession = false) => new(
+            ApplicationInfo.Phase11B2,
             new FakeSettingsManager(),
             new FakeSettingsDialogService(),
             new FakeMediaDialogService(),
             MediaInput,
             allowNull ? videoFrameReader! : videoFrameReader ?? VideoFrames,
             VideoExports,
+            allowNullManagedVideoArtifactSession
+                ? managedVideoArtifactSession!
+                : managedVideoArtifactSession ?? ManagedArtifacts,
             ImagePipeline,
             ImageExporter,
             SaveDialogs,
@@ -1521,6 +1561,34 @@ public sealed class MainWindowVideoPreviewTests
             allowNullExportStatusPresentationService
                 ? exportStatusPresentationService!
                 : exportStatusPresentationService ?? ExportStatusPresentation);
+    }
+
+    private sealed class FakeManagedVideoArtifactSession : IManagedVideoArtifactSession
+    {
+        public ManagedVideoArtifact? Current => null;
+
+        public int PendingCleanupCount => 0;
+
+        public IReadOnlyList<string> CleanupDiagnostics => [];
+
+        public int ClearCalls { get; private set; }
+
+        public Task AcceptAsync(ManagedVideoArtifact artifact, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task RejectAsync(ManagedVideoArtifact artifact, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task ClearAsync(CancellationToken cancellationToken = default)
+        {
+            ClearCalls++;
+            return Task.CompletedTask;
+        }
+
+        public Task<ArtifactCleanupResult> RecoverOrphansAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ArtifactCleanupResult(0, []));
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class FakeExportStatusPresentationService : IExportStatusPresentationService

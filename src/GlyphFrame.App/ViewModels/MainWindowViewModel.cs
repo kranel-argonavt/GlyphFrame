@@ -23,6 +23,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly IMediaInputService _mediaInputService;
     private readonly IVideoFrameReader _videoFrameReader;
     private readonly IVideoExportService _videoExportService;
+    private readonly IManagedVideoArtifactSession _managedVideoArtifactSession;
     private readonly IImagePipelineService _imagePipelineService;
     private readonly IImageExporter _imageExporter;
     private readonly IImageSaveDialogService _imageSaveDialogService;
@@ -110,6 +111,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         IMediaInputService mediaInputService,
         IVideoFrameReader videoFrameReader,
         IVideoExportService videoExportService,
+        IManagedVideoArtifactSession managedVideoArtifactSession,
         IImagePipelineService imagePipelineService,
         IImageExporter imageExporter,
         IImageSaveDialogService imageSaveDialogService,
@@ -126,6 +128,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _mediaInputService = mediaInputService ?? throw new ArgumentNullException(nameof(mediaInputService));
         _videoFrameReader = videoFrameReader ?? throw new ArgumentNullException(nameof(videoFrameReader));
         _videoExportService = videoExportService ?? throw new ArgumentNullException(nameof(videoExportService));
+        _managedVideoArtifactSession = managedVideoArtifactSession
+            ?? throw new ArgumentNullException(nameof(managedVideoArtifactSession));
         _imagePipelineService = imagePipelineService ?? throw new ArgumentNullException(nameof(imagePipelineService));
         _imageExporter = imageExporter ?? throw new ArgumentNullException(nameof(imageExporter));
         _imageSaveDialogService = imageSaveDialogService ?? throw new ArgumentNullException(nameof(imageSaveDialogService));
@@ -687,6 +691,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref _selectedAudioMode, value))
             {
+                _renderWorkflowState = _renderWorkflowState.VideoAudioModeChanged(value);
                 OnPropertyChanged(nameof(IsKeepAudioSelected));
                 OnPropertyChanged(nameof(IsRemoveAudioSelected));
             }
@@ -867,10 +872,21 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         _pendingFilePath = null;
-        ApplyMediaInputState(completed);
+
+        if (!result.Success)
+        {
+            ApplyMediaInputState(completed);
+        }
 
         if (result.Success)
         {
+            await _managedVideoArtifactSession.ClearAsync();
+            if (_disposed || requestId != _mediaRequestId)
+            {
+                return;
+            }
+
+            ApplyMediaInputState(completed);
             ApplyPresentationState(UiPresentationState.ForMedia(result.MediaType));
             PreviewMode = PreviewMode.Original;
             _selectedOutputPath = null;
@@ -878,6 +894,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 result.MediaType,
                 requestId,
                 result.MediaType == MediaSelectionKind.Image && decodedImage is not null);
+            if (result.MediaType == MediaSelectionKind.Video)
+            {
+                _renderWorkflowState = _renderWorkflowState.VideoAudioModeChanged(SelectedAudioMode);
+            }
 
             if (result.MediaType == MediaSelectionKind.Image && decodedImage is not null)
             {
@@ -1971,6 +1991,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void ApplyApplicationSettings(AppSettings settings, bool invalidatePreview)
     {
+        AudioExportMode previousAudioMode = _selectedAudioMode;
         CharacterPresetOption preset = _presetProvider.Get(settings.DefaultCharacterPreset);
         bool changed = !Equals(_selectedPreset, preset)
             || !_selectedFont.Equals(settings.DefaultFontFamily, StringComparison.Ordinal)
@@ -1987,6 +2008,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _selectedSymbolPolarity = settings.DefaultSymbolPolarity;
         _selectedImageOutputFormat = AppSettingsCatalog.GetDisplayName(settings.DefaultImageExportFormat);
         _selectedAudioMode = settings.DefaultVideoAudioMode;
+        if (_selectedAudioMode != previousAudioMode)
+        {
+            _renderWorkflowState = _renderWorkflowState.VideoAudioModeChanged(_selectedAudioMode);
+        }
 
         OnPropertyChanged(nameof(SelectedPreset));
         OnPropertyChanged(nameof(CharacterRamp));

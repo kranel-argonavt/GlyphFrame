@@ -245,6 +245,140 @@ public sealed class RenderWorkflowStateTests
     }
 
     [Fact]
+    public void FullVideoArtifactIdentity_IsIndependentFromFramePreviewPosition()
+    {
+        RenderWorkflowState ready = ReadyVideo();
+        PreviewIdentity frameIdentity = ready.CurrentIdentity!;
+        RenderWorkflowState previewed = ready
+            .BeginOperation(60, RenderWorkflowOperation.PreviewVideoFrame)
+            .CompleteVideoFramePreview(60, frameIdentity)
+            .EndOperation(60);
+        FullVideoRenderIdentity artifactIdentity = previewed.CreateFullVideoRenderIdentity(
+            ImageRenderSettings.Default,
+            CharacterPresetOption.Default);
+        RenderWorkflowState rendered = previewed
+            .BeginVideoRender(61, artifactIdentity)
+            .CompleteVideoRender(61, artifactIdentity)
+            .EndOperation(61);
+
+        RenderWorkflowState moved = rendered.SourceChanged();
+
+        Assert.True(moved.IsVideoFramePreviewStale);
+        Assert.False(moved.IsVideoArtifactStale);
+        Assert.Equal(artifactIdentity, moved.VideoArtifactIdentity);
+        Assert.Equal(RenderWorkflowStatus.RenderReady, moved.Status);
+    }
+
+    [Fact]
+    public void NewFramePreview_DoesNotReplaceCurrentFullVideoArtifactStatus()
+    {
+        RenderWorkflowState rendered = WithVideoArtifactAndFramePreview();
+        RenderWorkflowState seeking = rendered.SourceChanged();
+        RenderWorkflowState withOriginal = seeking.OriginalAvailable(seeking.MediaVersion);
+        PreviewIdentity newFrameIdentity = withOriginal.CurrentIdentity!;
+
+        RenderWorkflowState previewed = withOriginal
+            .BeginOperation(62, RenderWorkflowOperation.PreviewVideoFrame)
+            .CompleteVideoFramePreview(62, newFrameIdentity)
+            .EndOperation(62);
+
+        Assert.Equal(RenderWorkflowStatus.RenderReady, previewed.Status);
+        Assert.False(previewed.IsVideoArtifactStale);
+        Assert.False(previewed.IsVideoFramePreviewStale);
+        Assert.True(previewed.HasVideoArtifact);
+    }
+
+    [Fact]
+    public void RenderSettingChange_StalesFramePreviewAndFullVideoArtifact()
+    {
+        RenderWorkflowState rendered = WithVideoArtifactAndFramePreview();
+
+        RenderWorkflowState changed = rendered.RenderingSettingChanged(ImageRenderSetting.FontSize);
+
+        Assert.True(changed.IsVideoFramePreviewStale);
+        Assert.True(changed.IsVideoArtifactStale);
+        Assert.Equal(RenderWorkflowStatus.RenderStale, changed.Status);
+    }
+
+    [Fact]
+    public void AudioModeChange_StalesOnlyFullVideoArtifact()
+    {
+        RenderWorkflowState rendered = WithVideoArtifactAndFramePreview();
+
+        RenderWorkflowState changed = rendered.VideoAudioModeChanged(AudioExportMode.RemoveAudio);
+
+        Assert.False(changed.IsVideoFramePreviewStale);
+        Assert.True(changed.IsVideoArtifactStale);
+        Assert.Equal(RenderWorkflowStatus.RenderStale, changed.Status);
+    }
+
+    [Fact]
+    public void SameAudioMode_DoesNotInvalidateVideoArtifact()
+    {
+        RenderWorkflowState rendered = WithVideoArtifactAndFramePreview();
+
+        RenderWorkflowState unchanged = rendered.VideoAudioModeChanged(AudioExportMode.KeepAudio);
+
+        Assert.Same(rendered, unchanged);
+        Assert.False(unchanged.IsVideoArtifactStale);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FailedOrCancelledReplacement_PreservesPreviousStaleArtifact(bool cancel)
+    {
+        RenderWorkflowState stale = WithVideoArtifactAndFramePreview()
+            .RenderingSettingChanged(ImageRenderSetting.SymbolPolarity);
+        FullVideoRenderIdentity replacement = stale.CreateFullVideoRenderIdentity(
+            ImageRenderSettings.Default with { SymbolPolarity = SymbolPolarity.DarkOnLight },
+            CharacterPresetOption.Default);
+        RenderWorkflowState rendering = stale.BeginVideoRender(70, replacement);
+
+        RenderWorkflowState ended = cancel
+            ? rendering.BeginCancellation().CancelActiveOperation()
+            : rendering.FailActiveOperation(70).EndOperation(70);
+
+        Assert.True(ended.HasVideoArtifact);
+        Assert.True(ended.IsVideoArtifactStale);
+        Assert.NotEqual(replacement, ended.VideoArtifactIdentity);
+        Assert.Equal(cancel ? RenderWorkflowStatus.Cancelled : RenderWorkflowStatus.Failed, ended.Status);
+    }
+
+    [Fact]
+    public void SupersededFullVideoRenderCompletion_IsRejected()
+    {
+        RenderWorkflowState ready = ReadyVideo();
+        FullVideoRenderIdentity identity = ready.CreateFullVideoRenderIdentity(
+            ImageRenderSettings.Default,
+            CharacterPresetOption.Default);
+        RenderWorkflowState first = ready.BeginVideoRender(80, identity);
+        RenderWorkflowState second = first.BeginVideoRender(81, identity);
+
+        RenderWorkflowState rejected = second.CompleteVideoRender(80, identity);
+
+        Assert.Same(second, rejected);
+        Assert.False(rejected.HasVideoArtifact);
+    }
+
+    [Fact]
+    public void MediaReplacement_ClearsFramePreviewAndFullVideoArtifactIdentities()
+    {
+        RenderWorkflowState renderedVideo = WithVideoArtifactAndFramePreview();
+
+        RenderWorkflowState replacement = renderedVideo.SelectMedia(
+            MediaSelectionKind.Image,
+            2,
+            hasOriginal: true);
+
+        Assert.False(replacement.HasVideoFramePreview);
+        Assert.False(replacement.HasVideoArtifact);
+        Assert.Null(replacement.ActiveVideoRenderIdentity);
+        Assert.Equal(AudioExportMode.KeepAudio, replacement.VideoAudioMode);
+        Assert.Equal(RenderWorkflowStatus.MediaReady, replacement.Status);
+    }
+
+    [Fact]
     public void InvalidOperationKind_IsRejected()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => ReadyImage().BeginOperation(
@@ -280,4 +414,20 @@ public sealed class RenderWorkflowStateTests
         .SelectMedia(MediaSelectionKind.Video, 1, hasOriginal: false)
         .SourceChanged()
         .OriginalAvailable(1);
+
+    private static RenderWorkflowState WithVideoArtifactAndFramePreview()
+    {
+        RenderWorkflowState ready = ReadyVideo();
+        RenderWorkflowState previewed = ready
+            .BeginOperation(90, RenderWorkflowOperation.PreviewVideoFrame)
+            .CompleteVideoFramePreview(90, ready.CurrentIdentity!)
+            .EndOperation(90);
+        FullVideoRenderIdentity identity = previewed.CreateFullVideoRenderIdentity(
+            ImageRenderSettings.Default,
+            CharacterPresetOption.Default);
+        return previewed
+            .BeginVideoRender(91, identity)
+            .CompleteVideoRender(91, identity)
+            .EndOperation(91);
+    }
 }

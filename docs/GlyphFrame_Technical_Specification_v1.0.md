@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 11B.1 — Workflow Foundation and Image Render Flow; later Phase 11B work specified
+Status: Updated through Phase 11B.2 — Managed Video Artifact Foundation; later Phase 11B work specified
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -534,6 +534,8 @@ Phase 8 preview behavior:
 ```
 
 The Phase 9 encoder continues to pass `-an` and creates an authoritative video-only intermediate. Phase 10 performs its audio decision only after that intermediate completes and never decodes or re-encodes the symbolized H.264 stream during muxing. Phase 11B relocates final publication from a user-selected destination to a managed review artifact; later export publishes that already-reviewed artifact.
+
+Phase 11B.2 implements this managed-artifact backend without exposing the final video UI. Completed candidates live under `%LocalAppData%\GlyphFrame\Cache\VideoArtifacts\<session>`, use generated identifiers rather than source filenames, and are promoted from a distinguishable pending MP4 only after the existing streaming pipeline completes. Each live session holds an exclusive lease file from store initialization through shutdown cleanup. Recovery probes sibling leases and skips the entire directory whenever another process still holds the lease; an exclusively acquirable lease identifies a stale session, while a short initialization grace period protects a newly created lease-less directory from a concurrent-startup race. The platform-neutral full-video identity captures media/source generation, preset and ramp, font, size, resolution, polarity, and audio mode while excluding frame-preview position. An application session retains at most one accepted artifact; failed, cancelled, superseded, rejected, replaced, shutdown, and recovered orphan files are deleted only through canonical, cache-root-contained operations. Failed current-session cleanup is deduplicated, retained as technical diagnostics, and retried at later lifecycle boundaries. `Preview Frame` and direct destination export remain transitional until later Phase 11B work connects `Render Video`, playback, and artifact publication.
 
 ### 9.3 Audio Modes
 
@@ -1269,6 +1271,12 @@ public sealed class ExportProgress
 }
 ```
 
+### 14.9 Managed Video Review Artifact
+
+Phase 11B.2 adds platform-neutral `FullVideoRenderIdentity`, `ManagedVideoArtifact`, and `ManagedVideoRenderResult` models. The identity captures the media/source generation, render-settings generation, preset and exact ramp, font family and size, output resolution, polarity, and audio mode; video-frame slider position is deliberately excluded. Artifact metadata contains only the generated identifier and cache path, output dimensions, normalized FPS, accepted frame count, authoritative duration, captured audio mode and outcome, and file size. Video bytes remain on disk rather than in settings or memory.
+
+The artifact store owns every physical file below its verified cache root. Normal candidate operations require a direct child of the current leased session with the canonical `artifact-{id}.mp4` or matching pending name; foreign-session, reparse-point, noncanonical, empty, and outside-root candidates are rejected. A completed render is a candidate until the workflow accepts or rejects it. Once accepted, other layers borrow the artifact while the session owns deletion. Replacement accepts the new candidate before attempting to delete the prior artifact; failed deletion is tracked without rolling back the new current artifact, then retried on later operations and shutdown. Exclusive lease probing makes later startup recovery safe when multiple GlyphFrame processes run concurrently.
+
 ## 15. Enums
 
 ```csharp
@@ -1604,6 +1612,8 @@ Tasks:
 - Keep export-status motion independent from pipeline semantics: stop decorative clocks when hidden or unloaded, respect the Windows reduced-motion preference, and show the completion mark only after successful publication and resource cleanup.
 
 ### Phase 11B - Render, Review, and Export Workflow
+
+Phase 11B.2 completes the managed artifact store, full-video identity, streaming-render adapter, single-artifact session ownership, and startup/shutdown recovery foundation. It does not yet expose `Render Video`, an in-app player, Video Ready UI, or artifact-based destination publication.
 
 - Replace image preview generation with an explicit `Render Image` action and retain one reusable rendered-image result.
 - Keep `Preview Frame` only for video and maintain its identity independently from the full-video render result.

@@ -22,7 +22,11 @@ namespace GlyphFrame.App;
 
 public partial class App : Application
 {
+    private readonly ApplicationShutdownCoordinator _shutdownCoordinator = new(
+        message => System.Diagnostics.Debug.WriteLine(message));
     private ServiceProvider? _serviceProvider;
+    private CancellationTokenSource? _artifactRecoveryCancellation;
+    private Task? _artifactRecoveryTask;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -43,6 +47,10 @@ public partial class App : Application
 
         _ = WarmFfmpegValidationAsync(
             _serviceProvider.GetRequiredService<IFfmpegValidationService>());
+        _artifactRecoveryCancellation = new CancellationTokenSource();
+        _artifactRecoveryTask = RecoverManagedArtifactsAsync(
+            _serviceProvider.GetRequiredService<IManagedVideoArtifactSession>(),
+            _artifactRecoveryCancellation.Token);
 
         MainWindow = _serviceProvider.GetRequiredService<MainWindow>();
         MainWindow.Show();
@@ -50,13 +58,24 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _serviceProvider?.Dispose();
-        base.OnExit(e);
+        try
+        {
+            ServiceProvider? provider = Interlocked.Exchange(ref _serviceProvider, null);
+            CancellationTokenSource? recoveryCancellation = Interlocked.Exchange(
+                ref _artifactRecoveryCancellation,
+                null);
+            Task? recoveryTask = Interlocked.Exchange(ref _artifactRecoveryTask, null);
+            _shutdownCoordinator.Shutdown(recoveryCancellation, recoveryTask, provider);
+        }
+        finally
+        {
+            base.OnExit(e);
+        }
     }
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton(ApplicationInfo.Phase11);
+        services.AddSingleton(ApplicationInfo.Phase11B2);
         services.AddSingleton<IApplicationPaths, ApplicationPaths>();
         services.AddSingleton<ISettingsService, JsonSettingsService>();
         services.AddSingleton<IFolderLauncher, WindowsFolderLauncher>();
@@ -85,6 +104,9 @@ public partial class App : Application
         services.AddSingleton<ISymbolFrameRenderer, SkiaSymbolFrameRenderer>();
         services.AddSingleton<IImagePipelineService, ImagePipelineService>();
         services.AddSingleton<IVideoExportService, StreamingVideoExportService>();
+        services.AddSingleton<IManagedVideoArtifactStore, ManagedVideoArtifactStore>();
+        services.AddSingleton<IManagedVideoRenderService, ManagedVideoRenderService>();
+        services.AddSingleton<IManagedVideoArtifactSession, ManagedVideoArtifactSession>();
         services.AddSingleton<IImageExporter, SkiaImageExporter>();
         services.AddSingleton<IAccentThemeService, AccentThemeService>();
         services.AddSingleton<IApplicationSettingsManager, ApplicationSettingsManager>();
@@ -111,6 +133,27 @@ public partial class App : Application
             or InvalidOperationException)
         {
             System.Diagnostics.Debug.WriteLine($"FFmpeg startup validation failed: {exception}");
+        }
+    }
+
+    private static async Task RecoverManagedArtifactsAsync(
+        IManagedVideoArtifactSession session,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await session.RecoverOrphansAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException
+            or InvalidOperationException)
+        {
+            System.Diagnostics.Debug.WriteLine($"Managed artifact recovery failed: {exception}");
         }
     }
 }

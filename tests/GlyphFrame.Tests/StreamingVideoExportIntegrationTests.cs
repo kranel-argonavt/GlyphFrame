@@ -6,6 +6,7 @@ using GlyphFrame.Core.Presets;
 using GlyphFrame.Core.Policies;
 using GlyphFrame.Infrastructure.Ffmpeg;
 using GlyphFrame.Infrastructure.Media;
+using GlyphFrame.Infrastructure.Paths;
 using GlyphFrame.Rendering.Conversion;
 using GlyphFrame.Rendering.Grid;
 using GlyphFrame.Rendering.Mapping;
@@ -16,6 +17,82 @@ namespace GlyphFrame.Tests;
 
 public sealed class StreamingVideoExportIntegrationTests
 {
+    [Fact]
+    public async Task ManagedRender_RealRotatedUnicodeVideoCreatesOwnedReviewArtifact()
+    {
+        using TemporaryMediaDirectory media = new("керований кеш 日本語");
+        string input = media.CopyFixture("video-preview-rotated.mov", "джерело артефакту 日本語.MOV");
+        BundledFfmpegLocator locator = new(RepositoryRoot);
+        ProcessRunner processRunner = new();
+        using FfmpegValidationService validation = new(locator, processRunner);
+        FfprobeVideoMetadataReader metadataReader = new(
+            new MetadataExtractorVideoMetadataReader(),
+            validation,
+            processRunner);
+        VideoMetadata metadata = await metadataReader.ReadAsync(input);
+        StreamingVideoExportService exportService = new(
+            new FfmpegSequentialVideoFrameReader(locator),
+            new FfmpegVideoEncoder(locator),
+            CreatePipeline(),
+            new OutputDimensionResolver(),
+            new FfprobeAudioStreamProbe(validation, processRunner),
+            new Mp4AudioCompatibilityPolicy(),
+            new FfmpegAudioMuxer(locator));
+        ApplicationPaths paths = new(media.RootPath);
+        using ManagedVideoArtifactStore store = new(paths, "сесія review");
+        ManagedVideoRenderService renderService = new(exportService, store);
+        ImageRenderSettings settings = new(
+            "Consolas",
+            9,
+            OutputResolution.SameAsSource,
+            SymbolPolarity.LightOnDark);
+        CharacterPresetOption preset = new CharacterPresetProvider().Get(CharacterPresetKind.SimpleAscii);
+        FullVideoRenderIdentity identity = new(
+            1,
+            1,
+            0,
+            preset.Kind,
+            preset.Characters,
+            settings.FontFamily,
+            settings.FontSize,
+            settings.OutputResolution,
+            settings.SymbolPolarity,
+            AudioExportMode.RemoveAudio);
+
+        ManagedVideoRenderResult result = await renderService.RenderAsync(new ManagedVideoRenderJob(
+            input,
+            metadata,
+            settings,
+            preset,
+            AudioExportMode.RemoveAudio,
+            identity));
+
+        Assert.True(result.Success, result.TechnicalDetail ?? result.UserMessage);
+        ManagedVideoArtifact artifact = result.Artifact!;
+        Assert.True(store.OwnsPath(artifact.FilePath));
+        Assert.Equal(new PixelDimensions(240, 320), artifact.OutputDimensions);
+        Assert.Equal(12, artifact.RenderedFrameCount);
+        Assert.Equal(10, artifact.FramesPerSecond);
+        Assert.Equal(AudioMuxOutcome.Removed, artifact.AudioOutcome);
+        Assert.True(artifact.FileSizeBytes > 1_000);
+        Assert.Empty(Directory.GetFiles(store.SessionDirectory, "*.partial"));
+        Assert.Empty(Directory.GetFiles(store.SessionDirectory, "*.pending.mp4"));
+
+        using JsonDocument probe = await ProbeAsync(artifact.FilePath, locator, processRunner);
+        JsonElement streams = probe.RootElement.GetProperty("streams");
+        JsonElement video = streams.EnumerateArray()
+            .Single(stream => stream.GetProperty("codec_type").GetString() == "video");
+        Assert.Equal("h264", video.GetProperty("codec_name").GetString());
+        Assert.Equal("yuv420p", video.GetProperty("pix_fmt").GetString());
+        Assert.DoesNotContain(
+            streams.EnumerateArray(),
+            stream => stream.GetProperty("codec_type").GetString() == "audio");
+        using FileStream sourceExclusive = new(input, FileMode.Open, FileAccess.Read, FileShare.None);
+        using FileStream artifactExclusive = new(artifact.FilePath, FileMode.Open, FileAccess.Read, FileShare.None);
+        Assert.True(sourceExclusive.CanRead);
+        Assert.True(artifactExclusive.CanRead);
+    }
+
     [Fact]
     public async Task ExportAsync_RealRotatedUnicodeVideoProducesSymbolizedVideoOnlyMp4()
     {

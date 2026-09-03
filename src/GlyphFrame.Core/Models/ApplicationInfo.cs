@@ -51,4 +51,9 @@ public sealed record ApplicationInfo(string Name, string Description, string Sta
         "GlyphFrame",
         "Video & Image to Symbol Converter",
         "Phase 11 - Progress and Cancellation");
+
+    public static ApplicationInfo Phase11B2 { get; } = new(
+        "GlyphFrame",
+        "Video & Image to Symbol Converter",
+        "Phase 11B.2 - Managed Video Artifact Foundation");
 }

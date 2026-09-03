@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 11B.1 — Workflow Foundation and Image Render Flow is complete. Image mode now follows an explicit Render → Review → Export workflow: `Render Image` retains one symbolized result for review, render-setting changes mark it stale without discarding it, and PNG/JPEG exports reuse the exact retained pixels without rerendering. Video frame preview and direct streaming video export remain available while the later Phase 11B video-artifact work is pending.
+Phase 11B.2 — Managed Video Artifact Foundation is complete. The backend can render a complete symbolized video into one application-owned MP4 review artifact with the captured Keep Audio or Remove Audio choice. Full-video identity, safe replacement, cancellation cleanup, and orphan recovery are independent from frame-preview position. Image Render → Review → Export, video frame preview, and the transitional direct video export remain unchanged; the player and artifact-based user export arrive in later Phase 11B work.
 
 ## Platform and target framework
 
@@ -161,7 +161,9 @@ Load media -> Render -> Review -> Export
 
 Phase 11B.1 completes the image half of this workflow. Image mode has no separate symbolized-preview command: one stable preview-panel action starts as `Render Image` and becomes `Render Again` after a result exists. Rendering creates one reusable full image result, selects the existing Symbolized tab, and enables `Export Image` in the persistent result panel. A stale result remains reviewable until that single `Render Again` action safely replaces it, and successful export retains it for further PNG/JPEG exports. The image Output card is removed; the transitional card remains video-only.
 
-Later Phase 11B work will keep `Preview Frame` as an optional quick check and add `Render Video` as the primary full-video action. Full rendering will produce one completed MP4 review artifact in an application-managed local cache using the captured Keep Audio or Remove Audio setting. The existing Symbolized tab will play that exact controlled H.264/AAC-or-silent artifact before `Export Video` becomes available. Export will publish the reviewed artifact through a destination-side partial and atomic move or replace without rerunning frame symbolization or H.264 encoding.
+Phase 11B.2 adds the backend for full rendering while intentionally leaving the transitional video UI in place. It composes the proven sequential FFmpeg decoder, shared symbolization and SkiaSharp renderer, H.264 encoder, and Phase 10 audio path to create a completed MP4 under `%LocalAppData%\GlyphFrame\Cache\VideoArtifacts\<session>`. Candidate files are promoted only after successful validation. Each running application session holds an exclusive filesystem lease, so startup recovery preserves every active GlyphFrame instance and removes only stale session directories. One accepted artifact may be retained; a replacement is accepted before cleanup of the previous file, and failed cleanup is tracked and retried at later lifecycle boundaries. All candidate and cleanup operations remain restricted to canonical files in the owning session.
+
+Later Phase 11B work will add `Render Video` as the primary full-video action, play the controlled H.264/AAC-or-silent artifact in the existing Symbolized tab, and publish that exact reviewed artifact to a chosen destination without rerunning symbolization or video encoding. No player or artifact-based user export is exposed in Phase 11B.2.
 
 The panel below the preview is now the canonical image processing/result surface: it shows truthful activity and Cancel while rendering, then settles into Image Ready, Render Stale, Exported, or operation-specific Failed/Cancelled states. Once rendered pixels exist, the panel owns PNG/JPEG selection, `Export Image` / `Export Again`, and `Open Folder`; it does not duplicate the preview-panel render action. Failed or cancelled export keeps the retained pixels available for retry, and repeated export never reruns symbolization. Later work will extend the same model to managed video artifacts and remove the transitional video Output card.
 
@@ -189,7 +191,7 @@ GlyphFrame resolves these tools relative to the running application directory, n
 
 ## Upcoming phases
 
-- Later Phase 11B subphases add the managed full-video review artifact, in-app rendered-video playback, and export reuse for video.
+- Later Phase 11B subphases connect the managed full-video artifact to `Render Video`, add in-app rendered-video playback, and publish the reviewed artifact without rerendering.
 - Phase 12 then adds expanded friendly-error presentation, technical Show Details, and local logging on top of the final workflow states.
 - Later phases cover UI polish, comprehensive testing, and portable packaging.
 
