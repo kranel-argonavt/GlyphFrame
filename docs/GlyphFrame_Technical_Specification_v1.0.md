@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 11B.2 — Managed Video Artifact Foundation; later Phase 11B work specified
+Status: Phase 11B.3 workflow and player UX implemented; interactive audiovisual and multi-monitor verification pending; Phase 11B.4 artifact publication and Phase 11B.5 original-video playback planned
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -43,6 +43,7 @@ GlyphFrame does not implement its own MP4 encoder. Video encoding, audio handlin
 - Symbolized preview.
 - Explicit Render -> Review -> Export workflow.
 - In-app playback of a completed GlyphFrame-rendered MP4.
+- Original-video playback for a validated input compatibility matrix, planned for Phase 11B.5; original-frame preview remains the fallback.
 - Three built-in character presets.
 - Font family selection.
 - Font size selection.
@@ -60,7 +61,7 @@ GlyphFrame does not implement its own MP4 encoder. Video encoding, audio handlin
 ### 2.2 MVP Excludes
 
 - Realtime or on-the-fly video symbolization during playback.
-- Playback of arbitrary input formats beyond the existing original-frame preview.
+- Guaranteed playback of every codec/container combination or arbitrary input formats outside the validated compatibility matrix. Original-video playback itself is planned for Phase 11B.5, not implemented in Phase 11B.3.
 - Before/after draggable comparison slider.
 - Batch export.
 - GIF export.
@@ -535,7 +536,9 @@ Phase 8 preview behavior:
 
 The Phase 9 encoder continues to pass `-an` and creates an authoritative video-only intermediate. Phase 10 performs its audio decision only after that intermediate completes and never decodes or re-encodes the symbolized H.264 stream during muxing. Phase 11B relocates final publication from a user-selected destination to a managed review artifact; later export publishes that already-reviewed artifact.
 
-Phase 11B.2 implements this managed-artifact backend without exposing the final video UI. Completed candidates live under `%LocalAppData%\GlyphFrame\Cache\VideoArtifacts\<session>`, use generated identifiers rather than source filenames, and are promoted from a distinguishable pending MP4 only after the existing streaming pipeline completes. Each live session holds an exclusive lease file from store initialization through shutdown cleanup. Recovery probes sibling leases and skips the entire directory whenever another process still holds the lease; an exclusively acquirable lease identifies a stale session, while a short initialization grace period protects a newly created lease-less directory from a concurrent-startup race. The platform-neutral full-video identity captures media/source generation, preset and ramp, font, size, resolution, polarity, and audio mode while excluding frame-preview position. An application session retains at most one accepted artifact; failed, cancelled, superseded, rejected, replaced, shutdown, and recovered orphan files are deleted only through canonical, cache-root-contained operations. Failed current-session cleanup is deduplicated, retained as technical diagnostics, and retried at later lifecycle boundaries. `Preview Frame` and direct destination export remain transitional until later Phase 11B work connects `Render Video`, playback, and artifact publication.
+Phase 11B.2 implements the managed-artifact backend. Completed candidates live under `%LocalAppData%\GlyphFrame\Cache\VideoArtifacts\<session>`, use generated identifiers rather than source filenames, and are promoted from a distinguishable pending MP4 only after the existing streaming pipeline completes. Each live session holds an exclusive lease file from store initialization through shutdown cleanup. Recovery probes sibling leases and skips the entire directory whenever another process still holds the lease; an exclusively acquirable lease identifies a stale session, while a short initialization grace period protects a newly created lease-less directory from a concurrent-startup race. The platform-neutral full-video identity captures media/source generation, preset and ramp, font, size, resolution, polarity, and audio mode while excluding frame-preview position. An application session retains at most one accepted artifact; failed, cancelled, superseded, rejected, replaced, shutdown, and recovered orphan files are deleted only through canonical, cache-root-contained operations. Failed current-session cleanup is deduplicated, retained as technical diagnostics, and retried at later lifecycle boundaries.
+
+Phase 11B.3 connects that backend to the video editor. The preview action row keeps independent secondary `Preview Frame` and primary `Render Video` / `Render Again` actions. A full render captures one immutable job and is accepted only while its operation, media generation, and full-video identity remain current. The existing player handle is stopped and closed before session acceptance may delete a replaced artifact. Only after acceptance and successful player opening does the workflow enter Video Ready and select Symbolized; obsolete candidates are rejected, and failed or cancelled replacements preserve the previously accepted artifact. The App-layer WPF player opens the exact managed MP4 with explicit manual lifetime, supports play/pause/restart, seek, current and total time, volume/mute, fit, and fullscreen, and releases its timer and file handle before media replacement or shutdown cleanup. A stale full artifact stays playable, audio-mode changes stale only that artifact, and frame-slider movement affects only frame preview. Direct destination export remains a separate transitional path until Phase 11B.4 publishes the reviewed artifact.
 
 ### 9.3 Audio Modes
 
@@ -700,7 +703,7 @@ Preview panel contains:
 - `Render Image` for images.
 - `Preview Frame` and `Render Video` for videos.
 - Video frame-position slider for videos only.
-- Fit selector and fullscreen preview action.
+- Fit / Fill / 100% selector; fullscreen entry is available for the rendered-video player, not as a no-op original-frame action.
 
 Preview panel behavior:
 
@@ -717,7 +720,7 @@ Preview panel behavior:
 - Rapid slider changes are coalesced; a superseded or cancelled read never replaces the newest frame and is not shown as an error.
 - Video frame loading and failure states are visually distinct while retaining successfully loaded metadata.
 - `Preview Frame` is enabled only after an owned original frame is available. `Render Video` depends on valid video metadata and bundled tools, not on a frame preview.
-- The rendered-video player supports play/pause, seek, current time/duration, volume/mute, and the existing fit behavior. It releases media handles before artifact replacement or cleanup.
+- The rendered-video player supports play/pause, restart after completion, seek, current time/duration, volume/mute, fit, and fullscreen review. It releases media handles before artifact replacement or cleanup.
 
 ### 10.7 Settings Panel
 
@@ -782,7 +785,7 @@ During full rendering it shows:
 
 The preview surface may be dimmed and blocked during full rendering, but it must not duplicate the complete progress presentation from this panel.
 
-After a render succeeds, the panel remains visible and settles into `Image Ready` or `Video Ready`. It shows the green completion mark, result summary, and `Export Image` or `Export Video`. Image Ready also exposes PNG/JPEG selection. Video Ready exposes the action that focuses or plays the rendered video. The media action row above the preview remains the single location for `Render Image` / `Render Again` and future `Render Video` actions. After export the panel shows the destination plus `Open Folder` while retaining the reusable render result.
+After a render succeeds, the panel remains visible and settles into `Image Ready` or `Video Ready`. It shows the green completion mark and a result summary. Image Ready exposes PNG/JPEG selection plus `Export Image`; the final Phase 11B result panel will expose artifact-based `Export Video`. In Phase 11B.3, Video Ready summarizes the accepted artifact while playback controls remain with the Symbolized preview and the transitional direct-export Output card remains separate. The media action row above the preview is the single location for `Render Image` / `Render Again` and `Render Video` / `Render Again`. After export the completed Phase 11B panel shows the destination plus `Open Folder` while retaining the reusable render result.
 
 Before an image render exists, the result panel may remain visible to report a failed or cancelled render, but it hides the output-format selector and all export-related action containers. A stale retained render keeps the format selector visible and Export disabled while the preview-panel `Render Again` action remains primary. Failed and cancelled states identify whether rendering or exporting was affected; export failure or cancellation preserves a current retained render for retry without rerendering.
 
@@ -1277,6 +1280,16 @@ Phase 11B.2 adds platform-neutral `FullVideoRenderIdentity`, `ManagedVideoArtifa
 
 The artifact store owns every physical file below its verified cache root. Normal candidate operations require a direct child of the current leased session with the canonical `artifact-{id}.mp4` or matching pending name; foreign-session, reparse-point, noncanonical, empty, and outside-root candidates are rejected. A completed render is a candidate until the workflow accepts or rejects it. Once accepted, other layers borrow the artifact while the session owns deletion. Replacement accepts the new candidate before attempting to delete the prior artifact; failed deletion is tracked without rolling back the new current artifact, then retried on later operations and shutdown. Exclusive lease probing makes later startup recovery safe when multiple GlyphFrame processes run concurrently.
 
+Phase 11B.3 finalization uses a cancellable playback preflight before the session commit. Close the previous player handle but retain its owned file, open the exact completed candidate with the render token, and revalidate operation, media generation, render identity, and view lifetime. Failed/cancelled preflight rejects the candidate and restores the previous review. If no previous result exists, an unplayable completed candidate may remain owned as Review Unavailable; it must not show success. After valid preflight, disable Cancel and label the narrow acceptance stage as non-cancellable. Accept the captured candidate, record its exact identity, and revalidate after the await. Only a current, successfully opened and accepted result may select Symbolized and show Video Ready/100%. If settings change during commit, retain the matching accepted identity as stale, not as a current success. Shutdown or view invalidation must prevent late reopening or success presentation. Backend progress cannot overwrite this UI finalization stage.
+
+Playback borrows the managed MP4 without transcoding or copying. Each opening creates an isolated WPF media transport and enables scrubbing, including after Close, so paused seeking is supported without resetting volume/mute preferences. Fullscreen is owned by the preview's window; Escape returns to the existing embedded session. Fit / Fill / 100% remains available during rendered-video review and applies to both surfaces. Unloading stops timers and closes media handles; reloading reopens the retained artifact paused at its saved position. Owner closure, replacement, and shutdown release playback before session deletion. A runtime playback failure updates all result indicators and commands and retains the artifact with Review Unavailable.
+
+The transitional direct export has an independent operation outcome: success returns to the retained current/stale review, while failure/cancellation uses export-specific presentation without changing its identity or deleting it. It does not publish the reviewed artifact. Deterministic workflow and STA window/transport tests cover these rules; real paused-frame refresh, audio, and interactive playback smoke checks remain required before final Phase 11B.3 closure.
+
+View reload during active rendering/acceptance, frame preview, or transitional direct export records deferred recovery rather than permanently skipping it. Every operation-completion path uses an awaitable completion boundary that releases operation resources before processing pending recovery. A shared serialized reopen path is used by this boundary, view loading, post-commit recovery, and restoration of a previous artifact. It validates media, operation, artifact, view generation, and cancellation before and after asynchronous work. Queued duplicate requests do not retry a failed recovery automatically; obsolete continuations never close a newer transport. A loaded view recovers the exact accepted artifact at its retained position without overwriting export success/failure/cancellation; an unloaded view remains suspended until a valid load, with no green Video Ready presentation. Only settings/audio changes affect artifact staleness, not view reloads. Image operations use the same completion boundary but cannot reopen video from unrelated media.
+
+Retained playback availability and diagnostics are independent of the latest render-operation outcome. Starting, failing, or cancelling Render Again does not clear an existing review error or describe a closed player as playable. A successful valid open clears the retained playback error; unrelated media selection clears its entire review context. Render diagnostics remain separately available when restoration succeeds after a failed replacement. Success, warning, and failure indicators must not overlap. Core continues to describe the completed artifact identity; App additionally requires a successfully opened matching player before presenting Video Ready.
+
 ## 15. Enums
 
 ```csharp
@@ -1613,7 +1626,7 @@ Tasks:
 
 ### Phase 11B - Render, Review, and Export Workflow
 
-Phase 11B.2 completes the managed artifact store, full-video identity, streaming-render adapter, single-artifact session ownership, and startup/shutdown recovery foundation. It does not yet expose `Render Video`, an in-app player, Video Ready UI, or artifact-based destination publication.
+Phase 11B.3 implements the `Render Video` / `Render Again` application workflow, latest-operation acceptance rules, Video Ready and stale/failure/cancelled result presentation, and in-app review of the exact accepted managed MP4. Player UX is implemented and covered by deterministic controller, view-contract, and STA layout/lifetime tests; interactive audiovisual and multi-monitor verification remain pending. Automated lifecycle tests are not a substitute for checking displayed paused frames and audible playback. Phase 11B.4 owns artifact-based destination publication and removal of the transitional direct-export surface. Phase 11B.5 then adds original-video playback within a validated compatibility matrix, before Phase 12. These planned items must not be reported as already implemented.
 
 - Replace image preview generation with an explicit `Render Image` action and retain one reusable rendered-image result.
 - Keep `Preview Frame` only for video and maintain its identity independently from the full-video render result.
@@ -1627,6 +1640,51 @@ Phase 11B.2 completes the managed artifact store, full-video identity, streaming
 - Keep stale results reviewable but disable export until the preview-panel Render Again action succeeds. Render-setting and video-audio changes invalidate the corresponding full result; image format and destination changes do not. Video slider movement invalidates only frame preview.
 - Use unique Unicode-safe artifact paths and clean player handles, render partials, destination partials, and superseded/orphaned artifacts after media replacement, rerender, cancellation, failure, application exit, and subsequent startup recovery.
 - Cover state transitions, result reuse, invalidation boundaries, stale-callback rejection, player disposal, cache cleanup, repeated export, cancellation, Unicode paths, and existing-destination preservation with automated tests.
+
+#### Phase 11B.3 completion — Player UX and Review Scaling
+
+The following player UX is implemented with automated controller, WPF view-contract, layout, and lifetime coverage. Real audiovisual and multi-monitor checks remain pending before phase closure. It does not add original-video playback or change export semantics.
+
+- Replace text playback controls with one Play/Pause icon button, current/total time and seek bar, a Mute/Unmute icon button, compact volume slider, review-scale selector, and fullscreen toggle. Provide tooltips, accessible names, keyboard operation, and visible focus states.
+- Style timeline and volume sliders consistently with the existing dark/accent theme: thin tracks, accent-filled position, a compact round thumb, and clear hover, pressed, disabled, and focus states. Retain native keyboard commands, click-to-seek, and a larger hit area. Suppress clock-to-thumb updates while dragging without replacing the binding or feeding clock updates back as seeks. Do not introduce a separate visual theme.
+- Remove the separate bottom-row Restart button. At natural playback completion, retain the last frame and show a centered replay icon button over a subtle dimming layer. Clicking it or the bottom Play button restarts playback from the beginning. Ordinary pause must not show the replay overlay; seeking back before the end hides it and leaves playback paused. Use a 160 ms opacity transition and honor reduced motion. Stop/remove animation clocks when hidden or unloaded. Only a natural end during playback sets replay state; paused end-position notifications do not. Keep the decoded final frame without an additional seek beyond it.
+- Reuse the same playback session and control behavior in embedded and fullscreen review. Fullscreen exposes an explicit exit button and supports Escape; replay, seeking, volume, and mute remain available without a second independent player. Controls remain visible; automatic hiding is deferred.
+- Make Fit and Fill effective on the applicable image/frame and video review surfaces. Fit preserves the entire frame and its aspect ratio; Fill preserves aspect ratio while filling and clipping to the viewport. 100% means one source/output pixel per physical display pixel: use the displayed frame/artifact pixel dimensions divided by the viewport's current monitor DPI scale. Use scrollbars for oversized content inside a clipped viewport. The application declares PerMonitorV2 DPI awareness and recalculates on viewport/DPI changes. No outer Viewbox may rescale the media; controls and overlays stay at normal UI scale. These are presentation settings only and never change render identity, output resolution, or export bytes.
+- Until Phase 11B.5, Original remains a frame-position preview. Remove the misleading disabled Play control and label the frame-selection function clearly; retain Preview Frame for symbolizing the selected frame.
+- Add regression coverage for control/replay state and scaling behavior, and manually verify displayed paused frames, audio, fullscreen controls, resizing, and Windows DPI behavior before declaring this completion work verified.
+
+#### Phase 11B.4 — Publish the Reviewed Video Artifact
+
+This is the next implementation phase after completing Phase 11B.3.
+
+- Move video export actions into the persistent result panel below the preview, matching the image workflow, and remove the permanent right-column Output card and transitional direct-render/export action.
+- Request an MP4 destination when Export Video is invoked. Publish the exact accepted, current managed MP4 without repeating symbolization or video/audio encoding; source playback or review scaling must not change what is exported.
+- Keep Render Video / Render Again solely in the preview-panel action row. A stale result remains reviewable but cannot be exported until rerendered.
+- Preserve the reusable artifact after export. Show the destination, Open Folder, and an appropriate repeat-export action in the result panel.
+- Use destination-side partial publication and atomic move/replace where supported; confirm overwrite, preserve existing destinations on failure/cancellation, and clean incomplete publication files. Reuse existing Unicode-path, ownership, and lifecycle safeguards.
+- Verify repeated export without rerendering, byte-preserving publication, stale-result blocking, cancellation, destination failures, existing-file preservation, and retention of the reviewed artifact.
+
+#### Phase 11B.5 — Original Video Playback and Tab Comparison (Planned)
+
+This is an approved roadmap addition after Phase 11B.4 and before Phase 12. It is not part of the current implemented player or a promise to play every imported file.
+
+- Add playback in the existing Original tab, before or after symbolized rendering, using the same visual control design as the result player. Keep the existing Original/Symbolized tab locations.
+- Start compatibility validation with the existing input-container allowlist: MP4, MOV, MKV, and AVI. A file extension identifies a container, not a codec guarantee. Document tested video/audio codec combinations, relevant profiles and orientation, backend requirements, and the validation environment.
+- Keep import/FFmpeg processing support distinct from original-player support. Do not label an entire accepted container unsupported merely because one codec combination fails to play. Do not expand the import allowlist implicitly.
+- When original playback is unavailable, retain FFmpeg-based original-frame preview and Preview Frame, explain the playback limitation, and keep rendering/export available if the processing pipeline can handle the file. Do not show an enabled but nonfunctional Play button.
+- Support play/pause, seeking while paused, current/total time, available source audio, mute/volume, replay, scaling, and fullscreen. Keep source playback independent of Keep Audio/Remove Audio, which controls the rendered artifact rather than mutating source media.
+- On switching tabs, pause the outgoing player before activating another surface; never play both audio streams concurrently. Aim to transfer the current media time, clamped to the target duration, for comparison. Frame-exact synchronization and automatic resume behavior require the decision below and must not be implied by approximate time alignment.
+- Preserve deterministic Preview Frame semantics: capture a defined original-media position and obtain the source frame through the existing decoder; continuous playback must not silently trigger symbolization. Seeking and tab changes must not stale the full-video artifact or start a full render.
+- Keep source media read-only and all processing local. Do not silently create a full source copy or a transcoded playback proxy. Any proxy strategy requires explicit approval of its storage, cleanup, cost, and privacy implications before implementation.
+- Apply bounded resource use, asynchronous opening/decoding, clear playback errors, obsolete-callback rejection, and deterministic release on media replacement, unload, fullscreen closure, and application shutdown. Do not delete or invalidate the managed symbolized artifact when original playback fails.
+- Before phase closure, validate a representative container/codec matrix, Unicode paths, rotated and silent/audio inputs, seek/replay, tab changes, source failures with frame-preview fallback, and simultaneous-audio prevention. Include real interactive checks, not only fake-backend tests.
+
+#### Decisions to Resolve Before Implementing the Relevant Work
+
+- Original playback backend: evaluate reuse of the WPF/system player against a locally bundled playback solution. Select based on demonstrated compatibility, deployment size, licensing, audio/video synchronization, and maintenance. No backend or external dependency is approved by this roadmap alone.
+- Tab comparison: define timestamp tolerance and whether the incoming tab stays paused or resumes the outgoing playback state. The proposed default is a paused frame at approximately the same time; simultaneous playback is excluded.
+- Resolved for Phase 11B.3: 100% is one media pixel per physical display pixel, with DPI-aware dimensions and scrollbars for oversized content; it is not another fit-to-window mode.
+- Resolved for Phase 11B.3: fullscreen controls remain visible. Automatic hiding is deferred and is not implemented.
 
 ### Phase 12 - Error Handling
 
@@ -1704,7 +1762,7 @@ MVP is accepted when all criteria below are met.
 - Right column contains Input, Characters, Render, and Audio for video in that order; it has no permanent Output card after Phase 11B.
 - Preview panel uses equal-width Original and Symbolized tabs and a 16:9 media stage.
 - Loaded-image mode shows `Render Image` and no redundant image-preview action.
-- Loaded-video mode shows the frame slider, fit action, fullscreen action, media metadata, secondary `Preview Frame`, and primary `Render Video` actions.
+- Loaded-video mode shows the labelled frame-position slider, scale selector, media metadata, secondary `Preview Frame`, and primary `Render Video` actions. Fullscreen belongs to rendered-video review; Original has no playback or inactive fullscreen button.
 - Rendering mode shows the circular percentage indicator, progress bar, frame progress, elapsed time, remaining time, and Cancel action.
 - Render Ready mode persists result and export actions below the preview.
 - Footer is present.

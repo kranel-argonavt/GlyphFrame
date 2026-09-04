@@ -189,5 +189,62 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <Border Style="{StaticResource CardStyle}"
+                Visibility="{Binding ShowVideoResultPanel, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="64" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Grid Width="46" Height="46" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Ellipse Fill="{DynamicResource AccentSubtleBrush}"
+                             Stroke="{DynamicResource AccentBrush}"
+                             StrokeThickness="1" />
+                    <Path Width="22"
+                          Height="16"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Data="M 1,8 L 7,14 L 21,1"
+                          Stroke="{StaticResource SuccessBrush}"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round"
+                          StrokeStartLineCap="Round"
+                          StrokeThickness="3"
+                          Stretch="Fill"
+                          Visibility="{Binding IsVideoResultSuccess, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Path Width="4"
+                          Height="20"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Data="M 2,0 L 2,12 M 2,18 L 2,20"
+                          Stroke="{StaticResource WarningBrush}"
+                          StrokeEndLineCap="Round"
+                          StrokeThickness="3"
+                          Visibility="{Binding IsVideoResultWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Path Width="20"
+                          Height="20"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Data="M 1,1 L 19,19 M 19,1 L 1,19"
+                          Stroke="{StaticResource ErrorBrush}"
+                          StrokeEndLineCap="Round"
+                          StrokeThickness="2.5"
+                          Visibility="{Binding IsVideoResultFailure, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                </Grid>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource SectionHeaderTextStyle}"
+                               Text="{Binding VideoResultTitle}" />
+                    <TextBlock Margin="0,5,0,0"
+                               MaxWidth="720"
+                               HorizontalAlignment="Left"
+                               Style="{StaticResource SecondaryTextStyle}"
+                               Text="{Binding VideoResultSummary}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

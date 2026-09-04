@@ -129,6 +129,9 @@ public sealed record RenderWorkflowState
         && HasOriginal
         && ActiveOperation == RenderWorkflowOperation.None;
 
+    public bool CanRenderVideo => MediaType == MediaSelectionKind.Video
+        && ActiveOperation == RenderWorkflowOperation.None;
+
     public bool CanExportImage => MediaType == MediaSelectionKind.Image
         && HasOriginal
         && HasImageRender
@@ -315,7 +318,7 @@ public sealed record RenderWorkflowState
             throw new ArgumentOutOfRangeException(nameof(operationId));
         }
 
-        if (MediaType != MediaSelectionKind.Video || !HasOriginal || !IsCurrentVideoRenderIdentity(identity))
+        if (MediaType != MediaSelectionKind.Video || !IsCurrentVideoRenderIdentity(identity))
         {
             throw new InvalidOperationException("The full-video render identity is not current.");
         }
@@ -358,12 +361,15 @@ public sealed record RenderWorkflowState
             }
             : this;
 
-    public RenderWorkflowState CompleteVideoRender(long operationId, FullVideoRenderIdentity identity) =>
+    public bool CanAcceptVideoRender(long operationId, FullVideoRenderIdentity identity) =>
         operationId == ActiveOperationId
         && ActiveOperation == RenderWorkflowOperation.RenderVideo
         && Status != RenderWorkflowStatus.Cancelling
         && identity == ActiveVideoRenderIdentity
-        && IsCurrentVideoRenderIdentity(identity)
+        && IsCurrentVideoRenderIdentity(identity);
+
+    public RenderWorkflowState CompleteVideoRender(long operationId, FullVideoRenderIdentity identity) =>
+        CanAcceptVideoRender(operationId, identity)
             ? this with
             {
                 VideoArtifactIdentity = identity,
@@ -371,6 +377,32 @@ public sealed record RenderWorkflowState
                 Status = RenderWorkflowStatus.RenderReady
             }
             : this;
+
+    public RenderWorkflowState FailVideoReview() => HasVideoArtifact
+        ? this with
+        {
+            OutcomeOperation = RenderWorkflowOperation.RenderVideo,
+            Status = RenderWorkflowStatus.Failed
+        }
+        : this;
+
+    // Session acceptance is a commit: even if settings change while it awaits cleanup,
+    // the retained physical artifact must have its matching (possibly stale) identity.
+    public RenderWorkflowState RecordAcceptedVideoArtifact(FullVideoRenderIdentity identity) =>
+        MediaType == MediaSelectionKind.Video && identity.MediaVersion == MediaVersion
+            ? this with
+            {
+                VideoArtifactIdentity = identity,
+                OutcomeOperation = RenderWorkflowOperation.RenderVideo,
+                Status = IsCurrentVideoRenderIdentity(identity)
+                    ? RenderWorkflowStatus.RenderReady
+                    : RenderWorkflowStatus.RenderStale
+            }
+            : this;
+
+    public RenderWorkflowStatus VideoReviewStatus => HasVideoArtifact
+        ? IsVideoArtifactStale ? RenderWorkflowStatus.RenderStale : RenderWorkflowStatus.RenderReady
+        : RenderWorkflowStatus.MediaReady;
 
     public RenderWorkflowState CompleteExport(long operationId) =>
         operationId == ActiveOperationId

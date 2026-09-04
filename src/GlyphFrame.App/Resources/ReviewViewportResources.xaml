@@ -1,0 +1,7 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- The native ScrollViewer corner uses this system brush. Override it only
+         inside the review viewport, retaining the native template and input behavior. -->
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}"
+                     Color="{DynamicResource PreviewBackgroundColor}" />
+</ResourceDictionary>

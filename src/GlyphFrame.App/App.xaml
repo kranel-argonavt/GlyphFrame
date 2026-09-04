@@ -8,6 +8,7 @@
                 <ResourceDictionary Source="Resources/Colors.xaml" />
                 <ResourceDictionary Source="Resources/Typography.xaml" />
                 <ResourceDictionary Source="Resources/Controls.xaml" />
+                <ResourceDictionary Source="Resources/PlayerControls.xaml" />
                 <ResourceDictionary Source="Resources/Components.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

@@ -362,6 +362,38 @@ public sealed class RenderWorkflowStateTests
     }
 
     [Fact]
+    public void FullVideoRender_DoesNotRequireRandomAccessFramePreview()
+    {
+        RenderWorkflowState video = RenderWorkflowState.Empty.SelectMedia(
+            MediaSelectionKind.Video,
+            1,
+            hasOriginal: false);
+        FullVideoRenderIdentity identity = video.CreateFullVideoRenderIdentity(
+            ImageRenderSettings.Default,
+            CharacterPresetOption.Default);
+
+        RenderWorkflowState rendering = video.BeginVideoRender(82, identity);
+
+        Assert.True(video.CanRenderVideo);
+        Assert.False(video.CanPreviewVideoFrame);
+        Assert.Equal(RenderWorkflowOperation.RenderVideo, rendering.ActiveOperation);
+        Assert.True(rendering.CanAcceptVideoRender(82, identity));
+    }
+
+    [Fact]
+    public void PlayerReviewFailure_PreservesAcceptedArtifactIdentity()
+    {
+        RenderWorkflowState rendered = WithVideoArtifactAndFramePreview();
+
+        RenderWorkflowState failed = rendered.FailVideoReview();
+
+        Assert.True(failed.HasVideoArtifact);
+        Assert.Equal(rendered.VideoArtifactIdentity, failed.VideoArtifactIdentity);
+        Assert.Equal(RenderWorkflowStatus.Failed, failed.Status);
+        Assert.Equal(RenderWorkflowOperation.RenderVideo, failed.OutcomeOperation);
+    }
+
+    [Fact]
     public void MediaReplacement_ClearsFramePreviewAndFullVideoArtifactIdentities()
     {
         RenderWorkflowState renderedVideo = WithVideoArtifactAndFramePreview();
@@ -397,6 +429,41 @@ public sealed class RenderWorkflowStateTests
         Assert.Throws<InvalidOperationException>(() => state.BeginOperation(
             2,
             RenderWorkflowOperation.ExportImage));
+    }
+
+    [Fact]
+    public void CommittedIdentity_RecordsStalenessButCannotAttachToNewMedia()
+    {
+        RenderWorkflowState ready = ReadyVideo();
+        FullVideoRenderIdentity identity = ready.CreateFullVideoRenderIdentity(
+            ImageRenderSettings.Default, CharacterPresetOption.Default);
+        RenderWorkflowState changed = ready.VideoAudioModeChanged(AudioExportMode.RemoveAudio)
+            .RecordAcceptedVideoArtifact(identity);
+        Assert.Equal(identity, changed.VideoArtifactIdentity);
+        Assert.Equal(RenderWorkflowStatus.RenderStale, changed.VideoReviewStatus);
+        RenderWorkflowState newMedia = ready.SelectMedia(MediaSelectionKind.Video, 2, false);
+        Assert.Same(newMedia, newMedia.RecordAcceptedVideoArtifact(identity));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DirectExportOutcome_PreservesIndependentReviewStatus(bool stale)
+    {
+        RenderWorkflowState ready = WithVideoArtifactAndFramePreview();
+        if (stale)
+        {
+            ready = ready.VideoAudioModeChanged(AudioExportMode.RemoveAudio);
+        }
+        RenderWorkflowState exporting = ready.BeginOperation(100, RenderWorkflowOperation.ExportVideo);
+        foreach (RenderWorkflowState outcome in new[]
+        {
+            exporting.CompleteExport(100), exporting.FailActiveOperation(100), exporting.CancelActiveOperation()
+        })
+        {
+            Assert.Equal(ready.VideoArtifactIdentity, outcome.VideoArtifactIdentity);
+            Assert.Equal(stale ? RenderWorkflowStatus.RenderStale : RenderWorkflowStatus.RenderReady, outcome.VideoReviewStatus);
+        }
     }
 
     private static RenderWorkflowState ReadyImage() => RenderWorkflowState.Empty.SelectMedia(

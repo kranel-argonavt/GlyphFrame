@@ -59,210 +59,230 @@
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
-                <Viewbox Stretch="Uniform">
-                    <Grid Width="960" Height="540" Background="Transparent">
-                        <Image Margin="12"
-                               RenderOptions.BitmapScalingMode="HighQuality"
-                               Source="{Binding CurrentPreviewImageSource}"
-                               Stretch="Uniform"
-                               Visibility="{Binding ShowImagePreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                        <Border Margin="18"
-                                Padding="12,7"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Bottom"
-                                Background="#CC151820"
-                                BorderBrush="{DynamicResource AccentBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Visibility="{Binding IsSymbolizedPreviewSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <TextBlock Foreground="{StaticResource SecondaryTextBrush}"
-                                       Text="{Binding PreviewStaleMessage}"
-                                       TextAlignment="Center" />
-                        </Border>
+                <Grid Background="Transparent" ClipToBounds="True">
+                    <views:ReviewViewport Source="{Binding CurrentPreviewImageSource}"
+                                          PixelWidth="{Binding CurrentPreviewPixelWidth}" PixelHeight="{Binding CurrentPreviewPixelHeight}"
+                                          ScaleMode="{Binding SelectedFitMode}"
+                                          Visibility="{Binding ShowImagePreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                        <Grid Visibility="{Binding ShowEmptyPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <StackPanel Width="520"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        TextBlock.TextAlignment="Center">
-                                <Border Width="74"
-                                        Height="74"
-                                        HorizontalAlignment="Center"
-                                        Background="{DynamicResource AccentSubtleBrush}"
-                                        BorderBrush="{DynamicResource AccentBrush}"
-                                        BorderThickness="2"
-                                        CornerRadius="18">
-                                    <Grid>
-                                        <TextBlock HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   FontSize="34"
-                                                   Foreground="{DynamicResource AccentHoverBrush}"
-                                                   Text="▶" />
-                                    </Grid>
-                                </Border>
-                                <TextBlock Margin="0,20,0,0"
-                                           FontSize="20"
-                                           FontWeight="SemiBold"
-                                           Text="Drop media here to begin" />
-                                <TextBlock Margin="0,12,0,0"
-                                           FontSize="13"
-                                           Foreground="{StaticResource SecondaryTextBrush}"
-                                           Text="Images and videos stay on this computer" />
-                                <Button Width="154"
-                                        Height="40"
-                                        Margin="0,20,0,0"
-                                        Command="{Binding BrowseMediaCommand}"
-                                        Content="Browse Media"
-                                        Style="{StaticResource PrimaryButtonStyle}" />
-                            </StackPanel>
-                        </Grid>
+                    <views:VideoReviewSurface Visibility="{Binding ShowRenderedVideoPlayer, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                        <Grid Visibility="{Binding ShowLoadingPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <StackPanel Width="520"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        TextBlock.TextAlignment="Center">
-                                <TextBlock FontSize="22"
-                                           FontWeight="SemiBold"
-                                           Text="{Binding SelectedFileName}" />
-                                <TextBlock Margin="0,12,0,0"
-                                           FontSize="15"
-                                           Foreground="{StaticResource SecondaryTextBrush}"
-                                           Text="Reading local media metadata..." />
-                                <ProgressBar Width="260"
-                                             Height="5"
-                                             Margin="0,22,0,0"
-                                             IsIndeterminate="True" />
-                                <TextBlock Margin="0,14,0,0"
-                                           Style="{StaticResource MutedTextStyle}"
-                                           Text="No media is uploaded or copied" />
-                            </StackPanel>
-                        </Grid>
+                    <Border Margin="18"
+                            Padding="12,7"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Bottom"
+                            Background="#CC151820"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Visibility="{Binding ShowPreviewStatusBadge, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Foreground="{StaticResource SecondaryTextBrush}"
+                                   Text="{Binding PreviewStaleMessage}"
+                                   TextAlignment="Center" />
+                    </Border>
 
-                        <Grid Visibility="{Binding ShowErrorPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <StackPanel Width="540"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        TextBlock.TextAlignment="Center">
-                                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Media could not be loaded" />
-                                <TextBlock Margin="0,12,0,0"
-                                           FontSize="15"
-                                           Foreground="{StaticResource ErrorBrush}"
-                                           Text="{Binding InputStatusMessage}"
-                                           TextWrapping="Wrap" />
-                                <Button Width="154"
-                                        Height="40"
-                                        Margin="0,20,0,0"
-                                        Command="{Binding BrowseMediaCommand}"
-                                        Content="Choose Another"
-                                        Style="{StaticResource PrimaryButtonStyle}" />
-                            </StackPanel>
-                        </Grid>
-
-                        <Grid Visibility="{Binding ShowMediaPlaceholder, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" TextBlock.TextAlignment="Center">
-                                <TextBlock FontSize="30" FontWeight="SemiBold" Text="Video selected" />
-                                <TextBlock Margin="0,12,0,0"
-                                           FontSize="18"
-                                           Foreground="{StaticResource SecondaryTextBrush}"
-                                           Text="Choose a position to load an original frame" />
-                                <TextBlock Margin="0,10,0,0"
-                                           Style="{StaticResource MutedTextStyle}"
-                                           Text="{Binding InputMetadataSummary}" />
-                            </StackPanel>
-                        </Grid>
-
-                        <Border Background="#C90D0F14"
-                                Visibility="{Binding ShowVideoFrameLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <StackPanel Width="520"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        TextBlock.TextAlignment="Center">
-                                <TextBlock FontSize="24"
-                                           FontWeight="SemiBold"
-                                           Text="Loading video frame..." />
-                                <TextBlock Margin="0,12,0,0"
-                                           FontSize="15"
-                                           Foreground="{StaticResource SecondaryTextBrush}"
-                                           Text="{Binding TimelineText}" />
-                                <ProgressBar Width="280"
-                                             Height="5"
-                                             Margin="0,22,0,0"
-                                             IsIndeterminate="True" />
-                                <TextBlock Margin="0,14,0,0"
-                                           Style="{StaticResource MutedTextStyle}"
-                                           Text="Decoding one local frame without loading the whole video" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Background="#E60D0F14"
-                                Visibility="{Binding ShowVideoFrameError, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <StackPanel Width="560"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        TextBlock.TextAlignment="Center">
-                                <TextBlock FontSize="24" FontWeight="SemiBold" Text="Frame preview unavailable" />
-                                <TextBlock Margin="0,12,0,0"
-                                           FontSize="15"
-                                           Foreground="{StaticResource ErrorBrush}"
-                                           Text="{Binding VideoFrameStatusMessage}"
-                                           TextWrapping="Wrap" />
-                                <TextBlock Margin="0,12,0,0"
-                                           Style="{StaticResource MutedTextStyle}"
-                                           Text="Move the position slider to retry, or choose another video."
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Background="#D90D0F14"
-                                Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <StackPanel Width="520"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        TextBlock.TextAlignment="Center">
-                                <views:ExportActivityIndicator Width="72"
-                                                               Height="72"
-                                                               Margin="0,0,0,18"
-                                                               HorizontalAlignment="Center"
-                                                               AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                                                               IsActive="{Binding IsExportActive}"
-                                                               IsCompleted="{Binding IsExportCompletionVisible}"
-                                                               PercentageText="{Binding ExportPercentageText}" />
-                                <TextBlock FontSize="24"
-                                           FontWeight="SemiBold"
-                                           Text="{Binding ExportOperationTitle}" />
-                                <TextBlock Margin="0,12,0,0"
-                                           FontSize="15"
-                                           Foreground="{StaticResource SecondaryTextBrush}"
-                                           presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                                           presentation:ExportStatusAnimation.Stage="{Binding ExportStage}"
-                                           presentation:ExportStatusAnimation.StageText="{Binding ExportProgressText}"
-                                           Text="" />
-                                <ProgressBar Width="280"
-                                             Height="5"
-                                             Margin="0,22,0,0"
-                                             Maximum="100"
-                                             presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                                             presentation:ExportStatusAnimation.ProgressGeneration="{Binding ExportPresentationGeneration}"
-                                             presentation:ExportStatusAnimation.ProgressIsIndeterminate="{Binding IsExportProgressIndeterminate}"
-                                             presentation:ExportStatusAnimation.ProgressStage="{Binding ExportStage}"
-                                             presentation:ExportStatusAnimation.ProgressValue="{Binding ExportProgress}" />
-                                <TextBlock Margin="0,14,0,0"
-                                           Style="{StaticResource MutedTextStyle}"
-                                           Text="{Binding ExportFrameText}" />
-                                <TextBlock Margin="0,6,0,0"
-                                           Style="{StaticResource MutedTextStyle}"
-                                           Text="{Binding ElapsedText}" />
-                            </StackPanel>
-                        </Border>
+                    <Grid Visibility="{Binding ShowEmptyPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel MaxWidth="520"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    TextBlock.TextAlignment="Center">
+                            <Border Width="74"
+                                    Height="74"
+                                    HorizontalAlignment="Center"
+                                    Background="{DynamicResource AccentSubtleBrush}"
+                                    BorderBrush="{DynamicResource AccentBrush}"
+                                    BorderThickness="2"
+                                    CornerRadius="18">
+                                <Grid>
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="34"
+                                               Foreground="{DynamicResource AccentHoverBrush}"
+                                               Text="▶" />
+                                </Grid>
+                            </Border>
+                            <TextBlock Margin="0,20,0,0"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"
+                                       Text="Drop media here to begin" />
+                            <TextBlock Margin="0,12,0,0"
+                                       FontSize="13"
+                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="Images and videos stay on this computer" />
+                            <Button Width="154"
+                                    Height="40"
+                                    Margin="0,20,0,0"
+                                    Command="{Binding BrowseMediaCommand}"
+                                    Content="Browse Media"
+                                    Style="{StaticResource PrimaryButtonStyle}" />
+                        </StackPanel>
                     </Grid>
-                </Viewbox>
+
+                    <Grid Visibility="{Binding ShowLoadingPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel MaxWidth="520"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    TextBlock.TextAlignment="Center">
+                            <TextBlock FontSize="22"
+                                       FontWeight="SemiBold"
+                                       Text="{Binding SelectedFileName}" />
+                            <TextBlock Margin="0,12,0,0"
+                                       FontSize="15"
+                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="Reading local media metadata..." />
+                            <ProgressBar Width="260"
+                                         Height="5"
+                                         Margin="0,22,0,0"
+                                         IsIndeterminate="True" />
+                            <TextBlock Margin="0,14,0,0"
+                                       Style="{StaticResource MutedTextStyle}"
+                                       Text="No media is uploaded or copied" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Visibility="{Binding ShowErrorPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel MaxWidth="540"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    TextBlock.TextAlignment="Center">
+                            <TextBlock FontSize="22" FontWeight="SemiBold" Text="Media could not be loaded" />
+                            <TextBlock Margin="0,12,0,0"
+                                       FontSize="15"
+                                       Foreground="{StaticResource ErrorBrush}"
+                                       Text="{Binding InputStatusMessage}"
+                                       TextWrapping="Wrap" />
+                            <Button Width="154"
+                                    Height="40"
+                                    Margin="0,20,0,0"
+                                    Command="{Binding BrowseMediaCommand}"
+                                    Content="Choose Another"
+                                    Style="{StaticResource PrimaryButtonStyle}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Visibility="{Binding ShowMediaPlaceholder, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" TextBlock.TextAlignment="Center">
+                            <TextBlock FontSize="30" FontWeight="SemiBold" Text="Video selected" />
+                            <TextBlock Margin="0,12,0,0"
+                                       FontSize="18"
+                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="Choose a position to load an original frame" />
+                            <TextBlock Margin="0,10,0,0"
+                                       Style="{StaticResource MutedTextStyle}"
+                                       Text="{Binding InputMetadataSummary}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Background="#C90D0F14"
+                            Visibility="{Binding ShowVideoFrameLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel MaxWidth="520"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    TextBlock.TextAlignment="Center">
+                            <TextBlock FontSize="24"
+                                       FontWeight="SemiBold"
+                                       Text="Loading video frame..." />
+                            <TextBlock Margin="0,12,0,0"
+                                       FontSize="15"
+                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="{Binding TimelineText}" />
+                            <ProgressBar Width="280"
+                                         Height="5"
+                                         Margin="0,22,0,0"
+                                         IsIndeterminate="True" />
+                            <TextBlock Margin="0,14,0,0"
+                                       Style="{StaticResource MutedTextStyle}"
+                                       Text="Decoding one local frame without loading the whole video" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#E60D0F14"
+                            Visibility="{Binding ShowVideoFrameError, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel MaxWidth="560"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    TextBlock.TextAlignment="Center">
+                            <TextBlock FontSize="24" FontWeight="SemiBold" Text="Frame preview unavailable" />
+                            <TextBlock Margin="0,12,0,0"
+                                       FontSize="15"
+                                       Foreground="{StaticResource ErrorBrush}"
+                                       Text="{Binding VideoFrameStatusMessage}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,12,0,0"
+                                       Style="{StaticResource MutedTextStyle}"
+                                       Text="Move the position slider to retry, or choose another video."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#E60D0F14"
+                            Visibility="{Binding ShowRenderedVideoReviewError, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel MaxWidth="560"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    TextBlock.TextAlignment="Center">
+                            <TextBlock FontSize="24" FontWeight="SemiBold" Text="Rendered video review unavailable" />
+                            <TextBlock Margin="0,12,0,0"
+                                       FontSize="15"
+                                       Foreground="{StaticResource ErrorBrush}"
+                                       Text="{Binding StatusMessage}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,12,0,0"
+                                       Style="{StaticResource MutedTextStyle}"
+                                       Text="The managed artifact is retained. Use Render Again to retry."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#D90D0F14"
+                            Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel MaxWidth="520"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    TextBlock.TextAlignment="Center">
+                            <views:ExportActivityIndicator Width="72"
+                                                           Height="72"
+                                                           Margin="0,0,0,18"
+                                                           HorizontalAlignment="Center"
+                                                           AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                                           IsActive="{Binding IsExportActive}"
+                                                           IsCompleted="{Binding IsExportCompletionVisible}"
+                                                           PercentageText="{Binding ExportPercentageText}" />
+                            <TextBlock FontSize="24"
+                                       FontWeight="SemiBold"
+                                       Text="{Binding ExportOperationTitle}" />
+                            <TextBlock Margin="0,12,0,0"
+                                       FontSize="15"
+                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                       presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                       presentation:ExportStatusAnimation.Stage="{Binding ExportStage}"
+                                       presentation:ExportStatusAnimation.StageText="{Binding ExportProgressText}"
+                                       Text="" />
+                            <ProgressBar Width="280"
+                                         Height="5"
+                                         Margin="0,22,0,0"
+                                         Maximum="100"
+                                         presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                         presentation:ExportStatusAnimation.ProgressGeneration="{Binding ExportPresentationGeneration}"
+                                         presentation:ExportStatusAnimation.ProgressIsIndeterminate="{Binding IsExportProgressIndeterminate}"
+                                         presentation:ExportStatusAnimation.ProgressStage="{Binding ExportStage}"
+                                         presentation:ExportStatusAnimation.ProgressValue="{Binding ExportProgress}" />
+                            <TextBlock Margin="0,14,0,0"
+                                       Style="{StaticResource MutedTextStyle}"
+                                       Text="{Binding ExportFrameText}" />
+                            <TextBlock Margin="0,6,0,0"
+                                       Style="{StaticResource MutedTextStyle}"
+                                       Text="{Binding ElapsedText}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
             </Border>
 
             <Grid Grid.Row="2"
                   Margin="14,10"
-                  Visibility="{Binding IsVideoSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                  Visibility="{Binding ShowVideoFrameControls, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -270,14 +290,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Button Grid.Column="0"
-                        Width="34"
-                        Height="32"
-                        Padding="0"
-                        Command="{Binding SelectOriginalCommand}"
-                        Content="▶"
-                        IsEnabled="False"
-                        ToolTip="Animated playback is outside the MVP; use the frame-position slider" />
+                <TextBlock Grid.Column="0" Text="Frame position" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
                 <TextBlock Grid.Column="1"
                            Margin="10,0,12,0"
                            Style="{StaticResource MutedTextStyle}"
@@ -290,21 +303,23 @@
                         Minimum="0"
                         SmallChange="0.01"
                         LargeChange="0.1"
-                        ToolTip="Choose the video frame position"
+                        ToolTip="Select an original video frame (not playback)"
+                        AutomationProperties.Name="Original frame position"
+                        Style="{DynamicResource PlayerSliderStyle}"
                         Value="{Binding TimelinePosition, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 <ComboBox Grid.Column="3"
-                          Width="82"
+                          Width="92"
                           Margin="0,0,8,0"
                           ItemsSource="{Binding FitModes}"
                           SelectedItem="{Binding SelectedFitMode}"
-                          ToolTip="Preview scaling" />
-                <Button Grid.Column="4"
-                        Width="36"
-                        Padding="0"
-                        Command="{Binding FullscreenCommand}"
-                        Content="⛶"
-                        ToolTip="Open fullscreen preview" />
+                          ToolTip="Preview scaling" AutomationProperties.Name="Frame review scale" />
+
             </Grid>
+
+            <ComboBox Grid.Row="2" Width="90" Margin="14,6" HorizontalAlignment="Right"
+                      ItemsSource="{Binding FitModes}" SelectedItem="{Binding SelectedFitMode}"
+                      Visibility="{Binding IsImageSelected, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      ToolTip="Review scale" AutomationProperties.Name="Image review scale" />
 
             <Border Grid.Row="3" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
                 <Grid Margin="14,12">
@@ -339,11 +354,17 @@
                                 Content="{Binding ImageRenderActionLabel}"
                                 Style="{StaticResource PrimaryButtonStyle}"
                                 Visibility="{Binding IsImageSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <Button MinWidth="188"
-                                Command="{Binding PreviewFrameCommand}"
-                                Content="{Binding PreviewFrameActionLabel}"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Visibility="{Binding IsVideoSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <StackPanel Orientation="Horizontal"
+                                    Visibility="{Binding IsVideoSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button MinWidth="132"
+                                    Command="{Binding PreviewFrameCommand}"
+                                    Content="{Binding PreviewFrameActionLabel}" />
+                            <Button MinWidth="148"
+                                    Margin="10,0,0,0"
+                                    Command="{Binding RenderVideoCommand}"
+                                    Content="{Binding VideoRenderActionLabel}"
+                                    Style="{StaticResource PrimaryButtonStyle}" />
+                        </StackPanel>
                     </Grid>
                 </Grid>
             </Border>

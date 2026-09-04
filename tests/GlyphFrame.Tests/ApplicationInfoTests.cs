@@ -113,4 +113,14 @@ public sealed class ApplicationInfoTests
         Assert.Equal("Video & Image to Symbol Converter", applicationInfo.Description);
         Assert.Equal("Phase 11B.2 - Managed Video Artifact Foundation", applicationInfo.Status);
     }
+
+    [Fact]
+    public void Phase11B3_ProvidesExpectedApplicationIdentityAndStatus()
+    {
+        ApplicationInfo applicationInfo = ApplicationInfo.Phase11B3;
+
+        Assert.Equal("GlyphFrame", applicationInfo.Name);
+        Assert.Equal("Video & Image to Symbol Converter", applicationInfo.Description);
+        Assert.Equal("Phase 11B.3 - Full Video Render and Review UI", applicationInfo.Status);
+    }
 }

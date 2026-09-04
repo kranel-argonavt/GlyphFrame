@@ -75,7 +75,7 @@ public partial class App : Application
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton(ApplicationInfo.Phase11B2);
+        services.AddSingleton(ApplicationInfo.Phase11B3);
         services.AddSingleton<IApplicationPaths, ApplicationPaths>();
         services.AddSingleton<ISettingsService, JsonSettingsService>();
         services.AddSingleton<IFolderLauncher, WindowsFolderLauncher>();
@@ -107,6 +107,7 @@ public partial class App : Application
         services.AddSingleton<IManagedVideoArtifactStore, ManagedVideoArtifactStore>();
         services.AddSingleton<IManagedVideoRenderService, ManagedVideoRenderService>();
         services.AddSingleton<IManagedVideoArtifactSession, ManagedVideoArtifactSession>();
+        services.AddSingleton<IRenderedVideoPlayer, RenderedVideoPlayer>();
         services.AddSingleton<IImageExporter, SkiaImageExporter>();
         services.AddSingleton<IAccentThemeService, AccentThemeService>();
         services.AddSingleton<IApplicationSettingsManager, ApplicationSettingsManager>();

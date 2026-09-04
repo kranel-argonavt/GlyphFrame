@@ -1,0 +1,200 @@
+<UserControl
+    x:Class="GlyphFrame.App.Views.VideoReviewSurface"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="clr-namespace:GlyphFrame.App.Views"
+    x:Name="Surface"
+    Focusable="False">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary
+                    Source="../Resources/PlayerControls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <Grid
+        Background="{DynamicResource PreviewBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition
+                Height="*" />
+            <RowDefinition
+                Height="Auto" />
+        </Grid.RowDefinitions>
+        <views:ReviewViewport
+            x:Name="Viewport"
+            Source="{Binding RenderedVideoPlaybackSource}"
+            PixelWidth="{Binding RenderedVideoPixelWidth}"
+            PixelHeight="{Binding RenderedVideoPixelHeight}"
+            ScaleMode="{Binding SelectedFitMode}" />
+        <Border
+            x:Name="ReplayOverlay"
+            Background="#33000000"
+            Visibility="Collapsed">
+            <Button
+                x:Name="ReplayButton"
+                Width="64"
+                Height="64"
+                Padding="16"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Style="{StaticResource PlayerIconButtonStyle}"
+                Command="{Binding RestartRenderedVideoCommand}"
+                ToolTip="Replay video"
+                AutomationProperties.Name="Replay video">
+                <Path
+                    Data="{StaticResource PlayerReplayIcon}"
+                    Fill="{DynamicResource PrimaryTextBrush}"
+                    Stretch="Uniform" />
+            </Button>
+        </Border>
+        <Grid
+            Grid.Row="1"
+            Margin="8,6"
+            Background="Transparent">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition
+                    Width="Auto" />
+                <ColumnDefinition
+                    Width="Auto" />
+                <ColumnDefinition
+                    Width="*"
+                    MinWidth="64" />
+                <ColumnDefinition
+                    Width="Auto" />
+                <ColumnDefinition
+                    Width="Auto" />
+                <ColumnDefinition
+                    Width="64" />
+                <ColumnDefinition
+                    Width="96" />
+                <ColumnDefinition
+                    Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button
+                x:Name="PlayButton"
+                Command="{Binding ToggleRenderedVideoPlaybackCommand}"
+                Style="{StaticResource PlayerIconButtonStyle}"
+                ToolTip="{Binding RenderedVideoPlaybackActionLabel}"
+                AutomationProperties.Name="{Binding RenderedVideoPlaybackActionLabel}">
+                <Path
+                    Stretch="Uniform"
+                    Fill="{DynamicResource PrimaryTextBrush}">
+                    <Path.Style>
+                        <Style
+                            TargetType="Path">
+                            <Setter
+                                Property="Data"
+                                Value="{StaticResource PlayerPlayIcon}" />
+                            <Style.Triggers>
+                                <DataTrigger
+                                    Binding="{Binding IsRenderedVideoPlaying}"
+                                    Value="True">
+                                    <Setter
+                                        Property="Data"
+                                        Value="{StaticResource PlayerPauseIcon}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Path.Style>
+                </Path>
+            </Button>
+            <TextBlock
+                Grid.Column="1"
+                Margin="6,0"
+                VerticalAlignment="Center"
+                Foreground="{DynamicResource SecondaryTextBrush}"
+                Text="{Binding RenderedVideoCurrentTimeText}" />
+            <views:ReviewSeekSlider
+                Grid.Column="2"
+                Minimum="0"
+                Maximum="{Binding RenderedVideoDurationSeconds}"
+                Position="{Binding RenderedVideoPositionSeconds, Mode=TwoWay}"
+                Style="{StaticResource PlayerSliderStyle}"
+                SmallChange="1"
+                LargeChange="5"
+                ToolTip="Seek rendered video"
+                AutomationProperties.Name="Rendered video position" />
+            <TextBlock
+                Grid.Column="3"
+                Margin="6,0"
+                VerticalAlignment="Center"
+                Foreground="{DynamicResource SecondaryTextBrush}"
+                Text="{Binding RenderedVideoTotalTimeText}" />
+            <Button
+                Grid.Column="4"
+                Command="{Binding ToggleRenderedVideoMuteCommand}"
+                Style="{StaticResource PlayerIconButtonStyle}"
+                ToolTip="{Binding RenderedVideoMuteActionLabel}"
+                AutomationProperties.Name="{Binding RenderedVideoMuteActionLabel}">
+                <Path
+                    Stretch="Uniform"
+                    Fill="{DynamicResource PrimaryTextBrush}">
+                    <Path.Style>
+                        <Style
+                            TargetType="Path">
+                            <Setter
+                                Property="Data"
+                                Value="{StaticResource PlayerSoundIcon}" />
+                            <Style.Triggers>
+                                <DataTrigger
+                                    Binding="{Binding IsRenderedVideoMuted}"
+                                    Value="True">
+                                    <Setter
+                                        Property="Data"
+                                        Value="{StaticResource PlayerMuteIcon}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Path.Style>
+                </Path>
+            </Button>
+            <Slider
+                Grid.Column="5"
+                Minimum="0"
+                Maximum="1"
+                SmallChange="0.05"
+                LargeChange="0.1"
+                Value="{Binding RenderedVideoVolume, Mode=TwoWay}"
+                Style="{StaticResource PlayerSliderStyle}"
+                ToolTip="Volume"
+                AutomationProperties.Name="Volume" />
+            <ComboBox
+                Grid.Column="6"
+                Margin="4,0"
+                ItemsSource="{Binding FitModes}"
+                SelectedItem="{Binding SelectedFitMode}"
+                ToolTip="Review scale"
+                AutomationProperties.Name="Review scale" />
+            <Button
+                x:Name="FullscreenButton"
+                Grid.Column="7"
+                Click="OnFullscreenClick"
+                Style="{StaticResource PlayerIconButtonStyle}"
+                ToolTip="{Binding FullscreenActionLabel, ElementName=Surface}"
+                AutomationProperties.Name="{Binding FullscreenActionLabel, ElementName=Surface}">
+                <Path
+                    Stretch="Uniform"
+                    Fill="{DynamicResource PrimaryTextBrush}">
+                    <Path.Style>
+                        <Style
+                            TargetType="Path">
+                            <Setter
+                                Property="Data"
+                                Value="{StaticResource PlayerFullscreenIcon}" />
+                            <Style.Triggers>
+                                <DataTrigger
+                                    Binding="{Binding IsFullscreen, ElementName=Surface}"
+                                    Value="True">
+                                    <Setter
+                                        Property="Data"
+                                        Value="{StaticResource PlayerExitFullscreenIcon}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Path.Style>
+                </Path>
+            </Button>
+        </Grid>
+    </Grid>
+</UserControl>
