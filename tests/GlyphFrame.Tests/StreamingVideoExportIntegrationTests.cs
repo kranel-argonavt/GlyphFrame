@@ -87,6 +87,22 @@ public sealed class StreamingVideoExportIntegrationTests
         Assert.DoesNotContain(
             streams.EnumerateArray(),
             stream => stream.GetProperty("codec_type").GetString() == "audio");
+        await using ManagedVideoArtifactSession session = new(store);
+        await session.AcceptAsync(artifact);
+        VideoArtifactPublisher publisher = new(store);
+        for (int copy = 0; copy < 2; copy++)
+        {
+            string destination = Path.Combine(media.RootPath, $"переглянутий 日本語 {copy}.mp4");
+            VideoPublicationDestination prepared = await publisher.PrepareAsync(destination, input);
+            VideoExportResult published = await session.UseCurrentAsync(artifact,
+                token => publisher.PublishAsync(new(artifact, input, prepared, false), token));
+            Assert.True(published.Success, published.TechnicalDetail);
+            Assert.Equal(await File.ReadAllBytesAsync(artifact.FilePath), await File.ReadAllBytesAsync(destination));
+            using JsonDocument exportedProbe = await ProbeAsync(destination, locator, processRunner);
+            Assert.Equal(video.GetProperty("nb_frames").GetString(), exportedProbe.RootElement.GetProperty("streams")[0].GetProperty("nb_frames").GetString());
+            using FileStream destinationExclusive = new(destination, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        }
+        Assert.Empty(Directory.GetFiles(media.RootPath, "*.partial", SearchOption.AllDirectories));
         using FileStream sourceExclusive = new(input, FileMode.Open, FileAccess.Read, FileShare.None);
         using FileStream artifactExclusive = new(artifact.FilePath, FileMode.Open, FileAccess.Read, FileShare.None);
         Assert.True(sourceExclusive.CanRead);

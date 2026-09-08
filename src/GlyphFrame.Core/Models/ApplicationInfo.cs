@@ -61,4 +61,9 @@ public sealed record ApplicationInfo(string Name, string Description, string Sta
         "GlyphFrame",
         "Video & Image to Symbol Converter",
         "Phase 11B.3 - Full Video Render and Review UI");
+
+    public static ApplicationInfo Phase11B4 { get; } = new(
+        "GlyphFrame",
+        "Video & Image to Symbol Converter",
+        "Phase 11B.4 - Publish the Reviewed Video Artifact");
 }

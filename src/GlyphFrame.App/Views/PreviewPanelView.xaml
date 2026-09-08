@@ -2,7 +2,6 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:behaviors="clr-namespace:GlyphFrame.App.Behaviors"
-             xmlns:presentation="clr-namespace:GlyphFrame.App.Presentation"
              xmlns:views="clr-namespace:GlyphFrame.App.Views"
              MinHeight="420"
              Focusable="False">
@@ -236,45 +235,15 @@
                     </Border>
 
                     <Border Background="#D90D0F14"
-                            Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <StackPanel MaxWidth="520"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    TextBlock.TextAlignment="Center">
-                            <views:ExportActivityIndicator Width="72"
-                                                           Height="72"
-                                                           Margin="0,0,0,18"
-                                                           HorizontalAlignment="Center"
-                                                           AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                                                           IsActive="{Binding IsExportActive}"
-                                                           IsCompleted="{Binding IsExportCompletionVisible}"
-                                                           PercentageText="{Binding ExportPercentageText}" />
-                            <TextBlock FontSize="24"
-                                       FontWeight="SemiBold"
-                                       Text="{Binding ExportOperationTitle}" />
-                            <TextBlock Margin="0,12,0,0"
-                                       FontSize="15"
-                                       Foreground="{StaticResource SecondaryTextBrush}"
-                                       presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                                       presentation:ExportStatusAnimation.Stage="{Binding ExportStage}"
-                                       presentation:ExportStatusAnimation.StageText="{Binding ExportProgressText}"
-                                       Text="" />
-                            <ProgressBar Width="280"
-                                         Height="5"
-                                         Margin="0,22,0,0"
-                                         Maximum="100"
-                                         presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                                         presentation:ExportStatusAnimation.ProgressGeneration="{Binding ExportPresentationGeneration}"
-                                         presentation:ExportStatusAnimation.ProgressIsIndeterminate="{Binding IsExportProgressIndeterminate}"
-                                         presentation:ExportStatusAnimation.ProgressStage="{Binding ExportStage}"
-                                         presentation:ExportStatusAnimation.ProgressValue="{Binding ExportProgress}" />
-                            <TextBlock Margin="0,14,0,0"
-                                       Style="{StaticResource MutedTextStyle}"
-                                       Text="{Binding ExportFrameText}" />
-                            <TextBlock Margin="0,6,0,0"
-                                       Style="{StaticResource MutedTextStyle}"
-                                       Text="{Binding ElapsedText}" />
-                        </StackPanel>
+                            Visibility="{Binding IsExportActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <views:ExportActivityIndicator Width="64"
+                                                       Height="64"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                                       IsActive="{Binding IsExportActive}"
+                                                       IsCompleted="False"
+                                                       PercentageText="{Binding ExportPercentageText}" />
                     </Border>
                 </Grid>
 
@@ -357,6 +326,8 @@
                         <StackPanel Orientation="Horizontal"
                                     Visibility="{Binding IsVideoSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Button MinWidth="132"
+                                    AutomationProperties.HelpText="Available before a complete rendered video is accepted"
+                                    AutomationProperties.Name="Preview the currently selected video frame"
                                     Command="{Binding PreviewFrameCommand}"
                                     Content="{Binding PreviewFrameActionLabel}" />
                             <Button MinWidth="148"

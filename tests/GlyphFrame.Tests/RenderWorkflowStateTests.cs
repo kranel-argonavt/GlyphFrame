@@ -448,14 +448,14 @@ public sealed class RenderWorkflowStateTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void DirectExportOutcome_PreservesIndependentReviewStatus(bool stale)
+    public void ArtifactExportOutcome_PreservesIndependentReviewStatus(bool stale)
     {
         RenderWorkflowState ready = WithVideoArtifactAndFramePreview();
+        RenderWorkflowState exporting = ready.BeginOperation(100, RenderWorkflowOperation.ExportVideo);
         if (stale)
         {
-            ready = ready.VideoAudioModeChanged(AudioExportMode.RemoveAudio);
+            exporting = exporting.VideoAudioModeChanged(AudioExportMode.RemoveAudio);
         }
-        RenderWorkflowState exporting = ready.BeginOperation(100, RenderWorkflowOperation.ExportVideo);
         foreach (RenderWorkflowState outcome in new[]
         {
             exporting.CompleteExport(100), exporting.FailActiveOperation(100), exporting.CancelActiveOperation()
@@ -464,6 +464,20 @@ public sealed class RenderWorkflowStateTests
             Assert.Equal(ready.VideoArtifactIdentity, outcome.VideoArtifactIdentity);
             Assert.Equal(stale ? RenderWorkflowStatus.RenderStale : RenderWorkflowStatus.RenderReady, outcome.VideoReviewStatus);
         }
+    }
+
+    [Fact]
+    public void VideoExport_RequiresCurrentRetainedArtifact_AndNeverStartsForStaleOrMissingRender()
+    {
+        RenderWorkflowState missing = ReadyVideo();
+        Assert.False(missing.CanExportVideo);
+        Assert.Throws<InvalidOperationException>(() => missing.BeginOperation(100, RenderWorkflowOperation.ExportVideo));
+        RenderWorkflowState ready = WithVideoArtifactAndFramePreview();
+        Assert.True(ready.CanExportVideo);
+        RenderWorkflowState stale = ready.VideoAudioModeChanged(AudioExportMode.RemoveAudio);
+        Assert.False(stale.CanExportVideo);
+        Assert.Throws<InvalidOperationException>(() => stale.BeginOperation(100, RenderWorkflowOperation.ExportVideo));
+        Assert.False(ready.BeginOperation(100, RenderWorkflowOperation.ExportVideo).CanExportVideo);
     }
 
     private static RenderWorkflowState ReadyImage() => RenderWorkflowState.Empty.SelectMedia(

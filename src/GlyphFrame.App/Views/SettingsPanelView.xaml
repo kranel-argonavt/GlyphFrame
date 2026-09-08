@@ -241,58 +241,5 @@
             </StackPanel>
         </Border>
 
-        <Border IsEnabled="{Binding AreSettingsEnabled}"
-                Visibility="{Binding ShowOutputCard, Converter={StaticResource BooleanToVisibilityConverter}}"
-                Style="{StaticResource CardStyle}">
-            <StackPanel>
-                <StackPanel Margin="0,0,0,14" Orientation="Horizontal">
-                    <Border Style="{StaticResource SectionIconStyle}">
-                        <TextBlock HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource AccentHoverBrush}"
-                                   Text="□" />
-                    </Border>
-                    <TextBlock Style="{StaticResource SectionHeaderTextStyle}" Text="Output" />
-                </StackPanel>
-
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="82" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Style="{StaticResource LabelTextStyle}" Text="Output File" />
-                    <Border Grid.Column="1"
-                            Margin="0,0,8,0"
-                            Style="{StaticResource ReadOnlySurfaceStyle}"
-                            ToolTip="Output file path">
-                        <TextBlock VerticalAlignment="Center"
-                                   Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="{Binding OutputPathText}" />
-                    </Border>
-                    <Button Grid.Column="2"
-                            MinWidth="78"
-                            Command="{Binding BrowseOutputCommand}"
-                            Content="Browse" />
-                </Grid>
-
-                <Grid Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="82" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Style="{StaticResource LabelTextStyle}" Text="Format" />
-                    <Border Grid.Column="1"
-                            Style="{StaticResource ReadOnlySurfaceStyle}">
-                        <TextBlock VerticalAlignment="Center" Text="MP4" />
-                    </Border>
-                </Grid>
-
-                <Button Margin="82,12,0,0"
-                        Command="{Binding ExportVideoCommand}"
-                        Content="Export Video"
-                        Style="{StaticResource PrimaryButtonStyle}" />
-            </StackPanel>
-        </Border>
     </StackPanel>
 </UserControl>

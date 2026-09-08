@@ -119,7 +119,7 @@
                     <TextBlock FontSize="14"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource PrimaryTextBrush}"
-                               Text="Reset preferences?" />
+                               Text="{Binding Title}" />
                     <TextBlock Margin="0,8,0,0"
                                Foreground="{StaticResource SecondaryTextBrush}"
                                LineHeight="20"

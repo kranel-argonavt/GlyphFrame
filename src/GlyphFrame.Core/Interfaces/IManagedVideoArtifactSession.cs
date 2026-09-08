@@ -19,5 +19,10 @@ public interface IManagedVideoArtifactSession : IAsyncDisposable
 
     Task ClearAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Serializes a bounded borrower with replacement, deletion and shutdown.
+    /// The callback must not require a UI dispatcher continuation.</summary>
+    Task<T> UseCurrentAsync<T>(ManagedVideoArtifact artifact,
+        Func<CancellationToken, Task<T>> borrower, CancellationToken cancellationToken = default);
+
     Task<ArtifactCleanupResult> RecoverOrphansAsync(CancellationToken cancellationToken = default);
 }

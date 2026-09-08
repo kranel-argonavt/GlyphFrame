@@ -190,15 +190,15 @@
             </Grid>
         </Border>
 
-        <Border Style="{StaticResource CardStyle}"
+        <Border x:Name="VideoResultCard"
+                Style="{StaticResource CardStyle}"
                 Visibility="{Binding ShowVideoResultPanel, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="64" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <Grid Width="46" Height="46" HorizontalAlignment="Left" VerticalAlignment="Center">
+            <views:AdaptiveResultPanel x:Name="VideoResultLayout">
+                <Grid Width="46"
+                      Height="46"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Center"
+                      views:AdaptiveResultPanel.Role="Status">
                     <Ellipse Fill="{DynamicResource AccentSubtleBrush}"
                              Stroke="{DynamicResource AccentBrush}"
                              StrokeThickness="1" />
@@ -234,17 +234,104 @@
                           Visibility="{Binding IsVideoResultFailure, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </Grid>
 
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource SectionHeaderTextStyle}"
-                               Text="{Binding VideoResultTitle}" />
-                    <TextBlock Margin="0,5,0,0"
-                               MaxWidth="720"
+                <StackPanel x:Name="VideoResultText"
+                            MinWidth="0"
+                            VerticalAlignment="Center"
+                            views:AdaptiveResultPanel.Role="Text">
+                    <TextBlock x:Name="VideoResultTitleText"
+                               Style="{StaticResource SectionHeaderTextStyle}"
+                               Text="{Binding VideoResultTitle}"
+                               TextTrimming="None"
+                               TextWrapping="Wrap" />
+                    <TextBlock x:Name="VideoResultSummaryText"
+                               Margin="0,5,0,0"
                                HorizontalAlignment="Left"
                                Style="{StaticResource SecondaryTextStyle}"
                                Text="{Binding VideoResultSummary}"
                                TextWrapping="Wrap" />
+                    <TextBlock x:Name="VideoExportDestinationTextBlock"
+                               Margin="0,5,0,0"
+                               Style="{StaticResource MutedTextStyle}"
+                               Text="{Binding VideoExportDestinationText}"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding VideoExportDestinationText}"
+                               Visibility="{Binding HasVideoExportDestination, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </StackPanel>
-            </Grid>
+
+                <StackPanel x:Name="VideoResultActions"
+                            VerticalAlignment="Center"
+                            views:AdaptiveResultPanel.Role="Actions"
+                            Visibility="{Binding HasVideoArtifact, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Button x:Name="VideoExportButton"
+                            MinWidth="112"
+                            Command="{Binding ExportVideoCommand}"
+                            Content="{Binding VideoExportActionLabel}"
+                            Style="{StaticResource PrimaryButtonStyle}" />
+                    <Button x:Name="OpenVideoExportFolderButton"
+                            Margin="0,8,0,0"
+                            Command="{Binding OpenExportFolderCommand}"
+                            Content="Open Folder"
+                            Visibility="{Binding CanOpenExportFolder, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                </StackPanel>
+
+                <Grid x:Name="VideoResultMetrics"
+                      HorizontalAlignment="Left"
+                      Visibility="{Binding ShowVideoRenderMetrics, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      views:AdaptiveResultPanel.Role="Metrics">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="VideoFramesMetricCard"
+                            MinWidth="78"
+                            Padding="10,8"
+                            Background="{DynamicResource ElevatedBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource MutedTextStyle}" Text="FRAMES" />
+                            <TextBlock Margin="0,3,0,0"
+                                       Style="{StaticResource MonospaceTextStyle}"
+                                       Text="{Binding VideoRenderedFrameCountText}" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="VideoOutputMetricCard"
+                            Grid.Column="1"
+                            MinWidth="112"
+                            Margin="8,0,0,0"
+                            Padding="10,8"
+                            Background="{DynamicResource ElevatedBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource MutedTextStyle}" Text="OUTPUT" />
+                            <TextBlock Margin="0,3,0,0"
+                                       Style="{StaticResource MonospaceTextStyle}"
+                                       Text="{Binding VideoOutputDimensionsText}" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="VideoAudioMetricCard"
+                            Grid.Column="2"
+                            MinWidth="92"
+                            Margin="8,0,0,0"
+                            Padding="10,8"
+                            Background="{DynamicResource ElevatedBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            ToolTip="{Binding VideoAudioOutcomeDescription}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource MutedTextStyle}" Text="AUDIO" />
+                            <TextBlock Margin="0,3,0,0"
+                                       Style="{StaticResource MonospaceTextStyle}"
+                                       Text="{Binding VideoAudioOutcomeText}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </views:AdaptiveResultPanel>
         </Border>
     </Grid>
 </UserControl>

@@ -23,6 +23,28 @@ public sealed class ManagedVideoArtifactSession(IManagedVideoArtifactStore store
 
     public IReadOnlyList<string> CleanupDiagnostics => Volatile.Read(ref _cleanupDiagnosticsSnapshot);
 
+    public async Task<T> UseCurrentAsync<T>(ManagedVideoArtifact artifact,
+        Func<CancellationToken, Task<T>> borrower, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(borrower);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
+            if (!ReferenceEquals(artifact, Current))
+            {
+                throw new InvalidOperationException("The requested review artifact is no longer current.");
+            }
+
+            _store.ValidateCompletedArtifact(artifact, requireNonEmptyFile: true);
+            return await borrower(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task AcceptAsync(
         ManagedVideoArtifact artifact,
         CancellationToken cancellationToken = default)

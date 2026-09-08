@@ -7,6 +7,7 @@ public enum VideoExportStage
     FinishingEncoding,
     InspectingAudio,
     MergingAudio,
+    CopyingArtifact,
     Finalizing,
     Cancelling,
     Completed

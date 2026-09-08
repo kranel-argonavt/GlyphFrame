@@ -138,6 +138,11 @@ public sealed record RenderWorkflowState
         && !IsImageRenderStale
         && ActiveOperation == RenderWorkflowOperation.None;
 
+    public bool CanExportVideo => MediaType == MediaSelectionKind.Video
+        && HasVideoArtifact
+        && !IsVideoArtifactStale
+        && ActiveOperation == RenderWorkflowOperation.None;
+
     public RenderWorkflowState SelectMedia(MediaSelectionKind mediaType, long mediaVersion, bool hasOriginal)
     {
         if (mediaVersion <= MediaVersion)
@@ -285,7 +290,7 @@ public sealed record RenderWorkflowState
             RenderWorkflowOperation.PreviewVideoFrame => MediaType == MediaSelectionKind.Video && HasOriginal,
             RenderWorkflowOperation.RenderVideo => false,
             RenderWorkflowOperation.ExportImage => CanExportImage,
-            RenderWorkflowOperation.ExportVideo => MediaType == MediaSelectionKind.Video,
+            RenderWorkflowOperation.ExportVideo => CanExportVideo,
             _ => false
         };
         if (!isAllowed)

@@ -43,6 +43,9 @@ public sealed record VideoExportResult(
 {
     public bool Success => Status == VideoExportStatus.Completed;
 
+    /// <summary>Operation-owned incomplete destination requiring later cleanup, if removal failed.</summary>
+    public string? IncompleteOutputPath { get; init; }
+
     public static VideoExportResult Completed(
         string outputPath,
         long framesWritten,

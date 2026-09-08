@@ -193,6 +193,7 @@ public sealed class VideoExportProgressTracker
         VideoExportStage.FinishingEncoding => "Finishing video encoding...",
         VideoExportStage.InspectingAudio => "Checking source audio...",
         VideoExportStage.MergingAudio => "Merging audio...",
+        VideoExportStage.CopyingArtifact => "Copying reviewed video...",
         VideoExportStage.Finalizing => "Finalizing output...",
         VideoExportStage.Cancelling => "Cancelling export and cleaning partial files...",
         VideoExportStage.Completed => "Export completed.",
