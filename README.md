@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 11B.4 — Publish the Reviewed Video Artifact is implemented. Video mode exposes independent `Preview Frame` and `Render Video` actions, renders a complete symbolized MP4 with the captured Keep Audio or Remove Audio choice, and opens that managed artifact in Symbolized. `Export Video` in the persistent result panel now copies the exact accepted artifact to a chosen destination without rendering, encoding, or muxing again. The transitional direct-export Output card is removed. Phase 11B.3's broader audiovisual and multi-monitor smoke checks remain pending; Original-video playback belongs to Phase 11B.5 and is not implemented.
+Phase 11B.4 — Publish the Reviewed Video Artifact is implemented. Video mode exposes independent `Preview Frame` and `Render Video` actions, renders a complete symbolized MP4 with the captured Keep Audio or Remove Audio choice, and opens that managed artifact in Symbolized. `Export Video` in the persistent result panel now copies the exact accepted artifact to a chosen destination without rendering, encoding, or muxing again. The transitional direct-export Output card is removed. Phase 11B.5A has evaluated Original-video playback compatibility and established the approved architecture for the next implementation block; Original playback itself is not implemented. Phase 11B.3's broader audiovisual and multi-monitor smoke checks remain pending.
 
 ## Platform and target framework
 
@@ -204,15 +204,16 @@ GlyphFrame resolves these tools relative to the running application directory, n
 
 - [GlyphFrame Technical Specification v1.0](docs/GlyphFrame_Technical_Specification_v1.0.md)
 - [GlyphFrame Design Reference](docs/design_reference/GlyphFrame_Design_Reference.png)
+- [Original Video Playback Compatibility Report](docs/Original_Video_Playback_Compatibility_Report.md)
 
 ## Upcoming phases
 
 - Complete the remaining manual Phase 11B.3/B.4 validation noted above. Player UX and reviewed-artifact publication are implemented; those manual checks are not implied by automated coverage.
-- Phase 11B.5 adds playback in Original, using a validated container/codec compatibility matrix and retaining FFmpeg frame preview when playback is unavailable. Existing MP4/MOV/MKV/AVI import support is not a universal playback guarantee. Backend selection, tab time-transfer behavior, and any source-proxy strategy require explicit design decisions; no new dependency or proxy is selected yet.
+- Phase 11B.5 adds playback in Original while retaining FFmpeg frame preview when playback is unavailable. Its approved Phase 11B.5A contract uses a dedicated Original-player facade over separate shared WPF transport primitives, runtime readiness rather than extension-wide guarantees, view-level rotation, paused timestamp transfer between tabs, and no automatic proxy. No third-party playback dependency is approved.
 - Phase 12 then adds expanded friendly-error presentation, technical Show Details, and local logging on top of the final workflow states.
 - Later phases cover UI polish, comprehensive testing, and portable packaging.
 
-The technical specification records the detailed phase boundaries. Natural-size review is now defined as one media pixel per physical display pixel with scrolling; fullscreen controls stay visible and auto-hide remains deferred. Original-player backend and tab-comparison decisions remain open for later work. Planned behavior must not be confused with the current implementation.
+The technical specification records the detailed phase boundaries. Natural-size review is now defined as one media pixel per physical display pixel with scrolling; fullscreen controls stay visible and auto-hide remains deferred. The Original-player backend, runtime fallback, orientation, tab-comparison, and no-proxy decisions are approved for Phase 11B.5B but are not yet implemented. Planned behavior must not be confused with the current implementation.
 
 ## Privacy
 

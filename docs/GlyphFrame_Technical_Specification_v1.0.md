@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 11B.4 — Publish the Reviewed Video Artifact; remaining Phase 11B.3/B.4 manual verification pending; Phase 11B.5 original-video playback planned
+Status: Phase 11B.4 implemented; Phase 11B.5A compatibility evaluation and architecture decisions approved; Phase 11B.5B original-video playback implementation planned; remaining Phase 11B.3/B.4 manual verification pending
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -1677,21 +1677,26 @@ Implementation and safety policy:
 
 This is an approved roadmap addition after Phase 11B.4 and before Phase 12. It is not part of the current implemented player or a promise to play every imported file.
 
+Phase 11B.5A compatibility evaluation is recorded in `docs/Original_Video_Playback_Compatibility_Report.md`. On the evaluated Windows 25H2 x64 system, WPF rendered the tested H.264/AAC-or-silent MP4, MOV, and MKV inputs and MPEG-4 Part 2/MP3 AVI input, including a Unicode source path. These are environment-specific observations, not container-wide guarantees. A tested FFV1/PCM MKV was fully readable through GlyphFrame metadata and FFmpeg frame extraction and raised WPF `MediaOpened`, but exposed no natural video dimensions and produced no decoded picture. A rotated H.264 MOV opened in WPF at encoded 320×240 rather than its metadata-directed 240×320 display orientation. WPF natural duration also differed from authoritative metadata on several short fixtures. Therefore `MediaOpened` alone is not a playback-readiness contract, display rotation needs explicit handling, and FFmpeg frame preview must remain the fallback. Audible playback and cross-player audio/video synchronization were not manually verified. The five Phase 11B.5A decisions are approved as the implementation contract for Phase 11B.5B: use a dedicated Original-player facade over separate shared WPF transport primitives, apply runtime playback eligibility and view-level rotation, coordinate paused timestamp transfer between tabs, retain explicit FFmpeg frame fallback, and create no automatic proxy.
+
 - Add playback in the existing Original tab, before or after symbolized rendering, using the same visual control design as the result player. Keep the existing Original/Symbolized tab locations.
 - Start compatibility validation with the existing input-container allowlist: MP4, MOV, MKV, and AVI. A file extension identifies a container, not a codec guarantee. Document tested video/audio codec combinations, relevant profiles and orientation, backend requirements, and the validation environment.
 - Keep import/FFmpeg processing support distinct from original-player support. Do not label an entire accepted container unsupported merely because one codec combination fails to play. Do not expand the import allowlist implicitly.
 - When original playback is unavailable, retain FFmpeg-based original-frame preview and Preview Frame, explain the playback limitation, and keep rendering/export available if the processing pipeline can handle the file. Do not show an enabled but nonfunctional Play button.
 - Support play/pause, seeking while paused, current/total time, available source audio, mute/volume, replay, scaling, and fullscreen. Keep source playback independent of Keep Audio/Remove Audio, which controls the rendered artifact rather than mutating source media.
-- On switching tabs, pause the outgoing player before activating another surface; never play both audio streams concurrently. Aim to transfer the current media time, clamped to the target duration, for comparison. Frame-exact synchronization and automatic resume behavior require the decision below and must not be implied by approximate time alignment.
+- On switching tabs, pause the outgoing player before activating another surface; never play both audio streams concurrently. Transfer the current absolute media time, clamped to the target duration, and keep the incoming player paused for comparison. Frame-exact synchronization and automatic resume behavior remain outside the approved contract and must not be implied by approximate time alignment.
 - Preserve deterministic Preview Frame semantics: capture a defined original-media position and obtain the source frame through the existing decoder; continuous playback must not silently trigger symbolization. Seeking and tab changes must not stale the full-video artifact or start a full render.
 - Keep source media read-only and all processing local. Do not silently create a full source copy or a transcoded playback proxy. Any proxy strategy requires explicit approval of its storage, cleanup, cost, and privacy implications before implementation.
 - Apply bounded resource use, asynchronous opening/decoding, clear playback errors, obsolete-callback rejection, and deterministic release on media replacement, unload, fullscreen closure, and application shutdown. Do not delete or invalidate the managed symbolized artifact when original playback fails.
 - Before phase closure, validate a representative container/codec matrix, Unicode paths, rotated and silent/audio inputs, seek/replay, tab changes, source failures with frame-preview fallback, and simultaneous-audio prevention. Include real interactive checks, not only fake-backend tests.
 
-#### Decisions to Resolve Before Implementing the Relevant Work
+#### Approved Phase 11B.5 Decisions
 
-- Original playback backend: evaluate reuse of the WPF/system player against a locally bundled playback solution. Select based on demonstrated compatibility, deployment size, licensing, audio/video synchronization, and maintenance. No backend or external dependency is approved by this roadmap alone.
-- Tab comparison: define timestamp tolerance and whether the incoming tab stays paused or resumes the outgoing playback state. The proposed default is a paused frame at approximately the same time; simultaneous playback is excluded.
+- Original playback backend: implement a dedicated Original-player facade with a separate instance of shared WPF playback primitives. Do not share one mutable player between Original and Symbolized, and do not add a third-party playback dependency in Phase 11B.5B.
+- Playback eligibility: require the current open generation to receive `MediaOpened` and positive natural video dimensions. Treat this as a minimum readiness gate rather than a guarantee of continued decoding; fall back on timeout, failure, missing dimensions, or later playback failure without marking the source unprocessable.
+- Orientation: apply trusted GlyphFrame rotation metadata in the Original view without transcoding or mutating the source.
+- Tab comparison: pause the outgoing player, transfer an absolute timestamp clamped to the incoming duration, and keep the incoming player paused. Simultaneous playback is excluded. Use `max(250 ms, two frame intervals)` as the initial comparison-validation threshold and refine it only from measured Phase 11B.5B evidence.
+- Fallback and proxy: retain FFmpeg original-frame preview and the existing explicit `Preview Frame` semantics, including full-artifact presentation priority, and do not create an automatic playback proxy.
 - Resolved for Phase 11B.3: 100% is one media pixel per physical display pixel, with DPI-aware dimensions and scrollbars for oversized content; it is not another fit-to-window mode.
 - Resolved for Phase 11B.3: fullscreen controls remain visible. Automatic hiding is deferred and is not implemented.
 
