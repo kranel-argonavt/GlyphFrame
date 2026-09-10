@@ -1,4 +1,3 @@
-using System.IO;
 using System.Windows;
 using System.Windows.Media;
 
@@ -63,16 +62,7 @@ public interface IRenderedVideoPlaybackBackend : IDisposable
     void UpdateFitMode(string fitMode) { }
 }
 
-public interface IRenderedVideoPositionTimer : IDisposable
-{
-    event EventHandler? Tick;
-
-    bool IsRunning { get; }
-
-    void Start();
-
-    void Stop();
-}
+public interface IRenderedVideoPositionTimer : IMediaPlaybackPositionTimer;
 
 public interface IRenderedVideoPlayer : IDisposable
 {
@@ -128,20 +118,21 @@ public interface IRenderedVideoPlayer : IDisposable
 public sealed class RenderedVideoPlayer : IRenderedVideoPlayer
 {
     private static readonly TimeSpan DefaultOpenTimeout = TimeSpan.FromSeconds(15);
+    private static readonly MediaPlaybackControllerOptions ControllerOptions = new(
+        RequireNaturalVideoDimensions: false,
+        ReturnFallbackOnCancellation: false,
+        OpenedMessage: "The rendered video is ready for review.",
+        FailureMessage: "GlyphFrame could not open the rendered video for review.",
+        TimeoutMessage: "GlyphFrame could not open the rendered video for review in time.",
+        ClosedMessage: "Rendered-video review was closed.",
+        SupersededMessage: "Rendered-video review was superseded.",
+        FallbackMessage: "GlyphFrame could not open the rendered video for review.",
+        CancellationTechnicalDetail: "Rendered-video review opening was cancelled.");
+
     private readonly IRenderedVideoPlaybackBackend _backend;
-    private readonly TimeSpan _openTimeout;
-    private readonly IRenderedVideoPositionTimer _positionTimer;
-    private TaskCompletionSource<RenderedVideoOpenResult>? _openCompletion;
-    private string? _sourcePath;
-    private string? _failureMessage;
-    private string? _technicalDetail;
-    private TimeSpan _duration;
-    private bool _disposed;
-    private bool _isOpen;
-    private bool _isPlaying;
-    private bool _hasEnded;
-    private long _openGeneration;
+    private readonly MediaPlaybackController _controller;
     private Window? _owner;
+    private bool _disposed;
 
     public RenderedVideoPlayer()
         : this(new WpfRenderedVideoPlaybackBackend(), new DispatcherRenderedVideoPositionTimer(), DefaultOpenTimeout)
@@ -154,235 +145,74 @@ public sealed class RenderedVideoPlayer : IRenderedVideoPlayer
         TimeSpan? openTimeout = null)
     {
         _backend = backend ?? throw new ArgumentNullException(nameof(backend));
-        _positionTimer = positionTimer ?? throw new ArgumentNullException(nameof(positionTimer));
-        _openTimeout = openTimeout ?? DefaultOpenTimeout;
-        if (_openTimeout <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(nameof(openTimeout));
-        }
-
-        _backend.MediaOpened += OnMediaOpened;
-        _backend.MediaEnded += OnMediaEnded;
-        _backend.MediaFailed += OnMediaFailed;
-        _positionTimer.Tick += OnPositionTimerTick;
+        ArgumentNullException.ThrowIfNull(positionTimer);
+        _controller = new MediaPlaybackController(
+            new RenderedPlaybackBackendAdapter(backend),
+            positionTimer,
+            new SystemMediaPlaybackOpenDeadline(),
+            openTimeout ?? DefaultOpenTimeout,
+            ControllerOptions);
+        _controller.StateChanged += OnControllerStateChanged;
     }
 
     public event EventHandler? StateChanged;
 
-    public ImageSource PlaybackSource => _backend.VisualSource;
+    public ImageSource PlaybackSource => _controller.PlaybackSource;
 
-    public string? SourcePath => _sourcePath;
+    public string? SourcePath => _controller.SourcePath;
 
-    public TimeSpan Position => ClampPosition(_backend.Position);
+    public TimeSpan Position => _controller.Position;
 
-    public TimeSpan Duration => _duration;
+    public TimeSpan Duration => _controller.Duration;
 
-    public double Volume => Math.Clamp(_backend.Volume, 0d, 1d);
+    public double Volume => _controller.Volume;
 
-    public bool IsMuted => _backend.IsMuted;
+    public bool IsMuted => _controller.IsMuted;
 
-    public bool IsOpen => _isOpen;
+    public bool IsOpen => _controller.IsOpen;
 
-    public bool IsPlaying => _isPlaying;
+    public bool IsPlaying => _controller.IsPlaying;
 
-    public bool HasEnded => _hasEnded;
+    public bool HasEnded => _controller.HasEnded;
 
-    public bool IsTimerRunning => _positionTimer.IsRunning;
+    public bool IsTimerRunning => _controller.IsTimerRunning;
 
-    public string? FailureMessage => _failureMessage;
+    public string? FailureMessage => _controller.FailureMessage;
 
-    public string? TechnicalDetail => _technicalDetail;
+    public string? TechnicalDetail => _controller.TechnicalDetail;
 
     public async Task<RenderedVideoOpenResult> OpenAsync(
         string filePath,
         CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
-        cancellationToken.ThrowIfCancellationRequested();
-        double preservedVolume = Volume;
-        bool preservedMute = IsMuted;
-        Close();
-        long generation = _openGeneration;
-        _backend.Volume = preservedVolume;
-        _backend.IsMuted = preservedMute;
-
-        TaskCompletionSource<RenderedVideoOpenResult> completion = new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        _openCompletion = completion;
-        _sourcePath = filePath;
-        _failureMessage = null;
-        _technicalDetail = null;
-        OnStateChanged();
-
-        try
-        {
-            _backend.Open(filePath);
-            using CancellationTokenRegistration registration = cancellationToken.Register(
-                () => completion.TrySetCanceled(cancellationToken));
-            RenderedVideoOpenResult result = await completion.Task.WaitAsync(_openTimeout, cancellationToken);
-            return !_disposed && generation == _openGeneration
-                ? result
-                : RenderedVideoOpenResult.Failed("Rendered-video review was superseded.");
-        }
-        catch (OperationCanceledException)
-        {
-            if (!_disposed && generation == _openGeneration)
-            {
-                Close();
-            }
-            throw;
-        }
-        catch (TimeoutException exception)
-        {
-            if (_disposed || generation != _openGeneration)
-            {
-                return RenderedVideoOpenResult.Failed("Rendered-video review was superseded.");
-            }
-            SetFailure(
-                "GlyphFrame could not open the rendered video for review in time.",
-                exception.Message);
-            _backend.Close();
-            return RenderedVideoOpenResult.Failed(
-                "GlyphFrame could not open the rendered video for review in time.",
-                _technicalDetail);
-        }
-        catch (Exception exception) when (exception is IOException
-            or UnauthorizedAccessException
-            or ArgumentException
-            or InvalidOperationException
-            or NotSupportedException)
-        {
-            if (_disposed || generation != _openGeneration)
-            {
-                return RenderedVideoOpenResult.Failed("Rendered-video review was superseded.");
-            }
-            SetFailure("GlyphFrame could not open the rendered video for review.", exception.Message);
-            _backend.Close();
-            return RenderedVideoOpenResult.Failed(
-                "GlyphFrame could not open the rendered video for review.",
-                _technicalDetail);
-        }
-        finally
-        {
-            if (ReferenceEquals(_openCompletion, completion))
-            {
-                _openCompletion = null;
-            }
-        }
+        MediaPlaybackOpenResult result = await _controller.OpenAsync(filePath, cancellationToken);
+        return result.IsReady
+            ? RenderedVideoOpenResult.Opened()
+            : RenderedVideoOpenResult.Failed(result.UserMessage, result.TechnicalDetail);
     }
 
-    public void Play()
-    {
-        if (_disposed || !_isOpen)
-        {
-            return;
-        }
+    public void Play() => _controller.Play();
 
-        if (_hasEnded)
-        {
-            _backend.Position = TimeSpan.Zero;
-            _hasEnded = false;
-        }
+    public void Pause() => _controller.Pause();
 
-        _backend.Play();
-        _isPlaying = true;
-        _positionTimer.Start();
-        OnStateChanged();
-    }
+    public void Restart() => _controller.Restart();
 
-    public void Pause()
-    {
-        if (_disposed || !_isOpen)
-        {
-            return;
-        }
+    public void Seek(TimeSpan position) => _controller.Seek(position);
 
-        _backend.Pause();
-        _isPlaying = false;
-        _positionTimer.Stop();
-        OnStateChanged();
-    }
+    public void SetVolume(double volume) => _controller.SetVolume(volume);
 
-    public void Restart()
-    {
-        if (_disposed || !_isOpen)
-        {
-            return;
-        }
-
-        _backend.Position = TimeSpan.Zero;
-        _hasEnded = false;
-        Play();
-    }
-
-    public void Seek(TimeSpan position)
-    {
-        if (_disposed || !_isOpen)
-        {
-            return;
-        }
-
-        _backend.Position = ClampPosition(position);
-        // Only MediaEnded represents natural completion. Scrubbing to the end is
-        // ordinary paused seeking, not a request for the replay overlay.
-        _hasEnded = false;
-        OnStateChanged();
-    }
-
-    public void SetVolume(double volume)
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _backend.Volume = double.IsFinite(volume) ? Math.Clamp(volume, 0d, 1d) : 0.75d;
-        OnStateChanged();
-    }
-
-    public void ToggleMute()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _backend.IsMuted = !_backend.IsMuted;
-        OnStateChanged();
-    }
+    public void ToggleMute() => _controller.ToggleMute();
 
     public void ShowFullscreen(string fitMode)
     {
-        if (!_disposed && _isOpen)
+        if (!_disposed && IsOpen)
         {
             _backend.ShowFullscreen(fitMode);
         }
     }
 
-    public void Close()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _openGeneration++;
-        _positionTimer.Stop();
-        _backend.Stop();
-        _backend.Close();
-        _openCompletion?.TrySetResult(RenderedVideoOpenResult.Failed(
-            "Rendered-video review was closed."));
-        _openCompletion = null;
-        _sourcePath = null;
-        _duration = TimeSpan.Zero;
-        _failureMessage = null;
-        _technicalDetail = null;
-        _isOpen = false;
-        _isPlaying = false;
-        _hasEnded = false;
-        OnStateChanged();
-    }
+    public void Close() => _controller.Close();
 
     public void Dispose()
     {
@@ -391,68 +221,11 @@ public sealed class RenderedVideoPlayer : IRenderedVideoPlayer
             return;
         }
 
-        Close();
         SetOwner(null);
+        _controller.StateChanged -= OnControllerStateChanged;
+        _controller.Dispose();
         _disposed = true;
-        _backend.MediaOpened -= OnMediaOpened;
-        _backend.MediaEnded -= OnMediaEnded;
-        _backend.MediaFailed -= OnMediaFailed;
-        _positionTimer.Tick -= OnPositionTimerTick;
-        _positionTimer.Dispose();
-        _backend.Dispose();
     }
-
-    private void OnMediaOpened(object? sender, EventArgs e)
-    {
-        if (_disposed || _sourcePath is null || _openCompletion is null)
-        {
-            return;
-        }
-
-        _duration = _backend.Duration is TimeSpan duration && duration > TimeSpan.Zero
-            ? duration
-            : TimeSpan.Zero;
-        _backend.Pause();
-        _backend.Position = TimeSpan.Zero;
-        _isOpen = true;
-        _isPlaying = false;
-        _hasEnded = false;
-        _failureMessage = null;
-        _technicalDetail = null;
-        _positionTimer.Stop();
-        _openCompletion?.TrySetResult(RenderedVideoOpenResult.Opened());
-        OnStateChanged();
-    }
-
-    private void OnMediaEnded(object? sender, EventArgs e)
-    {
-        if (_disposed || !_isOpen || !_isPlaying)
-        {
-            return;
-        }
-
-        _positionTimer.Stop();
-        _backend.Pause();
-        _isPlaying = false;
-        _hasEnded = true;
-        // Keep the actual final decoded frame; seeking to duration can blank it.
-        OnStateChanged();
-    }
-
-    private void OnMediaFailed(object? sender, RenderedVideoPlaybackFailedEventArgs e)
-    {
-        if (_disposed || _sourcePath is null)
-        {
-            return;
-        }
-
-        _positionTimer.Stop();
-        _backend.Close();
-        SetFailure(e.Message, e.TechnicalDetail);
-        _openCompletion?.TrySetResult(RenderedVideoOpenResult.Failed(e.Message, e.TechnicalDetail));
-    }
-
-    private void OnPositionTimerTick(object? sender, EventArgs e) => OnStateChanged();
 
     public void SetOwner(Window? owner)
     {
@@ -474,25 +247,124 @@ public sealed class RenderedVideoPlayer : IRenderedVideoPlayer
 
     private void OnOwnerClosed(object? sender, EventArgs e) => Close();
 
-    private TimeSpan ClampPosition(TimeSpan position)
+    private void OnControllerStateChanged(object? sender, EventArgs e) =>
+        StateChanged?.Invoke(this, EventArgs.Empty);
+
+    private sealed class RenderedPlaybackBackendAdapter : IMediaPlaybackBackend
     {
-        if (position < TimeSpan.Zero)
+        private readonly IRenderedVideoPlaybackBackend _backend;
+        private long _generation;
+        private bool _active;
+        private bool _disposed;
+
+        public RenderedPlaybackBackendAdapter(IRenderedVideoPlaybackBackend backend)
         {
-            return TimeSpan.Zero;
+            _backend = backend;
+            _backend.MediaOpened += OnMediaOpened;
+            _backend.MediaEnded += OnMediaEnded;
+            _backend.MediaFailed += OnMediaFailed;
         }
 
-        return _duration > TimeSpan.Zero && position > _duration ? _duration : position;
-    }
+        public event EventHandler<MediaPlaybackOpenedEventArgs>? MediaOpened;
 
-    private void SetFailure(string message, string? technicalDetail)
-    {
-        _isOpen = false;
-        _isPlaying = false;
-        _hasEnded = false;
-        _failureMessage = message;
-        _technicalDetail = technicalDetail;
-        OnStateChanged();
-    }
+        public event EventHandler<MediaPlaybackEndedEventArgs>? MediaEnded;
 
-    private void OnStateChanged() => StateChanged?.Invoke(this, EventArgs.Empty);
+        public event EventHandler<MediaPlaybackFailedEventArgs>? MediaFailed;
+
+        public ImageSource VisualSource => _backend.VisualSource;
+
+        public TimeSpan Position
+        {
+            get => _backend.Position;
+            set => _backend.Position = value;
+        }
+
+        public TimeSpan? Duration => _backend.Duration;
+
+        public int NaturalVideoWidth => 0;
+
+        public int NaturalVideoHeight => 0;
+
+        public double Volume
+        {
+            get => _backend.Volume;
+            set => _backend.Volume = value;
+        }
+
+        public bool IsMuted
+        {
+            get => _backend.IsMuted;
+            set => _backend.IsMuted = value;
+        }
+
+        public void Open(string filePath, long generation)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _generation = generation;
+            _active = true;
+            try
+            {
+                _backend.Open(filePath);
+            }
+            catch
+            {
+                _active = false;
+                throw;
+            }
+        }
+
+        public void Play() => _backend.Play();
+
+        public void Pause() => _backend.Pause();
+
+        public void Stop() => _backend.Stop();
+
+        public void Close()
+        {
+            _active = false;
+            _backend.Close();
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _active = false;
+            _backend.MediaOpened -= OnMediaOpened;
+            _backend.MediaEnded -= OnMediaEnded;
+            _backend.MediaFailed -= OnMediaFailed;
+            _backend.Dispose();
+            _disposed = true;
+        }
+
+        private void OnMediaOpened(object? sender, EventArgs e)
+        {
+            if (_active && !_disposed)
+            {
+                MediaOpened?.Invoke(this, new MediaPlaybackOpenedEventArgs(_generation));
+            }
+        }
+
+        private void OnMediaEnded(object? sender, EventArgs e)
+        {
+            if (_active && !_disposed)
+            {
+                MediaEnded?.Invoke(this, new MediaPlaybackEndedEventArgs(_generation));
+            }
+        }
+
+        private void OnMediaFailed(object? sender, RenderedVideoPlaybackFailedEventArgs e)
+        {
+            if (_active && !_disposed)
+            {
+                MediaFailed?.Invoke(this, new MediaPlaybackFailedEventArgs(
+                    _generation,
+                    e.Message,
+                    e.TechnicalDetail));
+            }
+        }
+    }
 }

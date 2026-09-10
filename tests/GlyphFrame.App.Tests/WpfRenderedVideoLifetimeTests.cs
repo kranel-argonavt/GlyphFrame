@@ -15,6 +15,46 @@ namespace GlyphFrame.App.Tests;
 public sealed class WpfRenderedVideoLifetimeTests
 {
     [Fact]
+    public void RenderedAndOriginalWpfTransports_AreDistinctAndDisposeIndependently()
+    {
+        RunSta(() =>
+        {
+            WpfRenderedVideoPlaybackBackend rendered = new();
+            WpfMediaPlaybackBackend original = new();
+            try
+            {
+                VideoDrawing renderedDrawing = Assert.IsType<VideoDrawing>(
+                    Assert.IsType<DrawingImage>(rendered.VisualSource).Drawing);
+                VideoDrawing originalDrawing = Assert.IsType<VideoDrawing>(
+                    Assert.IsType<DrawingImage>(original.VisualSource).Drawing);
+                Assert.NotSame(rendered.VisualSource, original.VisualSource);
+                Assert.NotSame(renderedDrawing.Player, originalDrawing.Player);
+
+                string renderedPath = Path.Combine(Path.GetTempPath(), $"renderedFill-{Guid.NewGuid():N}.mp4");
+                string originalPath = Path.Combine(Path.GetTempPath(), $"original-{Guid.NewGuid():N}.mp4");
+                rendered.Open(renderedPath);
+                original.Open(originalPath, 42);
+                Assert.NotSame(renderedDrawing.Player, originalDrawing.Player);
+
+                original.Volume = 0.2d;
+                original.IsMuted = true;
+                Assert.NotEqual(original.Volume, rendered.Volume);
+                Assert.NotEqual(original.IsMuted, rendered.IsMuted);
+
+                original.Dispose();
+                rendered.Volume = 0.6d;
+                Assert.Equal(0.6d, rendered.Volume, 3);
+                rendered.Close();
+            }
+            finally
+            {
+                original.Dispose();
+                rendered.Dispose();
+            }
+        });
+    }
+
+    [Fact]
     public void Fullscreen_IsOwned_EscapePreservesBackend_AndOwnerCloseClosesChild()
     {
         RunSta(() =>

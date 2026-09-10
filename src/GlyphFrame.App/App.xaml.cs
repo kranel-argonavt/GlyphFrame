@@ -109,6 +109,9 @@ public partial class App : Application
         services.AddSingleton<IManagedVideoRenderService, ManagedVideoRenderService>();
         services.AddSingleton<IManagedVideoArtifactSession, ManagedVideoArtifactSession>();
         services.AddSingleton<IRenderedVideoPlayer, RenderedVideoPlayer>();
+        services.AddSingleton<IOriginalVideoPlayer>(_ => new OriginalVideoPlayer(
+            new WpfMediaPlaybackBackend(),
+            new DispatcherMediaPlaybackPositionTimer()));
         services.AddSingleton<IImageExporter, SkiaImageExporter>();
         services.AddSingleton<IAccentThemeService, AccentThemeService>();
         services.AddSingleton<IApplicationSettingsManager, ApplicationSettingsManager>();
