@@ -1,15 +1,13 @@
 using System.Windows;
-using System.Windows.Input;
 using System.Windows.Media;
-using GlyphFrame.App.Views;
 
 namespace GlyphFrame.App.Services;
 
 public sealed class WpfRenderedVideoPlaybackBackend : IRenderedVideoPlaybackBackend
 {
     private readonly WpfMediaPlaybackBackend _transport = new();
-    private Window? _fullscreenWindow;
-    private Window? _owner;
+    private readonly IVideoPlaybackFullscreenHost _fullscreenHost =
+        new WpfVideoPlaybackFullscreenHost(VideoPlaybackSurfaceKind.Rendered);
     private bool _disposed;
     private long _generation;
 
@@ -62,72 +60,24 @@ public sealed class WpfRenderedVideoPlaybackBackend : IRenderedVideoPlaybackBack
 
     public void Close()
     {
-        CloseFullscreen();
+        _fullscreenHost.Close();
         _transport.Close();
     }
 
     public void SetOwner(Window? owner)
     {
-        if (ReferenceEquals(owner, _owner))
-        {
-            return;
-        }
-
-        CloseFullscreen();
-        if (_owner is not null)
-        {
-            _owner.Closed -= OnOwnerClosed;
-        }
-
-        _owner = owner;
-        if (_owner is not null)
-        {
-            _owner.Closed += OnOwnerClosed;
-        }
+        _fullscreenHost.SetOwner(owner);
     }
 
     public void UpdateFitMode(string fitMode)
     {
-        if (_fullscreenWindow?.Content is VideoReviewSurface surface)
-        {
-            surface.Viewport.SetCurrentValue(ReviewViewport.ScaleModeProperty, fitMode);
-        }
+        _fullscreenHost.UpdateFitMode(fitMode);
     }
 
     public void ShowFullscreen(string fitMode)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_owner is null || !_owner.IsLoaded)
-        {
-            return;
-        }
-
-        if (_fullscreenWindow is not null)
-        {
-            _fullscreenWindow.Activate();
-            return;
-        }
-
-        VideoReviewSurface surface = new() { DataContext = _owner.DataContext, IsFullscreen = true };
-        surface.Viewport.SetCurrentValue(ReviewViewport.SourceProperty, _transport.VisualSource);
-        surface.Viewport.SetCurrentValue(ReviewViewport.ScaleModeProperty, fitMode);
-        Window window = new()
-        {
-            Owner = _owner,
-            Background = Brushes.Black,
-            Content = surface,
-            WindowStyle = WindowStyle.None,
-            WindowState = WindowState.Maximized,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ResizeMode = ResizeMode.NoResize,
-            Topmost = true,
-            Title = "GlyphFrame rendered video review"
-        };
-        window.KeyDown += OnFullscreenKeyDown;
-        window.Closed += OnFullscreenClosed;
-        _fullscreenWindow = window;
-        window.Show();
-        window.Activate();
+        _fullscreenHost.Show(fitMode);
     }
 
     public void Dispose()
@@ -137,12 +87,13 @@ public sealed class WpfRenderedVideoPlaybackBackend : IRenderedVideoPlaybackBack
             return;
         }
 
-        CloseFullscreen();
+        _fullscreenHost.Close();
         SetOwner(null);
         _transport.MediaOpened -= OnMediaOpened;
         _transport.MediaEnded -= OnMediaEnded;
         _transport.MediaFailed -= OnMediaFailed;
         _transport.Dispose();
+        _fullscreenHost.Dispose();
         _disposed = true;
     }
 
@@ -172,44 +123,6 @@ public sealed class WpfRenderedVideoPlaybackBackend : IRenderedVideoPlaybackBack
         }
     }
 
-    private void OnOwnerClosed(object? sender, EventArgs e)
-    {
-        Close();
-        SetOwner(null);
-    }
-
-    private void OnFullscreenKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Escape)
-        {
-            ((Window)sender).Close();
-        }
-    }
-
-    private void OnFullscreenClosed(object? sender, EventArgs e)
-    {
-        if (sender is Window window)
-        {
-            window.KeyDown -= OnFullscreenKeyDown;
-            window.Closed -= OnFullscreenClosed;
-        }
-
-        _fullscreenWindow = null;
-    }
-
-    private void CloseFullscreen()
-    {
-        Window? window = _fullscreenWindow;
-        if (window is null)
-        {
-            return;
-        }
-
-        _fullscreenWindow = null;
-        window.KeyDown -= OnFullscreenKeyDown;
-        window.Closed -= OnFullscreenClosed;
-        window.Close();
-    }
 }
 
 public sealed class DispatcherRenderedVideoPositionTimer : IRenderedVideoPositionTimer

@@ -189,6 +189,31 @@ public sealed record RenderWorkflowState
         };
     }
 
+    /// <summary>
+    /// Restores the identity of the last successfully decoded video frame after a current
+    /// frame request is cancelled. Render-setting changes made after that frame was decoded
+    /// remain effective; only the speculative source-frame version is rolled back.
+    /// </summary>
+    public RenderWorkflowState RestoreVideoFrameSource(PreviewIdentity retainedFrameIdentity)
+    {
+        ArgumentNullException.ThrowIfNull(retainedFrameIdentity);
+        if (MediaType != MediaSelectionKind.Video
+            || retainedFrameIdentity.MediaType != MediaSelectionKind.Video
+            || retainedFrameIdentity.MediaVersion != MediaVersion
+            || retainedFrameIdentity.SourceVersion <= 0
+            || retainedFrameIdentity.SourceVersion > SourceVersion)
+        {
+            return this;
+        }
+
+        RenderWorkflowState restored = this with
+        {
+            SourceVersion = retainedFrameIdentity.SourceVersion,
+            HasOriginal = true
+        };
+        return restored with { Status = restored.ResolveRestingStatus() };
+    }
+
     public RenderWorkflowState OriginalAvailable(long mediaVersion)
     {
         if (mediaVersion != MediaVersion || MediaType == MediaSelectionKind.None)

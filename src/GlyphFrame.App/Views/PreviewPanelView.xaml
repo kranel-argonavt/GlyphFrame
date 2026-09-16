@@ -65,7 +65,45 @@
                                           ScaleMode="{Binding SelectedFitMode}"
                                           Visibility="{Binding ShowImagePreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
+                    <views:VideoReviewSurface
+                        PlaybackKind="Original"
+                        Visibility="{Binding ShowOriginalVideoPlayer, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
                     <views:VideoReviewSurface Visibility="{Binding ShowRenderedVideoPlayer, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                    <Border
+                        Margin="18"
+                        Padding="10,6"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Top"
+                        Background="#CC151820"
+                        BorderBrush="{DynamicResource AccentBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Visibility="{Binding ShowOriginalPlaybackOpening, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock
+                            Foreground="{StaticResource SecondaryTextBrush}"
+                            Text="Opening continuous Original playback…"
+                            TextAlignment="Center" />
+                    </Border>
+
+                    <Border
+                        Margin="18"
+                        Padding="12,8"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Bottom"
+                        Background="#E6151820"
+                        BorderBrush="{StaticResource WarningBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Visibility="{Binding ShowOriginalPlaybackFallback, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock
+                            MaxWidth="560"
+                            Foreground="{StaticResource SecondaryTextBrush}"
+                            Text="{Binding OriginalVideoPlaybackLimitationMessage}"
+                            TextAlignment="Center"
+                            TextWrapping="Wrap" />
+                    </Border>
 
                     <Border Margin="18"
                             Padding="12,7"

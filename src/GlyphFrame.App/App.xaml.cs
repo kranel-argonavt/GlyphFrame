@@ -111,7 +111,9 @@ public partial class App : Application
         services.AddSingleton<IRenderedVideoPlayer, RenderedVideoPlayer>();
         services.AddSingleton<IOriginalVideoPlayer>(_ => new OriginalVideoPlayer(
             new WpfMediaPlaybackBackend(),
-            new DispatcherMediaPlaybackPositionTimer()));
+            new DispatcherMediaPlaybackPositionTimer(),
+            fullscreenHost: new WpfVideoPlaybackFullscreenHost(VideoPlaybackSurfaceKind.Original)));
+        services.AddSingleton<IVideoPlaybackCoordinator, VideoPlaybackCoordinator>();
         services.AddSingleton<IImageExporter, SkiaImageExporter>();
         services.AddSingleton<IAccentThemeService, AccentThemeService>();
         services.AddSingleton<IApplicationSettingsManager, ApplicationSettingsManager>();

@@ -11,6 +11,7 @@ public sealed class ReviewViewport : Grid
     public static readonly DependencyProperty SourceProperty = DependencyProperty.Register(nameof(Source), typeof(ImageSource), typeof(ReviewViewport), new PropertyMetadata(null, Changed));
     public static readonly DependencyProperty PixelWidthProperty = DependencyProperty.Register(nameof(PixelWidth), typeof(double), typeof(ReviewViewport), new PropertyMetadata(0d, Changed));
     public static readonly DependencyProperty PixelHeightProperty = DependencyProperty.Register(nameof(PixelHeight), typeof(double), typeof(ReviewViewport), new PropertyMetadata(0d, Changed));
+    public static readonly DependencyProperty RotationDegreesProperty = DependencyProperty.Register(nameof(RotationDegrees), typeof(double), typeof(ReviewViewport), new PropertyMetadata(0d, Changed));
     public static readonly DependencyProperty ScaleModeProperty = DependencyProperty.Register(nameof(ScaleMode), typeof(string), typeof(ReviewViewport), new PropertyMetadata("Fit", Changed));
     // The computed size preserves the media aspect ratio. Pixel alignment prevents
     // centering at fractional device pixels from softening a natural-size image.
@@ -36,6 +37,7 @@ public sealed class ReviewViewport : Grid
     public ImageSource? Source { get => (ImageSource?)GetValue(SourceProperty); set => SetValue(SourceProperty, value); }
     public double PixelWidth { get => (double)GetValue(PixelWidthProperty); set => SetValue(PixelWidthProperty, value); }
     public double PixelHeight { get => (double)GetValue(PixelHeightProperty); set => SetValue(PixelHeightProperty, value); }
+    public double RotationDegrees { get => (double)GetValue(RotationDegreesProperty); set => SetValue(RotationDegreesProperty, value); }
     public string ScaleMode { get => (string)GetValue(ScaleModeProperty); set => SetValue(ScaleModeProperty, value); }
 
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi) { base.OnDpiChanged(oldDpi, newDpi); Refresh(); }
@@ -49,12 +51,27 @@ public sealed class ReviewViewport : Grid
         double width = _scroll.ViewportWidth > 0 ? _scroll.ViewportWidth : ActualWidth;
         double height = _scroll.ViewportHeight > 0 ? _scroll.ViewportHeight : ActualHeight;
         Size media = ReviewScaleLayout.Calculate(PixelWidth, PixelHeight, new Size(width, height), VisualTreeHelper.GetDpi(this), ScaleMode);
-        _image.Width = media.Width;
-        _image.Height = media.Height;
+        int rotation = NormalizeQuarterTurn(RotationDegrees);
+        bool swapsDimensions = rotation is 90 or 270;
+        _image.Width = swapsDimensions ? media.Height : media.Width;
+        _image.Height = swapsDimensions ? media.Width : media.Height;
+        _image.RenderTransformOrigin = new Point(0.5, 0.5);
+        _image.RenderTransform = rotation == 0 ? Transform.Identity : new RotateTransform(rotation);
         _canvas.Width = natural ? Math.Max(width, media.Width) : width;
         _canvas.Height = natural ? Math.Max(height, media.Height) : height;
-        Canvas.SetLeft(_image, (_canvas.Width - media.Width) / 2);
-        Canvas.SetTop(_image, (_canvas.Height - media.Height) / 2);
+        Canvas.SetLeft(_image, (_canvas.Width - _image.Width) / 2);
+        Canvas.SetTop(_image, (_canvas.Height - _image.Height) / 2);
         if (!natural) { _scroll.ScrollToHorizontalOffset(0); _scroll.ScrollToVerticalOffset(0); }
+    }
+
+    internal static int NormalizeQuarterTurn(double rotation)
+    {
+        if (!double.IsFinite(rotation))
+        {
+            return 0;
+        }
+
+        int normalized = ((int)Math.Round(rotation) % 360 + 360) % 360;
+        return normalized is 90 or 180 or 270 ? normalized : 0;
     }
 }

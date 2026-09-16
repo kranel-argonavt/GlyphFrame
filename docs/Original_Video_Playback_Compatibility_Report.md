@@ -20,16 +20,17 @@ The evaluation asked whether the WPF `MediaPlayer` stack already used for manage
 
 WPF `MediaPlayer` uses Windows media components and therefore remains dependent on the codecs available on the target Windows installation. A pass on this machine is evidence for this environment, not a portable compatibility guarantee.
 
-## Architecture after the first Phase 11B.5B foundation block
+## Architecture after the first two Phase 11B.5B blocks
 
 - Neutral App-layer playback contracts represent generation-tagged native events, visual source, natural dimensions, duration/position, volume/mute, transport operations, and position timing.
 - `WpfMediaPlaybackBackend` owns one WPF `MediaPlayer`, exposes its `VideoDrawing`, recreates the transport for each open, rejects native events from inactive/replaced players, enables paused scrubbing, and releases the player on close or disposal.
 - A shared media-playback controller owns open generations, the bounded injectable open deadline, common transport state, position clamping, play/pause/replay behavior, and deterministic event/timer disposal.
 - `RenderedVideoPlayer` preserves its existing public Symbolized-review contract through an adapter over those shared primitives; `WpfRenderedVideoPlaybackBackend` retains only rendered-review fullscreen ownership and messages around the neutral transport.
-- `OriginalVideoPlayer` is a separate high-level facade with its own backend, timer, generation, state, source path, and Original-specific readiness/fallback results. It is registered for later ViewModel integration but is not presented in the Original tab yet.
+- `OriginalVideoPlayer` is a separate high-level facade with its own backend, timer, generation, state, source path, fullscreen host, and Original-specific readiness/fallback results. The editor opens it only after a source and metadata are accepted, and validates callbacks against the active media identity.
 - The rendered-video player is coupled to managed-artifact review semantics and user messages. It borrows the artifact; the managed session remains the file owner.
 - Original-frame preview is independent. `FfprobeVideoMetadataReader` obtains authoritative metadata and `FfmpegVideoFrameReader` extracts a display-oriented owned RGBA frame with bundled FFmpeg. This path supports Unicode paths and applies rotation metadata.
-- `MainWindowViewModel` still owns only the rendered-artifact player. The Original tab intentionally remains a frame-position surface until the next integration block.
+- `MainWindowViewModel` owns both facades but coordinates them without sharing transport state. The reusable player surface presents Original controls only while runtime readiness is established; otherwise the existing FFmpeg frame surface and frame-position controls remain available.
+- Trusted quarter-turn metadata rotates only the WPF Original visual. A small coordinator pauses both players on tab switches and pauses the opposite player before playback starts. Timestamp transfer remains a later comparison block.
 
 Reusing the transport technology does not require sharing one player instance. Original media and the accepted symbolized artifact have different ownership, failure, duration, and lifecycle rules.
 

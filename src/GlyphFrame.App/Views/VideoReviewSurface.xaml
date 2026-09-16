@@ -23,10 +23,11 @@
         </Grid.RowDefinitions>
         <views:ReviewViewport
             x:Name="Viewport"
-            Source="{Binding RenderedVideoPlaybackSource}"
-            PixelWidth="{Binding RenderedVideoPixelWidth}"
-            PixelHeight="{Binding RenderedVideoPixelHeight}"
-            ScaleMode="{Binding SelectedFitMode}" />
+            Source="{Binding PlaybackSource, ElementName=Surface}"
+            PixelWidth="{Binding PixelWidth, ElementName=Surface}"
+            PixelHeight="{Binding PixelHeight, ElementName=Surface}"
+            RotationDegrees="{Binding RotationDegrees, ElementName=Surface}"
+            ScaleMode="{Binding SelectedScaleMode, ElementName=Surface}" />
         <Border
             x:Name="ReplayOverlay"
             Background="#33000000"
@@ -39,7 +40,7 @@
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Style="{StaticResource PlayerIconButtonStyle}"
-                Command="{Binding RestartRenderedVideoCommand}"
+                Command="{Binding ReplayCommand, ElementName=Surface}"
                 ToolTip="Replay video"
                 AutomationProperties.Name="Replay video">
                 <Path
@@ -73,10 +74,10 @@
             </Grid.ColumnDefinitions>
             <Button
                 x:Name="PlayButton"
-                Command="{Binding ToggleRenderedVideoPlaybackCommand}"
+                Command="{Binding TogglePlaybackCommand, ElementName=Surface}"
                 Style="{StaticResource PlayerIconButtonStyle}"
-                ToolTip="{Binding RenderedVideoPlaybackActionLabel}"
-                AutomationProperties.Name="{Binding RenderedVideoPlaybackActionLabel}">
+                ToolTip="{Binding PlaybackActionLabel, ElementName=Surface}"
+                AutomationProperties.Name="{Binding PlaybackActionLabel, ElementName=Surface}">
                 <Path
                     Stretch="Uniform"
                     Fill="{DynamicResource PrimaryTextBrush}">
@@ -88,7 +89,7 @@
                                 Value="{StaticResource PlayerPlayIcon}" />
                             <Style.Triggers>
                                 <DataTrigger
-                                    Binding="{Binding IsRenderedVideoPlaying}"
+                                    Binding="{Binding IsPlaying, ElementName=Surface}"
                                     Value="True">
                                     <Setter
                                         Property="Data"
@@ -104,29 +105,29 @@
                 Margin="6,0"
                 VerticalAlignment="Center"
                 Foreground="{DynamicResource SecondaryTextBrush}"
-                Text="{Binding RenderedVideoCurrentTimeText}" />
+                Text="{Binding CurrentTimeText, ElementName=Surface}" />
             <views:ReviewSeekSlider
                 Grid.Column="2"
                 Minimum="0"
-                Maximum="{Binding RenderedVideoDurationSeconds}"
-                Position="{Binding RenderedVideoPositionSeconds, Mode=TwoWay}"
+                Maximum="{Binding DurationSeconds, ElementName=Surface}"
+                Position="{Binding PositionSeconds, ElementName=Surface, Mode=TwoWay}"
                 Style="{StaticResource PlayerSliderStyle}"
                 SmallChange="1"
                 LargeChange="5"
-                ToolTip="Seek rendered video"
-                AutomationProperties.Name="Rendered video position" />
+                ToolTip="{Binding PositionAutomationName, ElementName=Surface}"
+                AutomationProperties.Name="{Binding PositionAutomationName, ElementName=Surface}" />
             <TextBlock
                 Grid.Column="3"
                 Margin="6,0"
                 VerticalAlignment="Center"
                 Foreground="{DynamicResource SecondaryTextBrush}"
-                Text="{Binding RenderedVideoTotalTimeText}" />
+                Text="{Binding TotalTimeText, ElementName=Surface}" />
             <Button
                 Grid.Column="4"
-                Command="{Binding ToggleRenderedVideoMuteCommand}"
+                Command="{Binding ToggleMuteCommand, ElementName=Surface}"
                 Style="{StaticResource PlayerIconButtonStyle}"
-                ToolTip="{Binding RenderedVideoMuteActionLabel}"
-                AutomationProperties.Name="{Binding RenderedVideoMuteActionLabel}">
+                ToolTip="{Binding MuteActionLabel, ElementName=Surface}"
+                AutomationProperties.Name="{Binding MuteActionLabel, ElementName=Surface}">
                 <Path
                     Stretch="Uniform"
                     Fill="{DynamicResource PrimaryTextBrush}">
@@ -138,7 +139,7 @@
                                 Value="{StaticResource PlayerSoundIcon}" />
                             <Style.Triggers>
                                 <DataTrigger
-                                    Binding="{Binding IsRenderedVideoMuted}"
+                                    Binding="{Binding IsMuted, ElementName=Surface}"
                                     Value="True">
                                     <Setter
                                         Property="Data"
@@ -155,15 +156,15 @@
                 Maximum="1"
                 SmallChange="0.05"
                 LargeChange="0.1"
-                Value="{Binding RenderedVideoVolume, Mode=TwoWay}"
+                Value="{Binding Volume, ElementName=Surface, Mode=TwoWay}"
                 Style="{StaticResource PlayerSliderStyle}"
-                ToolTip="Volume"
-                AutomationProperties.Name="Volume" />
+                ToolTip="{Binding VolumeAutomationName, ElementName=Surface}"
+                AutomationProperties.Name="{Binding VolumeAutomationName, ElementName=Surface}" />
             <ComboBox
                 Grid.Column="6"
                 Margin="4,0"
-                ItemsSource="{Binding FitModes}"
-                SelectedItem="{Binding SelectedFitMode}"
+                ItemsSource="{Binding FitModes, ElementName=Surface}"
+                SelectedItem="{Binding SelectedScaleMode, ElementName=Surface, Mode=TwoWay}"
                 ToolTip="Review scale"
                 AutomationProperties.Name="Review scale" />
             <Button

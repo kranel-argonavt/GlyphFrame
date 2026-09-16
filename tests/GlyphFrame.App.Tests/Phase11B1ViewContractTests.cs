@@ -53,11 +53,19 @@ public sealed class Phase11B1ViewContractTests
         Assert.Contains("views:VideoReviewSurface", previewPanel, StringComparison.Ordinal);
         Assert.Contains("ShowVideoResultPanel", resultPanel, StringComparison.Ordinal);
         string player = File.ReadAllText(Path.Combine(root, "src", "GlyphFrame.App", "Views", "VideoReviewSurface.xaml"));
-        Assert.Contains("RenderedVideoPlaybackSource", player, StringComparison.Ordinal);
+        Assert.Contains("PlaybackSource", player, StringComparison.Ordinal);
+        string playerBindings = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "GlyphFrame.App",
+            "Views",
+            "VideoReviewSurface.xaml.cs"));
+        Assert.Contains("RenderedVideoPlaybackSource", playerBindings, StringComparison.Ordinal);
+        Assert.Contains("OriginalVideoPlaybackSource", playerBindings, StringComparison.Ordinal);
         System.Xml.Linq.XDocument document = System.Xml.Linq.XDocument.Parse(player);
         Assert.Single(document.Descendants(), element =>
             element.Name.LocalName == "ComboBox"
-            && element.Attribute("SelectedItem")?.Value == "{Binding SelectedFitMode}");
+            && element.Attribute("SelectedItem")?.Value == "{Binding SelectedScaleMode, ElementName=Surface, Mode=TwoWay}");
     }
 
     [Fact]

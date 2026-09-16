@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.IO;
+using System.Windows;
 using System.Windows.Media;
 using GlyphFrame.App.Services;
 using GlyphFrame.App.ViewModels;
@@ -845,6 +846,44 @@ public sealed class MainWindowVideoPreviewTests
         Assert.Equal(1, seekCalls);
         Assert.Equal(0.8d, viewModel.TimelinePosition, 3);
         Assert.Equal(final, harness.ImageSources.LastDecodedImage);
+        Assert.False(viewModel.HasVideoFrameError);
+    }
+
+    [Fact]
+    public async Task ObsoleteCancelledFrameRequest_CannotRestoreOlderPositionOrStatus()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("superseded-cancelled-frame.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        TaskCompletionSource firstStarted = NewCompletion();
+        TaskCompletionSource releaseFirst = NewCompletion();
+        DecodedImage latestFrame = SolidFrame(20, 40, 220);
+        harness.VideoFrames.Handler = async (_, position, metadata, _) =>
+        {
+            if (Math.Abs(position - 0.2d) < 0.001d)
+            {
+                firstStarted.TrySetResult();
+                await releaseFirst.Task;
+                return VideoFrameReadResult.Cancelled(position);
+            }
+
+            return FrameResult(latestFrame, position, metadata);
+        };
+
+        viewModel.TimelinePosition = 0.2d;
+        await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        viewModel.TimelinePosition = 0.8d;
+        releaseFirst.SetResult();
+        await WaitUntilAsync(
+            viewModel,
+            () => !viewModel.IsVideoFrameLoading
+                && ReferenceEquals(harness.ImageSources.LastDecodedImage, latestFrame));
+
+        Assert.Equal(0.8d, viewModel.TimelinePosition, 3);
+        Assert.Same(latestFrame, harness.ImageSources.LastDecodedImage);
+        Assert.Equal("Video frame ready at 0:08.", viewModel.StatusMessage);
         Assert.False(viewModel.HasVideoFrameError);
     }
 
@@ -2983,6 +3022,490 @@ public sealed class MainWindowVideoPreviewTests
         Assert.Equal(committed, vm.HasVideoExportDestination);
     }
 
+    [Fact]
+    public async Task AcceptedVideo_OpensOriginalPlaybackAndShowsContinuousPlayerWhenReady()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("original-ready.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+
+        Assert.Equal(videoPath, harness.OriginalVideoPlayer.SourcePath);
+        Assert.True(viewModel.ShowOriginalVideoPlayer);
+        Assert.False(viewModel.ShowVideoFrameControls);
+        Assert.False(viewModel.ShowOriginalPlaybackFallback);
+        Assert.True(viewModel.ToggleOriginalVideoPlaybackCommand.CanExecute(null));
+        Assert.True(viewModel.PreviewFrameCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ReadyOriginalPlayer_SuppressesPlaceholderWithoutDecodedFrameAndNotifiesBinding()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("original-ready-without-frame.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.VideoFrames.Handler = (_, position, _, _) =>
+            Task.FromResult(VideoFrameReadResult.Cancelled(position));
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        List<string?> changes = [];
+        viewModel.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+
+        Assert.False(viewModel.HasVideoFrame);
+        Assert.False(viewModel.HasVideoFrameError);
+        Assert.True(viewModel.ShowOriginalVideoPlayer);
+        Assert.False(viewModel.ShowMediaPlaceholder);
+        Assert.Contains(nameof(MainWindowViewModel.ShowMediaPlaceholder), changes);
+
+        changes.Clear();
+        harness.OriginalVideoPlayer.FailPlayback();
+
+        Assert.True(viewModel.ShowMediaPlaceholder);
+        Assert.Contains(nameof(MainWindowViewModel.ShowMediaPlaceholder), changes);
+    }
+
+    [Fact]
+    public async Task ReadyRenderedPlayer_SuppressesPlaceholderWithoutDecodedFrameAndNotifiesBinding()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("rendered-ready-without-frame.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.VideoFrames.Handler = (_, position, _, _) =>
+            Task.FromResult(VideoFrameReadResult.Cancelled(position));
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("managed-review.mp4"), job.Identity)));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackFallback);
+        List<string?> changes = [];
+        viewModel.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.HasVideoFrame);
+        Assert.True(viewModel.ShowRenderedVideoPlayer);
+        Assert.False(viewModel.ShowMediaPlaceholder);
+        Assert.Contains(nameof(MainWindowViewModel.ShowMediaPlaceholder), changes);
+
+        changes.Clear();
+        viewModel.SelectOriginalCommand.Execute(null);
+
+        Assert.True(viewModel.ShowMediaPlaceholder);
+        Assert.Contains(nameof(MainWindowViewModel.ShowMediaPlaceholder), changes);
+    }
+
+    [Fact]
+    public async Task PlaybackFallbackWithoutDecodedFrame_ShowsPlaceholder()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("fallback-without-frame.mkv");
+        TestHarness harness = ReadyVideoHarness();
+        harness.VideoFrames.Handler = (_, position, _, _) =>
+            Task.FromResult(VideoFrameReadResult.Cancelled(position));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackFallback);
+
+        Assert.False(viewModel.HasVideoFrame);
+        Assert.False(viewModel.HasVideoFrameError);
+        Assert.False(viewModel.ShowOriginalVideoPlayer);
+        Assert.False(viewModel.ShowRenderedVideoPlayer);
+        Assert.True(viewModel.ShowMediaPlaceholder);
+    }
+
+    [Fact]
+    public async Task AcceptedVideo_ReportsOriginalOpeningWithoutBlankingDecodedFrame()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("original-opening.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        TaskCompletionSource<OriginalVideoOpenResult> opening = NewCompletion<OriginalVideoOpenResult>();
+        harness.OriginalVideoPlayer.Handler = (_, _) => opening.Task;
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackOpening);
+
+        Assert.True(viewModel.ShowOriginalPlaybackOpening);
+        Assert.True(viewModel.ShowImagePreview);
+        Assert.True(viewModel.ShowVideoFrameControls);
+        Assert.False(viewModel.ToggleOriginalVideoPlaybackCommand.CanExecute(null));
+        opening.SetResult(OriginalReady());
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+    }
+
+    [Fact]
+    public async Task OriginalPlaybackFallback_PreservesFfmpegFrameAndProcessingCommands()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("original-fallback.mkv");
+        TestHarness harness = ReadyVideoHarness();
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackFallback);
+
+        Assert.True(viewModel.ShowOriginalPlaybackFallback);
+        Assert.True(viewModel.ShowImagePreview);
+        Assert.True(viewModel.ShowVideoFrameControls);
+        Assert.False(viewModel.ShowOriginalVideoPlayer);
+        Assert.False(viewModel.ToggleOriginalVideoPlaybackCommand.CanExecute(null));
+        Assert.True(viewModel.PreviewFrameCommand.CanExecute(null));
+        Assert.True(viewModel.RenderVideoCommand.CanExecute(null));
+        Assert.Contains("Frame preview and rendering remain available", viewModel.OriginalVideoPlaybackLimitationMessage);
+    }
+
+    [Fact]
+    public async Task OriginalPlaybackFailureAfterReadiness_FallsBackWithoutInvalidatingMedia()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("original-runtime-failure.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+
+        harness.OriginalVideoPlayer.FailPlayback();
+
+        Assert.True(viewModel.IsVideoSelected);
+        Assert.Equal(videoPath, viewModel.VideoMetadata?.FilePath);
+        Assert.True(viewModel.ShowOriginalPlaybackFallback);
+        Assert.True(viewModel.ShowVideoFrameControls);
+        Assert.True(viewModel.PreviewFrameCommand.CanExecute(null));
+        Assert.True(viewModel.RenderVideoCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task FailedVideoReplacement_PreservesAcceptedOriginalPlayback()
+    {
+        using TestMediaFiles files = new();
+        string firstPath = files.Create("accepted-original.mp4");
+        string failedPath = files.Create("failed-original.avi");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(
+            path == firstPath
+                ? VideoResult(path)
+                : MediaInputResult.Failure(MediaInputErrorCategory.MetadataUnavailable, "Video metadata could not be read."));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([firstPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        int closeCalls = harness.OriginalVideoPlayer.CloseCalls;
+
+        await viewModel.DropMediaCommand.ExecuteAsync([failedPath]);
+
+        Assert.Equal(firstPath, viewModel.VideoMetadata?.FilePath);
+        Assert.Equal(firstPath, harness.OriginalVideoPlayer.SourcePath);
+        Assert.True(viewModel.IsOriginalVideoPlaybackReady);
+        Assert.Equal(closeCalls, harness.OriginalVideoPlayer.CloseCalls);
+    }
+
+    [Fact]
+    public async Task AcceptedImage_ClosesOriginalPlaybackAfterSelectionSucceeds()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("original-before-image.mp4");
+        string imagePath = files.Create("replacement.png");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(
+            path == videoPath ? VideoResult(path) : ImageResult(path!));
+        harness.ImagePipeline.DecodeResult = SolidFrame(5, 10, 15);
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+
+        Assert.True(viewModel.IsImageSelected);
+        Assert.Null(harness.OriginalVideoPlayer.SourcePath);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaybackReady);
+    }
+
+    [Fact]
+    public async Task RapidVideoReplacement_RejectsObsoleteOriginalOpenCompletion()
+    {
+        using TestMediaFiles files = new();
+        string firstPath = files.Create("first-original.mp4");
+        string secondPath = files.Create("second-original.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        TaskCompletionSource<OriginalVideoOpenResult> firstOpen = NewCompletion<OriginalVideoOpenResult>();
+        harness.OriginalVideoPlayer.Handler = (path, _) => path == firstPath
+            ? firstOpen.Task
+            : Task.FromResult(OriginalReady());
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([firstPath]);
+        await WaitUntilAsync(viewModel, () => harness.OriginalVideoPlayer.SourcePath == firstPath);
+        await viewModel.DropMediaCommand.ExecuteAsync([secondPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        firstOpen.SetResult(OriginalReady());
+        await Task.Yield();
+
+        Assert.Equal(secondPath, viewModel.VideoMetadata?.FilePath);
+        Assert.Equal(secondPath, harness.OriginalVideoPlayer.SourcePath);
+        Assert.True(viewModel.IsOriginalVideoPlaybackReady);
+    }
+
+    [Fact]
+    public async Task PreviewFrame_WhenOriginalPlaybackReady_UsesPausedPlaybackPosition()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("preview-from-playback.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        DecodedImage retainedFrame = harness.ImageSources.LastDecodedImage!;
+        DecodedImage extractedFrame = SolidFrame(210, 120, 30);
+        harness.VideoFrames.Handler = (_, position, metadata, _) =>
+            Task.FromResult(FrameResult(extractedFrame, position, metadata));
+        viewModel.OriginalVideoPositionSeconds = 7d;
+        viewModel.ToggleOriginalVideoPlaybackCommand.Execute(null);
+        int pauseCalls = harness.OriginalVideoPlayer.PauseCalls;
+
+        await viewModel.PreviewFrameCommand.ExecuteAsync(null);
+
+        Assert.True(harness.OriginalVideoPlayer.PauseCalls > pauseCalls);
+        Assert.Equal(0.7d, harness.VideoFrames.LastNormalizedPosition, 3);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        Assert.Same(extractedFrame, harness.ImagePipeline.LastRenderedSource);
+        Assert.NotSame(retainedFrame, harness.ImagePipeline.LastRenderedSource);
+        Assert.Equal(PreviewMode.Symbolized, viewModel.PreviewMode);
+    }
+
+    [Fact]
+    public async Task PreviewFrame_FailedCurrentExtraction_DoesNotRenderOrRelabelRetainedFrame()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("failed-current-preview.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        viewModel.OriginalVideoPositionSeconds = 5d;
+        await viewModel.PreviewFrameCommand.ExecuteAsync(null);
+        DecodedImage retainedFrame = harness.ImageSources.LastDecodedImage!;
+        ImageSource? retainedSymbolized = viewModel.SymbolizedImageSource;
+        int renderCalls = harness.ImagePipeline.RenderCalls;
+        harness.VideoFrames.Handler = (_, position, _, _) => Task.FromResult(
+            VideoFrameReadResult.Failure(
+                VideoFrameReadStatus.Failed,
+                VideoFrameReadErrorCategory.DecodeFailed,
+                position,
+                "The requested frame could not be decoded.",
+                "controlled decoder failure"));
+        viewModel.OriginalVideoPositionSeconds = 7d;
+
+        await viewModel.PreviewFrameCommand.ExecuteAsync(null);
+
+        Assert.Equal(renderCalls, harness.ImagePipeline.RenderCalls);
+        Assert.Same(retainedFrame, harness.ImageSources.LastDecodedImage);
+        Assert.Same(retainedFrame, harness.ImagePipeline.LastRenderedSource);
+        Assert.Same(retainedSymbolized, viewModel.SymbolizedImageSource);
+        Assert.Equal(0.5d, viewModel.TimelinePosition, 3);
+        Assert.True(viewModel.HasVideoFrameError);
+        Assert.Equal("The requested frame could not be decoded.", viewModel.VideoFrameStatusMessage);
+        Assert.Equal("controlled decoder failure", viewModel.VideoFrameTechnicalDetail);
+        Assert.Equal("The requested frame could not be decoded.", viewModel.StatusMessage);
+        Assert.False(viewModel.IsVideoFrameLoading);
+        Assert.True(viewModel.PreviewFrameCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task PreviewFrame_CancelledCurrentExtraction_DoesNotRenderRetainedFrame()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("cancelled-current-preview.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        viewModel.OriginalVideoPositionSeconds = 5d;
+        await viewModel.PreviewFrameCommand.ExecuteAsync(null);
+        DecodedImage retainedFrame = harness.ImageSources.LastDecodedImage!;
+        ImageSource? retainedSymbolized = viewModel.SymbolizedImageSource;
+        int renderCalls = harness.ImagePipeline.RenderCalls;
+        harness.VideoFrames.Handler = (_, position, _, _) =>
+            Task.FromResult(VideoFrameReadResult.Cancelled(position));
+        viewModel.OriginalVideoPositionSeconds = 7d;
+        viewModel.ToggleOriginalVideoPlaybackCommand.Execute(null);
+
+        await viewModel.PreviewFrameCommand.ExecuteAsync(null);
+
+        Assert.Equal(renderCalls, harness.ImagePipeline.RenderCalls);
+        Assert.Same(retainedFrame, harness.ImageSources.LastDecodedImage);
+        Assert.Same(retainedFrame, harness.ImagePipeline.LastRenderedSource);
+        Assert.Same(retainedSymbolized, viewModel.SymbolizedImageSource);
+        Assert.True(viewModel.HasSymbolizedPreview);
+        Assert.False(viewModel.IsSymbolizedPreviewStale);
+        Assert.Equal(0.5d, viewModel.TimelinePosition, 3);
+        Assert.False(viewModel.HasVideoFrameError);
+        Assert.False(viewModel.IsVideoFrameLoading);
+        Assert.True(viewModel.PreviewFrameCommand.CanExecute(null));
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
+        Assert.Equal(
+            "Frame preview was cancelled. The previous original frame remains available.",
+            viewModel.StatusMessage);
+
+        int frameReadCalls = harness.VideoFrames.Calls;
+        harness.OriginalVideoPlayer.FailPlayback();
+        await viewModel.PreviewFrameCommand.ExecuteAsync(null);
+
+        Assert.Equal(frameReadCalls, harness.VideoFrames.Calls);
+        Assert.Equal(renderCalls + 1, harness.ImagePipeline.RenderCalls);
+        Assert.Same(retainedFrame, harness.ImagePipeline.LastRenderedSource);
+        Assert.Equal(0.5d, viewModel.TimelinePosition, 3);
+        Assert.Equal(PreviewMode.Symbolized, viewModel.PreviewMode);
+        Assert.False(viewModel.IsSymbolizedPreviewStale);
+    }
+
+    [Fact]
+    public async Task PlayerCoordination_PausesOutgoingAndNeverAutoResumesIncomingPlayer()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("coordinated-playback.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.PathFor("review.mp4"), job.Identity)));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        viewModel.ToggleOriginalVideoPlaybackCommand.Execute(null);
+        Assert.True(harness.OriginalVideoPlayer.IsPlaying);
+
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        viewModel.ToggleRenderedVideoPlaybackCommand.Execute(null);
+        Assert.True(harness.RenderedVideoPlayer.IsPlaying);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+
+        viewModel.SelectOriginalCommand.Execute(null);
+
+        Assert.False(harness.RenderedVideoPlayer.IsPlaying);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        viewModel.ToggleOriginalVideoPlaybackCommand.Execute(null);
+        Assert.True(harness.OriginalVideoPlayer.IsPlaying);
+        Assert.False(harness.RenderedVideoPlayer.IsPlaying);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 64, 48)]
+    [InlineData(90, 90, 48, 64)]
+    [InlineData(180, 180, 64, 48)]
+    [InlineData(270, 270, 48, 64)]
+    [InlineData(-90, 270, 48, 64)]
+    [InlineData(450, 90, 48, 64)]
+    [InlineData(45, 0, 64, 48)]
+    public async Task OriginalPlayback_UsesTrustedQuarterTurnAndDisplayDimensions(
+        int metadataRotation,
+        int expectedRotation,
+        int expectedWidth,
+        int expectedHeight)
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create($"rotation-{metadataRotation}.mov");
+        TestHarness harness = ReadyVideoHarness();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(MediaInputResult.ForVideo(
+            VideoMetadataFor(path!) with { RotationDegrees = metadataRotation }));
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+
+        Assert.Equal(expectedRotation, viewModel.OriginalVideoRotationDegrees);
+        Assert.Equal(expectedWidth, viewModel.OriginalVideoPixelWidth);
+        Assert.Equal(expectedHeight, viewModel.OriginalVideoPixelHeight);
+    }
+
+    [Fact]
+    public async Task AudioModeChanges_DoNotMutateOriginalPlaybackAudioState()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("independent-source-audio.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        viewModel.OriginalVideoVolume = 0.42d;
+        viewModel.ToggleOriginalVideoMuteCommand.Execute(null);
+
+        viewModel.SelectedAudioMode = AudioExportMode.RemoveAudio;
+
+        Assert.Equal(videoPath, harness.OriginalVideoPlayer.SourcePath);
+        Assert.Equal(0.42d, harness.OriginalVideoPlayer.Volume, 3);
+        Assert.True(harness.OriginalVideoPlayer.IsMuted);
+        Assert.True(viewModel.IsOriginalVideoPlaybackReady);
+    }
+
+    [Fact]
+    public async Task OriginalCommands_AreDisabledAndPlaybackPausesDuringManagedRender()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("original-operation-lock.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        TaskCompletionSource<ManagedVideoRenderResult> pending = NewCompletion<ManagedVideoRenderResult>();
+        harness.ManagedVideoRenders.Handler = (_, _, _) => pending.Task;
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        viewModel.ToggleOriginalVideoPlaybackCommand.Execute(null);
+
+        Task render = viewModel.RenderVideoCommand.ExecuteAsync(null);
+
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        Assert.False(viewModel.ToggleOriginalVideoPlaybackCommand.CanExecute(null));
+        Assert.False(viewModel.OriginalFullscreenCommand.CanExecute(null));
+        pending.SetResult(ManagedVideoRenderResult.Failure(
+            ManagedVideoArtifactErrorCategory.RenderFailed,
+            "Controlled render failure."));
+        await render;
+        Assert.True(viewModel.ToggleOriginalVideoPlaybackCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task OriginalFullscreenCommand_ForwardsFitModeAndDisposeClosesTransport()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("original-fullscreen.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        viewModel.SelectedFitMode = "Fill";
+
+        viewModel.OriginalFullscreenCommand.Execute(null);
+
+        Assert.Equal(1, harness.OriginalVideoPlayer.FullscreenCalls);
+        Assert.Equal("Fill", harness.OriginalVideoPlayer.LastFullscreenFitMode);
+        viewModel.Dispose();
+        Assert.Null(harness.OriginalVideoPlayer.SourcePath);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaybackReady);
+    }
+
+    private static OriginalVideoOpenResult OriginalReady() => new(
+        OriginalVideoOpenOutcome.Ready,
+        "The original video is ready for playback.",
+        null);
+
     private static TestHarness ReadyVideoHarness()
     {
         TestHarness harness = new();
@@ -3145,6 +3668,8 @@ public sealed class MainWindowVideoPreviewTests
 
         public FakeRenderedVideoPlayer RenderedVideoPlayer { get; } = new();
 
+        public FakeOriginalVideoPlayer OriginalVideoPlayer { get; } = new();
+
         public FakeBundledFfmpegLocator FfmpegLocator { get; } = new();
 
         public FakeImageSaveDialogService SaveDialogs { get; } = new();
@@ -3178,6 +3703,8 @@ public sealed class MainWindowVideoPreviewTests
                 ? managedVideoArtifactSession!
                 : managedVideoArtifactSession ?? ManagedArtifacts,
             RenderedVideoPlayer,
+            OriginalVideoPlayer,
+            new VideoPlaybackCoordinator(OriginalVideoPlayer, RenderedVideoPlayer),
             FfmpegLocator,
             ImagePipeline,
             ImageExporter,
@@ -3406,6 +3933,140 @@ public sealed class MainWindowVideoPreviewTests
         }
     }
 
+    private sealed class FakeOriginalVideoPlayer : IOriginalVideoPlayer
+    {
+        private readonly DrawingImage _source = new();
+        private long _generation;
+
+        public event EventHandler? StateChanged;
+        public ImageSource PlaybackSource => _source;
+        public string? SourcePath { get; private set; }
+        public TimeSpan Position { get; private set; }
+        public TimeSpan Duration { get; set; } = TimeSpan.FromSeconds(10);
+        public int NaturalVideoWidth { get; set; } = 640;
+        public int NaturalVideoHeight { get; set; } = 360;
+        public double Volume { get; private set; } = 0.75d;
+        public bool IsMuted { get; private set; }
+        public bool IsOpening { get; private set; }
+        public bool IsPlaybackReady { get; private set; }
+        public bool IsPlaying { get; private set; }
+        public bool HasEnded { get; private set; }
+        public bool IsTimerRunning => IsPlaying;
+        public bool FallbackRequired { get; private set; }
+        public string? FailureMessage { get; private set; }
+        public string? TechnicalDetail { get; private set; }
+        public int OpenCalls { get; private set; }
+        public int CloseCalls { get; private set; }
+        public int PauseCalls { get; private set; }
+        public int FullscreenCalls { get; private set; }
+        public string? LastFullscreenFitMode { get; private set; }
+        public Func<string, CancellationToken, Task<OriginalVideoOpenResult>> Handler { get; set; } =
+            (_, _) => Task.FromResult(new OriginalVideoOpenResult(
+                OriginalVideoOpenOutcome.FallbackRequired,
+                OriginalVideoPlayer.PlaybackUnavailableMessage,
+                "Controlled fallback."));
+
+        public async Task<OriginalVideoOpenResult> OpenAsync(string filePath, CancellationToken cancellationToken = default)
+        {
+            OpenCalls++;
+            long generation = ++_generation;
+            SourcePath = filePath;
+            IsOpening = true;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+            OriginalVideoOpenResult result = await Handler(filePath, cancellationToken);
+            if (generation != _generation)
+            {
+                return new OriginalVideoOpenResult(OriginalVideoOpenOutcome.Superseded, "Superseded", null);
+            }
+
+            IsOpening = false;
+            IsPlaybackReady = result.IsReady;
+            FallbackRequired = result.FallbackRequired;
+            FailureMessage = result.IsReady ? null : result.UserMessage;
+            TechnicalDetail = result.TechnicalDetail;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+            return result;
+        }
+
+        public void Play()
+        {
+            IsPlaying = IsPlaybackReady;
+            HasEnded = false;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void Pause()
+        {
+            if (!IsPlaybackReady)
+            {
+                return;
+            }
+
+            PauseCalls++;
+            IsPlaying = false;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void Restart()
+        {
+            Position = TimeSpan.Zero;
+            Play();
+        }
+
+        public void Seek(TimeSpan position)
+        {
+            Position = position < TimeSpan.Zero ? TimeSpan.Zero : position;
+            HasEnded = false;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void SetVolume(double volume)
+        {
+            Volume = Math.Clamp(volume, 0d, 1d);
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void ToggleMute()
+        {
+            IsMuted = !IsMuted;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void ShowFullscreen(string fitMode)
+        {
+            FullscreenCalls++;
+            LastFullscreenFitMode = fitMode;
+        }
+        public void SetOwner(Window? owner) { }
+        public void UpdateFitMode(string fitMode) { }
+
+        public void Close()
+        {
+            _generation++;
+            CloseCalls++;
+            SourcePath = null;
+            IsOpening = false;
+            IsPlaybackReady = false;
+            IsPlaying = false;
+            FallbackRequired = false;
+            FailureMessage = null;
+            TechnicalDetail = null;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void Dispose() => Close();
+
+        public void FailPlayback(string detail = "Controlled Original playback failure.")
+        {
+            IsPlaybackReady = false;
+            IsPlaying = false;
+            FallbackRequired = true;
+            FailureMessage = OriginalVideoPlayer.PlaybackUnavailableMessage;
+            TechnicalDetail = detail;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     private sealed class FakeBundledFfmpegLocator : IBundledFfmpegLocator
     {
         public bool Available { get; set; } = true;
@@ -3437,6 +4098,10 @@ public sealed class MainWindowVideoPreviewTests
 
     private sealed class FakeVideoFrameReader : IVideoFrameReader
     {
+        public int Calls { get; private set; }
+
+        public double LastNormalizedPosition { get; private set; }
+
         public Func<string, double, VideoMetadata?, CancellationToken, Task<VideoFrameReadResult>> Handler { get; set; } =
             (_, position, metadata, _) => Task.FromResult(FrameResult(SolidFrame(1, 2, 3), position, metadata));
 
@@ -3444,8 +4109,12 @@ public sealed class MainWindowVideoPreviewTests
             string inputPath,
             double normalizedPosition,
             VideoMetadata? metadataContext = null,
-            CancellationToken cancellationToken = default) =>
-            Handler(inputPath, normalizedPosition, metadataContext, cancellationToken);
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            LastNormalizedPosition = normalizedPosition;
+            return Handler(inputPath, normalizedPosition, metadataContext, cancellationToken);
+        }
     }
 
     private sealed class FakeMediaInputService : IMediaInputService

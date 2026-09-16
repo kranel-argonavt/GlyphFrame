@@ -26,6 +26,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly IManagedVideoRenderService _managedVideoRenderService;
     private readonly IManagedVideoArtifactSession _managedVideoArtifactSession;
     private readonly IRenderedVideoPlayer _renderedVideoPlayer;
+    private readonly IOriginalVideoPlayer _originalVideoPlayer;
+    private readonly IVideoPlaybackCoordinator _videoPlaybackCoordinator;
     private readonly IImagePipelineService _imagePipelineService;
     private readonly IImageExporter _imageExporter;
     private readonly IImageSaveDialogService _imageSaveDialogService;
@@ -52,6 +54,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly RelayCommand _restartRenderedVideoCommand;
     private readonly RelayCommand _toggleRenderedVideoMuteCommand;
     private readonly RelayCommand _fullscreenCommand;
+    private readonly RelayCommand _toggleOriginalVideoPlaybackCommand;
+    private readonly RelayCommand _restartOriginalVideoCommand;
+    private readonly RelayCommand _toggleOriginalVideoMuteCommand;
+    private readonly RelayCommand _originalFullscreenCommand;
     private UiPresentationState _presentationState = UiPresentationState.Empty;
     private MediaInputState _mediaInputState = MediaInputState.Empty;
     private RenderWorkflowState _renderWorkflowState = RenderWorkflowState.Empty;
@@ -59,12 +65,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _videoFrameCancellation;
     private CancellationTokenSource? _imageOperationCancellation;
     private CancellationTokenSource? _exportCompletionCancellation;
+    private CancellationTokenSource? _originalVideoOpenCancellation;
     private readonly SemaphoreSlim _videoReadGate = new(1, 1);
     private long _mediaRequestId;
     private long _videoFrameRequestId;
     private long _imageOperationId;
     private long _exportCompletionPresentationId;
     private long _exportPresentationGeneration;
+    private long _originalVideoOpenGeneration;
     private string? _pendingFilePath;
     private DecodedImage? _decodedImage;
     private RenderedImage? _renderedImage;
@@ -93,6 +101,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private TimeSpan? _resolvedVideoTimestamp;
     private TimeSpan? _resolvedVideoDuration;
     private long? _resolvedVideoFrameIndex;
+    private PreviewIdentity? _resolvedVideoFrameIdentity;
     private double _exportProgress;
     private bool _isExportProgressIndeterminate = true;
     private string _exportFrameText = string.Empty;
@@ -106,6 +115,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private bool _isVideoFrameLoading;
     private bool _suppressTimelineSeek;
     private bool _suppressRenderedVideoSeek;
+    private bool _suppressOriginalVideoSeek;
     private bool _disposed;
     private string? _videoFrameError;
     private string? _videoFrameTechnicalDetail;
@@ -121,6 +131,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private bool _reviewViewUnloaded;
     private long _reviewViewGeneration;
     private TimeSpan _suspendedReviewPosition;
+    private TimeSpan _suspendedOriginalPosition;
     private readonly bool _videoRenderToolsAvailable;
 
     public MainWindowViewModel(
@@ -134,6 +145,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         IManagedVideoRenderService managedVideoRenderService,
         IManagedVideoArtifactSession managedVideoArtifactSession,
         IRenderedVideoPlayer renderedVideoPlayer,
+        IOriginalVideoPlayer originalVideoPlayer,
+        IVideoPlaybackCoordinator videoPlaybackCoordinator,
         IBundledFfmpegLocator ffmpegLocator,
         IImagePipelineService imagePipelineService,
         IImageExporter imageExporter,
@@ -156,6 +169,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _managedVideoArtifactSession = managedVideoArtifactSession
             ?? throw new ArgumentNullException(nameof(managedVideoArtifactSession));
         _renderedVideoPlayer = renderedVideoPlayer ?? throw new ArgumentNullException(nameof(renderedVideoPlayer));
+        _originalVideoPlayer = originalVideoPlayer ?? throw new ArgumentNullException(nameof(originalVideoPlayer));
+        _videoPlaybackCoordinator = videoPlaybackCoordinator
+            ?? throw new ArgumentNullException(nameof(videoPlaybackCoordinator));
         ArgumentNullException.ThrowIfNull(ffmpegLocator);
         _imagePipelineService = imagePipelineService ?? throw new ArgumentNullException(nameof(imagePipelineService));
         _imageExporter = imageExporter ?? throw new ArgumentNullException(nameof(imageExporter));
@@ -173,6 +189,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         };
         _exportElapsedTimer.Tick += OnExportElapsedTimerTick;
         _renderedVideoPlayer.StateChanged += OnRenderedVideoPlayerStateChanged;
+        _originalVideoPlayer.StateChanged += OnOriginalVideoPlayerStateChanged;
         BundledFfmpegLocation tools = ffmpegLocator.Locate();
         _videoRenderToolsAvailable = tools.Ffmpeg.Exists
             && !tools.Ffmpeg.IsDirectory
@@ -207,7 +224,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             SelectOriginalPreview,
             () => IsMediaSelected && !IsLoadingMedia && !IsExportActive);
         _selectSymbolizedCommand = new RelayCommand(
-            () => PreviewMode = PreviewMode.Symbolized,
+            SelectSymbolizedPreview,
             () => HasSymbolizedReview && !IsLoadingMedia && !IsExportActive);
         _toggleRenderedVideoPlaybackCommand = new RelayCommand(
             ToggleRenderedVideoPlayback,
@@ -221,6 +238,18 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _fullscreenCommand = new RelayCommand(
             () => _renderedVideoPlayer.ShowFullscreen(SelectedFitMode),
             () => ShowRenderedVideoPlayer && !IsExportActive);
+        _toggleOriginalVideoPlaybackCommand = new RelayCommand(
+            ToggleOriginalVideoPlayback,
+            CanControlOriginalVideo);
+        _restartOriginalVideoCommand = new RelayCommand(
+            () => _videoPlaybackCoordinator.RestartOriginal(),
+            CanControlOriginalVideo);
+        _toggleOriginalVideoMuteCommand = new RelayCommand(
+            _originalVideoPlayer.ToggleMute,
+            CanControlOriginalVideo);
+        _originalFullscreenCommand = new RelayCommand(
+            () => _originalVideoPlayer.ShowFullscreen(SelectedFitMode),
+            CanControlOriginalVideo);
 
         AboutCommand = new RelayCommand(
             () => StatusMessage = "GlyphFrame v1.0.0 - local media processing with no telemetry.");
@@ -279,6 +308,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public IRelayCommand FullscreenCommand => _fullscreenCommand;
 
+    public IRelayCommand ToggleOriginalVideoPlaybackCommand => _toggleOriginalVideoPlaybackCommand;
+
+    public IRelayCommand RestartOriginalVideoCommand => _restartOriginalVideoCommand;
+
+    public IRelayCommand ToggleOriginalVideoMuteCommand => _toggleOriginalVideoMuteCommand;
+
+    public IRelayCommand OriginalFullscreenCommand => _originalFullscreenCommand;
+
     public IRelayCommand AboutCommand { get; }
 
     public IRelayCommand SettingsCommand { get; }
@@ -326,22 +363,27 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public bool ShowVideoFrameLoading => IsVideoSelected
         && IsVideoFrameLoading
+        && !ShowOriginalVideoPlayer
         && (!IsSymbolizedPreviewSelected || !HasVideoArtifact);
 
     public bool ShowVideoFrameError => IsVideoSelected
         && HasVideoFrameError
         && !IsVideoFrameLoading
+        && !ShowOriginalVideoPlayer
         && (!IsSymbolizedPreviewSelected || !HasVideoArtifact);
 
     public bool ShowMediaPlaceholder => IsVideoSelected
         && !IsLoadingMedia
         && !HasVideoFrame
         && !IsVideoFrameLoading
-        && !HasVideoFrameError;
+        && !HasVideoFrameError
+        && !ShowOriginalVideoPlayer
+        && !ShowRenderedVideoPlayer;
 
     public bool ShowImagePreview => IsMediaSelected
         && CurrentPreviewImageSource is not null
         && !IsLoadingMedia
+        && !ShowOriginalVideoPlayer
         && !ShowRenderedVideoPlayer;
 
     public bool ShowErrorPreview => IsNoMediaSelected && HasMediaInputError;
@@ -427,6 +469,32 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             StringComparison.OrdinalIgnoreCase) == true;
 
     public ImageSource RenderedVideoPlaybackSource => _renderedVideoPlayer.PlaybackSource;
+
+    public bool IsOriginalVideoPlaybackOpening => IsVideoSelected
+        && _originalVideoPlayer.IsOpening
+        && VideoMetadata?.FilePath.Equals(_originalVideoPlayer.SourcePath, StringComparison.OrdinalIgnoreCase) == true;
+
+    public bool IsOriginalVideoPlaybackReady => IsVideoSelected
+        && _originalVideoPlayer.IsPlaybackReady
+        && VideoMetadata?.FilePath.Equals(_originalVideoPlayer.SourcePath, StringComparison.OrdinalIgnoreCase) == true;
+
+    public bool IsOriginalVideoPlaybackFallback => IsVideoSelected
+        && !IsOriginalVideoPlaybackOpening
+        && _originalVideoPlayer.FallbackRequired
+        && VideoMetadata?.FilePath.Equals(_originalVideoPlayer.SourcePath, StringComparison.OrdinalIgnoreCase) == true;
+
+    public bool ShowOriginalVideoPlayer => IsOriginalPreviewSelected && IsOriginalVideoPlaybackReady;
+
+    public bool ShowOriginalPlaybackOpening => IsOriginalPreviewSelected && IsOriginalVideoPlaybackOpening;
+
+    public bool ShowOriginalPlaybackFallback => IsOriginalPreviewSelected && IsOriginalVideoPlaybackFallback;
+
+    public ImageSource OriginalVideoPlaybackSource => _originalVideoPlayer.PlaybackSource;
+
+    public string OriginalVideoPlaybackLimitationMessage => _originalVideoPlayer.FailureMessage
+        ?? OriginalVideoPlayer.PlaybackUnavailableMessage;
+
+    public string? OriginalVideoPlaybackTechnicalDetail => _originalVideoPlayer.TechnicalDetail;
 
     public bool ShowRenderedVideoReviewError => IsVideoSelected
         && IsSymbolizedPreviewSelected
@@ -660,7 +728,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         && !IsExportActive;
 
     public bool ShowVideoFrameControls => IsVideoSelected
-        && (!IsSymbolizedPreviewSelected || !HasVideoArtifact);
+        && (!IsSymbolizedPreviewSelected || !HasVideoArtifact)
+        && !(IsOriginalPreviewSelected && IsOriginalVideoPlaybackReady);
 
     public string RenderedVideoPlaybackActionLabel => _renderedVideoPlayer.HasEnded
         ? "Restart"
@@ -698,6 +767,50 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     {
         get => _renderedVideoPlayer.Volume;
         set => _renderedVideoPlayer.SetVolume(value);
+    }
+
+    public string OriginalVideoPlaybackActionLabel => _originalVideoPlayer.HasEnded
+        ? "Restart"
+        : _originalVideoPlayer.IsPlaying ? "Pause" : "Play";
+
+    public string OriginalVideoMuteActionLabel => _originalVideoPlayer.IsMuted ? "Unmute" : "Mute";
+
+    public bool IsOriginalVideoPlaying => _originalVideoPlayer.IsPlaying;
+
+    public bool IsOriginalVideoMuted => _originalVideoPlayer.IsMuted;
+
+    public bool ShowOriginalVideoReplay => IsOriginalVideoPlaybackReady && _originalVideoPlayer.HasEnded;
+
+    public double OriginalVideoPixelWidth => VideoMetadata?.DisplayWidth
+        ?? (_originalVideoPlayer.NaturalVideoWidth > 0 ? _originalVideoPlayer.NaturalVideoWidth : 0);
+
+    public double OriginalVideoPixelHeight => VideoMetadata?.DisplayHeight
+        ?? (_originalVideoPlayer.NaturalVideoHeight > 0 ? _originalVideoPlayer.NaturalVideoHeight : 0);
+
+    public double OriginalVideoRotationDegrees => NormalizeVideoRotation(VideoMetadata?.NormalizedRotationDegrees ?? 0);
+
+    public string OriginalVideoCurrentTimeText => FormatDuration(_originalVideoPlayer.Position);
+
+    public string OriginalVideoTotalTimeText => FormatDuration(ResolveOriginalVideoDuration());
+
+    public double OriginalVideoPositionSeconds
+    {
+        get => Math.Max(0d, _originalVideoPlayer.Position.TotalSeconds);
+        set
+        {
+            if (!_suppressOriginalVideoSeek && double.IsFinite(value) && IsOriginalVideoPlaybackReady)
+            {
+                _originalVideoPlayer.Seek(TimeSpan.FromSeconds(Math.Max(0d, value)));
+            }
+        }
+    }
+
+    public double OriginalVideoDurationSeconds => Math.Max(0d, ResolveOriginalVideoDuration().TotalSeconds);
+
+    public double OriginalVideoVolume
+    {
+        get => _originalVideoPlayer.Volume;
+        set => _originalVideoPlayer.SetVolume(value);
     }
 
     public bool ShowResolutionWarning => IsImageSelected
@@ -976,6 +1089,13 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         get => _previewMode;
         private set
         {
+            if (_previewMode != value)
+            {
+                // Tab changes are comparison boundaries: both transports end paused,
+                // and this block deliberately performs no timestamp transfer.
+                _videoPlaybackCoordinator.PauseAll();
+            }
+
             if (SetProperty(ref _previewMode, value))
             {
                 OnPropertyChanged(nameof(IsOriginalPreviewSelected));
@@ -990,6 +1110,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(ShowVideoFrameError));
                 OnPropertyChanged(nameof(ShowPreviewStatusBadge));
                 OnPropertyChanged(nameof(ShowVideoFrameControls));
+                OnPropertyChanged(nameof(ShowOriginalVideoPlayer));
+                OnPropertyChanged(nameof(ShowOriginalPlaybackOpening));
+                OnPropertyChanged(nameof(ShowOriginalPlaybackFallback));
+                OnPropertyChanged(nameof(ShowMediaPlaceholder));
                 NotifyCommandStates();
             }
         }
@@ -1007,6 +1131,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _selectedFitMode, value))
             {
                 _renderedVideoPlayer.UpdateFitMode(value);
+                _originalVideoPlayer.UpdateFitMode(value);
             }
         }
     }
@@ -1150,6 +1275,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             CancelReviewRecovery();
             _reviewRecoveryPending = false;
+            CancelOriginalVideoOpen();
+            _originalVideoPlayer.Close();
             _renderedVideoPlayer.Close();
             await _managedVideoArtifactSession.ClearAsync();
             if (_disposed || requestId != _mediaRequestId)
@@ -1198,6 +1325,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 ClearSymbolizedPreview();
                 StatusMessage = "Video metadata loaded locally. Loading a middle preview frame...";
                 NotifyVideoFrameProperties();
+                StartOriginalVideoOpen(result.VideoMetadata, requestId, TimeSpan.Zero);
                 await LoadVideoFrameAsync(
                     result.VideoMetadata.FilePath,
                     VideoPreviewDefaults.MiddlePosition,
@@ -1211,6 +1339,101 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             StatusMessage = result.UserMessage;
         }
+    }
+
+    private void StartOriginalVideoOpen(
+        VideoMetadata metadata,
+        long mediaVersion,
+        TimeSpan resumePosition)
+    {
+        if (_disposed || _reviewViewUnloaded || !ReferenceEquals(metadata, VideoMetadata))
+        {
+            return;
+        }
+
+        CancelOriginalVideoOpen();
+        CancellationTokenSource cancellation = new();
+        _originalVideoOpenCancellation = cancellation;
+        long generation = Interlocked.Increment(ref _originalVideoOpenGeneration);
+        _ = OpenOriginalVideoAsync(metadata, mediaVersion, resumePosition, generation, cancellation);
+    }
+
+    private async Task OpenOriginalVideoAsync(
+        VideoMetadata metadata,
+        long mediaVersion,
+        TimeSpan resumePosition,
+        long generation,
+        CancellationTokenSource cancellation)
+    {
+        try
+        {
+            OriginalVideoOpenResult result = await _originalVideoPlayer.OpenAsync(
+                metadata.FilePath,
+                cancellation.Token);
+            if (!IsCurrentOriginalVideoOpen(metadata, mediaVersion, generation, cancellation))
+            {
+                return;
+            }
+
+            if (result.IsReady)
+            {
+                _originalVideoPlayer.Seek(resumePosition);
+                StatusMessage = "Original video playback is ready.";
+            }
+            else if (result.Outcome == OriginalVideoOpenOutcome.FallbackRequired)
+            {
+                StatusMessage = result.UserMessage;
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or InvalidOperationException
+            or NotSupportedException)
+        {
+            if (IsCurrentOriginalVideoOpen(metadata, mediaVersion, generation, cancellation))
+            {
+                StatusMessage = OriginalVideoPlayer.PlaybackUnavailableMessage;
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(
+                    Interlocked.CompareExchange(ref _originalVideoOpenCancellation, null, cancellation),
+                    cancellation))
+            {
+                cancellation.Dispose();
+            }
+
+            if (!_disposed && generation == _originalVideoOpenGeneration)
+            {
+                NotifyOriginalVideoPlayerProperties();
+            }
+        }
+    }
+
+    private bool IsCurrentOriginalVideoOpen(
+        VideoMetadata metadata,
+        long mediaVersion,
+        long generation,
+        CancellationTokenSource cancellation) =>
+        !_disposed
+        && !_reviewViewUnloaded
+        && !cancellation.IsCancellationRequested
+        && generation == _originalVideoOpenGeneration
+        && mediaVersion == _renderWorkflowState.MediaVersion
+        && ReferenceEquals(metadata, VideoMetadata)
+        && metadata.FilePath.Equals(_originalVideoPlayer.SourcePath, StringComparison.OrdinalIgnoreCase);
+
+    private void CancelOriginalVideoOpen()
+    {
+        Interlocked.Increment(ref _originalVideoOpenGeneration);
+        CancellationTokenSource? cancellation = Interlocked.Exchange(ref _originalVideoOpenCancellation, null);
+        cancellation?.Cancel();
+        cancellation?.Dispose();
     }
 
     private void QueueVideoSeek(double normalizedPosition)
@@ -1227,7 +1450,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             debounce: true);
     }
 
-    private async Task LoadVideoFrameAsync(
+    private async Task<VideoFrameLoadResult> LoadVideoFrameAsync(
         string inputPath,
         double normalizedPosition,
         long mediaVersion,
@@ -1250,6 +1473,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         NotifyImageProperties();
 
         bool gateEntered = false;
+        VideoFrameLoadResult loadResult = VideoFrameLoadResult.NotAccepted(
+            requestId,
+            mediaVersion,
+            inputPath,
+            normalizedPosition);
         try
         {
             if (debounce)
@@ -1262,7 +1490,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
             if (!IsCurrentVideoFrameRequest(requestId, mediaVersion, inputPath))
             {
-                return;
+                return loadResult;
             }
 
             VideoFrameReadResult result = await _videoFrameReader.ReadAsync(
@@ -1273,7 +1501,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
             if (!IsCurrentVideoFrameRequest(requestId, mediaVersion, inputPath))
             {
-                return;
+                return loadResult;
             }
 
             if (result.Success && result.Frame is not null)
@@ -1281,6 +1509,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 _decodedImage = result.Frame;
                 _originalImageSource = _imageSourceFactory.Create(result.Frame);
                 _renderWorkflowState = _renderWorkflowState.OriginalAvailable(mediaVersion);
+                _resolvedVideoFrameIdentity = _renderWorkflowState.CurrentIdentity;
                 _resolvedVideoPosition = result.ActualNormalizedPosition ?? normalizedPosition;
                 _resolvedVideoTimestamp = result.ActualTimestamp
                     ?? ResolveTimelineTimestamp(_resolvedVideoPosition, result.Duration ?? VideoMetadata?.Duration);
@@ -1294,8 +1523,25 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                     StatusMessage = $"Video frame ready at {FormatVideoPosition(_resolvedVideoTimestamp, _resolvedVideoPosition)}.";
                 }
                 NotifyImageProperties();
+                loadResult = loadResult.Accept(result.Frame, _renderWorkflowState.CurrentIdentity);
             }
-            else if (result.Status != VideoFrameReadStatus.Cancelled)
+            else if (result.Status == VideoFrameReadStatus.Cancelled)
+            {
+                if (_resolvedVideoFrameIdentity is not null)
+                {
+                    _renderWorkflowState = _renderWorkflowState.RestoreVideoFrameSource(
+                        _resolvedVideoFrameIdentity);
+                }
+
+                SetTimelinePositionSilently(_resolvedVideoPosition);
+                if (!IsExportActive)
+                {
+                    StatusMessage = "Frame preview was cancelled. The previous original frame remains available.";
+                }
+
+                NotifyImageProperties();
+            }
+            else
             {
                 _videoFrameError = result.UserMessage;
                 _videoFrameTechnicalDetail = result.TechnicalDetail;
@@ -1357,6 +1603,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 NotifyCommandStates();
             }
         }
+
+        return loadResult;
     }
 
     private bool IsCurrentVideoFrameRequest(long requestId, long mediaVersion, string inputPath) =>
@@ -1365,6 +1613,15 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         && mediaVersion == _renderWorkflowState.MediaVersion
         && IsVideoSelected
         && VideoMetadata?.FilePath.Equals(inputPath, StringComparison.OrdinalIgnoreCase) == true;
+
+    private bool IsCurrentVideoFrameLoad(VideoFrameLoadResult result, double requestedNormalizedPosition) =>
+        result.Success
+        && result.Frame is not null
+        && result.Identity is not null
+        && result.RequestedNormalizedPosition == requestedNormalizedPosition
+        && IsCurrentVideoFrameRequest(result.RequestId, result.MediaVersion, result.InputPath)
+        && ReferenceEquals(result.Frame, _decodedImage)
+        && result.Identity == _renderWorkflowState.CurrentIdentity;
 
     public void UnloadReviewView()
     {
@@ -1378,7 +1635,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _reviewRecoveryPending = true;
         CancelReviewRecovery();
         _suspendedReviewPosition = _renderedVideoPlayer.Position;
+        _suspendedOriginalPosition = _originalVideoPlayer.Position;
+        CancelOriginalVideoOpen();
         CancelActiveImageOperation();
+        _originalVideoPlayer.Close();
+        _originalVideoPlayer.SetOwner(null);
         _renderedVideoPlayer.Close();
         _renderedVideoPlayer.SetOwner(null);
     }
@@ -1391,12 +1652,18 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         _renderedVideoPlayer.SetOwner(owner);
+        _originalVideoPlayer.SetOwner(owner);
         if (_reviewViewUnloaded)
         {
             _reviewViewGeneration++;
         }
         _reviewViewUnloaded = false;
         NotifyCommandStates();
+        if (VideoMetadata is VideoMetadata metadata)
+        {
+            StartOriginalVideoOpen(metadata, _renderWorkflowState.MediaVersion, _suspendedOriginalPosition);
+        }
+
         if (_reviewRecoveryPending && !IsExportActive)
         {
             await EnsureAcceptedReviewAsync();
@@ -1504,7 +1771,38 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private Task RenderImageAsync() => RenderCurrentSourceAsync(RenderWorkflowOperation.RenderImage);
 
-    private Task PreviewFrameAsync() => RenderCurrentSourceAsync(RenderWorkflowOperation.PreviewVideoFrame);
+    private async Task PreviewFrameAsync()
+    {
+        if (IsOriginalVideoPlaybackReady && VideoMetadata is VideoMetadata metadata)
+        {
+            _originalVideoPlayer.Pause();
+            TimeSpan authoritativeDuration = metadata.Duration is TimeSpan duration && duration > TimeSpan.Zero
+                ? duration
+                : _originalVideoPlayer.Duration;
+            double normalized = authoritativeDuration > TimeSpan.Zero
+                ? Math.Clamp(_originalVideoPlayer.Position.TotalSeconds / authoritativeDuration.TotalSeconds, 0d, 1d)
+                : 0d;
+            SetTimelinePositionSilently(normalized);
+            VideoFrameLoadResult loadResult = await LoadVideoFrameAsync(
+                metadata.FilePath,
+                normalized,
+                _renderWorkflowState.MediaVersion,
+                debounce: false);
+
+            if (!IsCurrentVideoFrameLoad(loadResult, normalized))
+            {
+                return;
+            }
+
+            await RenderCurrentSourceAsync(
+                RenderWorkflowOperation.PreviewVideoFrame,
+                loadResult.Frame,
+                loadResult.Identity);
+            return;
+        }
+
+        await RenderCurrentSourceAsync(RenderWorkflowOperation.PreviewVideoFrame);
+    }
 
     private async Task RenderVideoAsync()
     {
@@ -1751,7 +2049,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
-    private async Task RenderCurrentSourceAsync(RenderWorkflowOperation operation)
+    private async Task RenderCurrentSourceAsync(
+        RenderWorkflowOperation operation,
+        DecodedImage? expectedSource = null,
+        PreviewIdentity? expectedIdentity = null)
     {
         bool imageRender = operation == RenderWorkflowOperation.RenderImage;
         if (_decodedImage is null
@@ -1771,6 +2072,12 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         DecodedImage source = _decodedImage;
+        if ((expectedSource is not null && !ReferenceEquals(source, expectedSource))
+            || (expectedIdentity is not null && identity != expectedIdentity))
+        {
+            return;
+        }
+
         (long operationId, CancellationToken token) = BeginImageOperation(
             operation,
             imageRender ? "Rendering image..." : "Previewing frame...",
@@ -2108,6 +2415,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void BeginOperationPresentation(string title, string text)
     {
+        _videoPlaybackCoordinator.PauseAll();
         _activeOperationTitle = title;
         _activeOperationText = text;
         _exportFrameText = string.Empty;
@@ -2508,7 +2816,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         IsVideoSelected
         && !HasVideoArtifact
         && _renderWorkflowState.CanPreviewVideoFrame
-        && _decodedImage is not null
+        && (_decodedImage is not null || IsOriginalVideoPlaybackReady)
         && !IsLoadingMedia
         && !IsVideoFrameLoading
         && !IsExportActive;
@@ -2533,6 +2841,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         && VideoMetadata is not null && HasVideoArtifact && _renderWorkflowState.CanExportVideo
         && !_disposed && !IsLoadingMedia && !IsVideoFrameLoading && !IsExportActive
         && !_reviewTransitionActive;
+
+    private bool CanControlOriginalVideo() => IsOriginalPreviewSelected
+        && IsOriginalVideoPlaybackReady
+        && !IsExportActive
+        && !_disposed;
 
 
     private bool IsCurrentManagedVideoRender(
@@ -2591,19 +2904,16 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void SelectOriginalPreview()
     {
-        if (_renderedVideoPlayer.IsPlaying)
-        {
-            _renderedVideoPlayer.Pause();
-        }
-
         PreviewMode = PreviewMode.Original;
     }
+
+    private void SelectSymbolizedPreview() => PreviewMode = PreviewMode.Symbolized;
 
     private void ToggleRenderedVideoPlayback()
     {
         if (_renderedVideoPlayer.HasEnded)
         {
-            _renderedVideoPlayer.Restart();
+            _videoPlaybackCoordinator.RestartRendered();
         }
         else if (_renderedVideoPlayer.IsPlaying)
         {
@@ -2611,7 +2921,23 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         else
         {
-            _renderedVideoPlayer.Play();
+            _videoPlaybackCoordinator.PlayRendered();
+        }
+    }
+
+    private void ToggleOriginalVideoPlayback()
+    {
+        if (_originalVideoPlayer.HasEnded)
+        {
+            _videoPlaybackCoordinator.RestartOriginal();
+        }
+        else if (_originalVideoPlayer.IsPlaying)
+        {
+            _originalVideoPlayer.Pause();
+        }
+        else
+        {
+            _videoPlaybackCoordinator.PlayOriginal();
         }
     }
 
@@ -2665,6 +2991,58 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void OnOriginalVideoPlayerStateChanged(object? sender, EventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        void Apply()
+        {
+            if (_disposed || !IsVideoSelected
+                || VideoMetadata?.FilePath.Equals(
+                    _originalVideoPlayer.SourcePath,
+                    StringComparison.OrdinalIgnoreCase) != true)
+            {
+                return;
+            }
+
+            if (_originalVideoPlayer.FallbackRequired
+                && !string.IsNullOrWhiteSpace(_originalVideoPlayer.FailureMessage)
+                && !IsExportActive)
+            {
+                StatusMessage = _originalVideoPlayer.FailureMessage;
+            }
+
+            _suppressOriginalVideoSeek = true;
+            try
+            {
+                NotifyOriginalVideoPlayerProperties();
+            }
+            finally
+            {
+                _suppressOriginalVideoSeek = false;
+            }
+        }
+
+        if (_synchronizationContext is null
+            || ReferenceEquals(SynchronizationContext.Current, _synchronizationContext))
+        {
+            Apply();
+        }
+        else
+        {
+            try
+            {
+                _synchronizationContext.Send(static state => ((Action)state!).Invoke(), (Action)Apply);
+            }
+            catch (InvalidAsynchronousStateException) when (_disposed)
+            {
+            }
+        }
+    }
+
     private static string FormatAudioOutcomeValue(AudioMuxOutcome outcome) => outcome switch
     {
         AudioMuxOutcome.StreamCopied => "Original",
@@ -2688,6 +3066,16 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         : _managedVideoArtifactSession.Current?.Duration is TimeSpan duration && duration > TimeSpan.Zero
             ? duration
             : TimeSpan.Zero;
+
+    private TimeSpan ResolveOriginalVideoDuration() => _originalVideoPlayer.Duration > TimeSpan.Zero
+        ? _originalVideoPlayer.Duration
+        : VideoMetadata?.Duration ?? TimeSpan.Zero;
+
+    private static int NormalizeVideoRotation(int rotation)
+    {
+        int normalized = ((rotation % 360) + 360) % 360;
+        return normalized is 90 or 180 or 270 ? normalized : 0;
+    }
 
 
     private bool CanOpenExportFolderAction() => CanOpenExportFolder;
@@ -2799,7 +3187,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(WorkflowStatus), nameof(ShowImageResultPanel), nameof(ShowImageExportControls),
             nameof(IsProcessingResultPanelVisible), nameof(HasVideoArtifact), nameof(HasSymbolizedReview),
             nameof(ShowVideoResultPanel), nameof(VideoRenderActionLabel), nameof(ShowRenderedVideoPlayer),
-            nameof(ShowRenderedVideoReviewError), nameof(ShowVideoFrameControls)
+            nameof(ShowRenderedVideoReviewError), nameof(ShowVideoFrameControls),
+            nameof(IsOriginalVideoPlaybackOpening), nameof(IsOriginalVideoPlaybackReady),
+            nameof(IsOriginalVideoPlaybackFallback), nameof(ShowOriginalVideoPlayer),
+            nameof(ShowOriginalPlaybackOpening), nameof(ShowOriginalPlaybackFallback),
+            nameof(OriginalVideoPlaybackLimitationMessage), nameof(OriginalVideoPlaybackTechnicalDetail)
         ];
 
         foreach (string propertyName in propertyNames)
@@ -2858,7 +3250,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(HasVideoExportDestination), nameof(VideoExportDestinationText), nameof(VideoExportActionLabel), nameof(CanOpenExportFolder),
             nameof(IsProcessingResultPanelVisible), nameof(ShowRenderedVideoPlayer),
             nameof(ShowRenderedVideoReviewError), nameof(ShowImagePreview), nameof(PreviewStaleMessage),
-            nameof(ShowVideoFrameControls)
+            nameof(ShowVideoFrameControls), nameof(ShowMediaPlaceholder)
         ];
 
         foreach (string propertyName in propertyNames)
@@ -2881,7 +3273,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(RenderedVideoDurationSeconds), nameof(RenderedVideoVolume),
             nameof(IsRenderedVideoPlaying), nameof(IsRenderedVideoMuted), nameof(ShowRenderedVideoReplay),
             nameof(RenderedVideoPixelWidth), nameof(RenderedVideoPixelHeight),
-            nameof(RenderedVideoCurrentTimeText), nameof(RenderedVideoTotalTimeText)
+            nameof(RenderedVideoCurrentTimeText), nameof(RenderedVideoTotalTimeText),
+            nameof(ShowMediaPlaceholder)
         ];
 
         foreach (string propertyName in propertyNames)
@@ -2893,6 +3286,37 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _restartRenderedVideoCommand.NotifyCanExecuteChanged();
         _toggleRenderedVideoMuteCommand.NotifyCanExecuteChanged();
         _fullscreenCommand.NotifyCanExecuteChanged();
+    }
+
+    private void NotifyOriginalVideoPlayerProperties()
+    {
+        string[] propertyNames =
+        [
+            nameof(IsOriginalVideoPlaybackOpening), nameof(IsOriginalVideoPlaybackReady),
+            nameof(IsOriginalVideoPlaybackFallback), nameof(ShowOriginalVideoPlayer),
+            nameof(ShowOriginalPlaybackOpening), nameof(ShowOriginalPlaybackFallback),
+            nameof(OriginalVideoPlaybackSource), nameof(OriginalVideoPlaybackLimitationMessage),
+            nameof(OriginalVideoPlaybackTechnicalDetail), nameof(OriginalVideoPlaybackActionLabel),
+            nameof(OriginalVideoMuteActionLabel), nameof(IsOriginalVideoPlaying),
+            nameof(IsOriginalVideoMuted), nameof(ShowOriginalVideoReplay),
+            nameof(OriginalVideoPixelWidth), nameof(OriginalVideoPixelHeight),
+            nameof(OriginalVideoRotationDegrees), nameof(OriginalVideoCurrentTimeText),
+            nameof(OriginalVideoTotalTimeText), nameof(OriginalVideoPositionSeconds),
+            nameof(OriginalVideoDurationSeconds), nameof(OriginalVideoVolume),
+            nameof(ShowImagePreview), nameof(ShowVideoFrameControls), nameof(ShowVideoFrameLoading),
+            nameof(ShowVideoFrameError), nameof(ShowMediaPlaceholder)
+        ];
+
+        foreach (string propertyName in propertyNames)
+        {
+            OnPropertyChanged(propertyName);
+        }
+
+        _toggleOriginalVideoPlaybackCommand.NotifyCanExecuteChanged();
+        _restartOriginalVideoCommand.NotifyCanExecuteChanged();
+        _toggleOriginalVideoMuteCommand.NotifyCanExecuteChanged();
+        _originalFullscreenCommand.NotifyCanExecuteChanged();
+        _previewFrameCommand.NotifyCanExecuteChanged();
     }
 
     private void NotifyVideoFrameProperties()
@@ -2930,6 +3354,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _restartRenderedVideoCommand.NotifyCanExecuteChanged();
         _toggleRenderedVideoMuteCommand.NotifyCanExecuteChanged();
         _fullscreenCommand.NotifyCanExecuteChanged();
+        _toggleOriginalVideoPlaybackCommand.NotifyCanExecuteChanged();
+        _restartOriginalVideoCommand.NotifyCanExecuteChanged();
+        _toggleOriginalVideoMuteCommand.NotifyCanExecuteChanged();
+        _originalFullscreenCommand.NotifyCanExecuteChanged();
         SettingsCommand.NotifyCanExecuteChanged();
     }
 
@@ -3004,6 +3432,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _resolvedVideoTimestamp = null;
         _resolvedVideoDuration = null;
         _resolvedVideoFrameIndex = null;
+        _resolvedVideoFrameIdentity = null;
         _videoFrameError = null;
         _videoFrameTechnicalDetail = null;
         SetTimelinePositionSilently(0d);
@@ -3048,6 +3477,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _disposed = true;
         CancelReviewRecovery();
         _reviewRecoveryCancellation.Dispose();
+        CancelOriginalVideoOpen();
+        _originalVideoPlayer.StateChanged -= OnOriginalVideoPlayerStateChanged;
+        _originalVideoPlayer.Close();
         _renderedVideoPlayer.StateChanged -= OnRenderedVideoPlayerStateChanged;
         _renderedVideoPlayer.Close();
         CancelExportCompletionPresentationCore();
@@ -3182,5 +3614,27 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         private readonly Action<T> _callback = callback ?? throw new ArgumentNullException(nameof(callback));
 
         public void Report(T value) => _callback(value);
+    }
+
+    private readonly record struct VideoFrameLoadResult(
+        bool Success,
+        long RequestId,
+        long MediaVersion,
+        string InputPath,
+        double RequestedNormalizedPosition,
+        DecodedImage? Frame,
+        PreviewIdentity? Identity)
+    {
+        public static VideoFrameLoadResult NotAccepted(
+            long requestId,
+            long mediaVersion,
+            string inputPath,
+            double requestedNormalizedPosition) =>
+            new(false, requestId, mediaVersion, inputPath, requestedNormalizedPosition, null, null);
+
+        public VideoFrameLoadResult Accept(DecodedImage frame, PreviewIdentity? identity) =>
+            identity is null
+                ? this
+                : this with { Success = true, Frame = frame, Identity = identity };
     }
 }

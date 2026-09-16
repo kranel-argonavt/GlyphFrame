@@ -249,6 +249,62 @@ public sealed class ReviewSurfaceTests
         });
     }
 
+    [Theory]
+    [InlineData(0, 640, 360)]
+    [InlineData(90, 360, 640)]
+    [InlineData(180, 640, 360)]
+    [InlineData(270, 360, 640)]
+    [InlineData(-90, 360, 640)]
+    [InlineData(450, 360, 640)]
+    public void OriginalPlaybackRotation_UsesDisplayBoundsAndSingleQuarterTurn(
+        double rotation,
+        double displayWidth,
+        double displayHeight)
+    {
+        RunSta(() =>
+        {
+            ReviewViewport viewport = new()
+            {
+                Width = 400,
+                Height = 300,
+                PixelWidth = displayWidth,
+                PixelHeight = displayHeight,
+                RotationDegrees = rotation,
+                ScaleMode = "100%",
+                Source = new DrawingImage(new GeometryDrawing(
+                    Brushes.MediumPurple,
+                    null,
+                    new RectangleGeometry(new Rect(0, 0, 640, 360))))
+            };
+            Window window = new() { Content = viewport, Width = 420, Height = 340, ShowInTaskbar = false };
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                ScrollViewer scroll = Assert.IsType<ScrollViewer>(Assert.Single(viewport.Children.Cast<UIElement>()));
+                Canvas canvas = Assert.IsType<Canvas>(scroll.Content);
+                Image image = Assert.IsType<Image>(Assert.Single(canvas.Children.Cast<UIElement>()));
+                int normalized = ((int)rotation % 360 + 360) % 360;
+                if (normalized is not (90 or 180 or 270)) normalized = 0;
+                if (normalized == 0)
+                {
+                    Assert.Same(Transform.Identity, image.RenderTransform);
+                }
+                else
+                {
+                    Assert.Equal(normalized, Assert.IsType<RotateTransform>(image.RenderTransform).Angle);
+                }
+                Rect displayed = image.TransformToAncestor(canvas).TransformBounds(new Rect(image.RenderSize));
+                DpiScale dpi = VisualTreeHelper.GetDpi(viewport);
+                Assert.Equal(displayWidth, displayed.Width * dpi.DpiScaleX, 3);
+                Assert.Equal(displayHeight, displayed.Height * dpi.DpiScaleY, 3);
+                Assert.True(canvas.Width * dpi.DpiScaleX >= displayWidth);
+                Assert.True(canvas.Height * dpi.DpiScaleY >= displayHeight);
+            }
+            finally { window.Close(); }
+        });
+    }
+
     [Fact]
     public void SeekSlider_ClockUpdatesDoNotFightDrag_AndBindingRemainsLive()
     {
@@ -520,13 +576,13 @@ public sealed class ReviewSurfaceTests
     public void SharedViewContract_HasOnePrimaryPlayControl_OverlayOnlyReplay_AndAccessibleActions()
     {
         XDocument document = ReadView("VideoReviewSurface.xaml");
-        XElement play = Assert.Single(document.Descendants(), e => e.Attribute("Command")?.Value == "{Binding ToggleRenderedVideoPlaybackCommand}");
-        Assert.Equal("{Binding RenderedVideoPlaybackActionLabel}", play.Attribute("AutomationProperties.Name")?.Value);
-        XElement replay = Assert.Single(document.Descendants(), e => e.Attribute("Command")?.Value == "{Binding RestartRenderedVideoCommand}");
+        XElement play = Assert.Single(document.Descendants(), e => e.Attribute("Command")?.Value == "{Binding TogglePlaybackCommand, ElementName=Surface}");
+        Assert.Equal("{Binding PlaybackActionLabel, ElementName=Surface}", play.Attribute("AutomationProperties.Name")?.Value);
+        XElement replay = Assert.Single(document.Descendants(), e => e.Attribute("Command")?.Value == "{Binding ReplayCommand, ElementName=Surface}");
         XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
         Assert.Equal("ReplayOverlay", replay.Parent?.Attribute(x + "Name")?.Value);
-        Assert.Single(document.Descendants(), e => e.Attribute("Command")?.Value == "{Binding ToggleRenderedVideoMuteCommand}");
-        Assert.Single(document.Descendants(), e => e.Attribute("SelectedItem")?.Value == "{Binding SelectedFitMode}");
+        Assert.Single(document.Descendants(), e => e.Attribute("Command")?.Value == "{Binding ToggleMuteCommand, ElementName=Surface}");
+        Assert.Single(document.Descendants(), e => e.Attribute("SelectedItem")?.Value == "{Binding SelectedScaleMode, ElementName=Surface, Mode=TwoWay}");
         foreach (XElement control in document.Descendants().Where(e => e.Name.LocalName is "Button" or "Slider" or "ReviewSeekSlider" or "ComboBox"))
         {
             Assert.NotNull(control.Attribute("ToolTip"));
@@ -534,7 +590,16 @@ public sealed class ReviewSurfaceTests
         }
         XDocument preview = ReadView("PreviewPanelView.xaml");
         Assert.DoesNotContain(preview.Descendants(), e => e.Name.LocalName == "Viewbox");
-        Assert.Single(preview.Descendants(), e => e.Name.LocalName == "VideoReviewSurface");
+        Assert.Equal(2, preview.Descendants().Count(e => e.Name.LocalName == "VideoReviewSurface"));
+        Assert.Single(preview.Descendants(), e => e.Name.LocalName == "VideoReviewSurface"
+            && e.Attribute("PlaybackKind")?.Value == "Original");
+        Assert.Single(document.Descendants(), e => e.Attribute("RotationDegrees")?.Value == "{Binding RotationDegrees, ElementName=Surface}");
+        Assert.Contains(
+            "OriginalVideoRotationDegrees",
+            File.ReadAllText(Path.Combine(
+                Path.GetDirectoryName(ReadViewPath("VideoReviewSurface.xaml"))!,
+                "VideoReviewSurface.xaml.cs")),
+            StringComparison.Ordinal);
         XElement frame = Assert.Single(preview.Descendants(), e => e.Attribute("Visibility")?.Value.Contains("ShowVideoFrameControls", StringComparison.Ordinal) == true);
         Assert.DoesNotContain(frame.Descendants(), e => e.Name.LocalName == "Button");
         Assert.Contains(frame.Descendants(), e => e.Attribute("Text")?.Value == "Frame position");
@@ -549,6 +614,14 @@ public sealed class ReviewSurfaceTests
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "GlyphFrame.sln"))) directory = directory.Parent;
         Assert.NotNull(directory);
         return XDocument.Load(Path.Combine(directory.FullName, "src", "GlyphFrame.App", "Views", name));
+    }
+
+    private static string ReadViewPath(string name)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "GlyphFrame.sln"))) directory = directory.Parent;
+        Assert.NotNull(directory);
+        return Path.Combine(directory.FullName, "src", "GlyphFrame.App", "Views", name);
     }
 
     private static UserControl LoadExportStatusViewForLayout()

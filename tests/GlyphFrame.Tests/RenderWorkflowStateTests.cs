@@ -233,6 +233,24 @@ public sealed class RenderWorkflowStateTests
     }
 
     [Fact]
+    public void CancelledVideoFrameChange_RestoresRetainedFrameIdentity()
+    {
+        RenderWorkflowState ready = ReadyVideo();
+        RenderWorkflowState preview = ready
+            .BeginOperation(41, RenderWorkflowOperation.PreviewVideoFrame)
+            .CompleteVideoFramePreview(41, ready.CurrentIdentity!)
+            .EndOperation(41);
+        PreviewIdentity retainedIdentity = preview.CurrentIdentity!;
+        RenderWorkflowState seeking = preview.SourceChanged();
+
+        RenderWorkflowState restored = seeking.RestoreVideoFrameSource(retainedIdentity);
+
+        Assert.Equal(retainedIdentity, restored.CurrentIdentity);
+        Assert.False(restored.IsVideoFramePreviewStale);
+        Assert.Equal(RenderWorkflowStatus.FramePreviewReady, restored.Status);
+    }
+
+    [Fact]
     public void VideoPreviewCannotCompleteAsImageRender()
     {
         RenderWorkflowState previewing = ReadyVideo()

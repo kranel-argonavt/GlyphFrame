@@ -112,21 +112,76 @@ public sealed class WpfRenderedVideoLifetimeTests
         });
     }
 
+    [Fact]
+    public void OriginalAndRenderedFullscreenHosts_AreIndependentAndUseTheirOwnCommands()
+    {
+        RunSta(() =>
+        {
+            using WpfMediaPlaybackBackend originalBackend = new();
+            using WpfRenderedVideoPlaybackBackend renderedBackend = new();
+            using WpfVideoPlaybackFullscreenHost originalHost = new(VideoPlaybackSurfaceKind.Original);
+            using WpfVideoPlaybackFullscreenHost renderedHost = new(VideoPlaybackSurfaceKind.Rendered);
+            SharedReviewModel model = new(renderedBackend.VisualSource, originalBackend.VisualSource);
+            Window owner = new() { Width = 100, Height = 100, ShowInTaskbar = false, DataContext = model };
+            try
+            {
+                owner.Show();
+                owner.Dispatcher.Invoke(() => { }, DispatcherPriority.Loaded);
+                originalHost.SetOwner(owner);
+                renderedHost.SetOwner(owner);
+                originalHost.Show("Fill");
+                renderedHost.Show("100%");
+
+                Window[] windows = owner.OwnedWindows.Cast<Window>().ToArray();
+                Assert.Equal(2, windows.Length);
+                Window originalWindow = Assert.Single(windows, window => window.Title.Contains("original", StringComparison.OrdinalIgnoreCase));
+                Window renderedWindow = Assert.Single(windows, window => window.Title.Contains("rendered", StringComparison.OrdinalIgnoreCase));
+                VideoReviewSurface originalSurface = Assert.IsType<VideoReviewSurface>(originalWindow.Content);
+                VideoReviewSurface renderedSurface = Assert.IsType<VideoReviewSurface>(renderedWindow.Content);
+                Assert.Equal(VideoPlaybackSurfaceKind.Original, originalSurface.PlaybackKind);
+                Assert.Equal(VideoPlaybackSurfaceKind.Rendered, renderedSurface.PlaybackKind);
+                Assert.Same(model.ToggleOriginalVideoPlaybackCommand, Assert.IsType<Button>(originalSurface.FindName("PlayButton")).Command);
+                Assert.Same(model.ToggleRenderedVideoPlaybackCommand, Assert.IsType<Button>(renderedSurface.FindName("PlayButton")).Command);
+
+                originalWindow.RaiseEvent(new KeyEventArgs(
+                    Keyboard.PrimaryDevice, PresentationSource.FromVisual(originalWindow), 0, Key.Escape)
+                { RoutedEvent = Keyboard.KeyDownEvent });
+
+                Assert.False(originalWindow.IsVisible);
+                Assert.True(renderedWindow.IsVisible);
+                owner.Close();
+                Assert.False(renderedWindow.IsVisible);
+            }
+            finally
+            {
+                owner.Close();
+            }
+        });
+    }
+
     private sealed class SharedReviewModel : ObservableObject
     {
         private bool _playing;
         private bool _replay;
-        public SharedReviewModel(ImageSource source)
+        public SharedReviewModel(ImageSource renderedSource, ImageSource? originalSource = null)
         {
-            RenderedVideoPlaybackSource = source;
+            RenderedVideoPlaybackSource = renderedSource;
+            OriginalVideoPlaybackSource = originalSource ?? renderedSource;
             ToggleRenderedVideoPlaybackCommand = new RelayCommand(() => IsRenderedVideoPlaying = !IsRenderedVideoPlaying);
+            ToggleOriginalVideoPlaybackCommand = new RelayCommand(() => IsOriginalVideoPlaying = !IsOriginalVideoPlaying);
         }
         public ImageSource RenderedVideoPlaybackSource { get; }
+        public ImageSource OriginalVideoPlaybackSource { get; }
         public string SelectedFitMode { get; set; } = "Fit";
         public double RenderedVideoPixelWidth => 1920;
         public double RenderedVideoPixelHeight => 1080;
+        public double OriginalVideoPixelWidth => 1080;
+        public double OriginalVideoPixelHeight => 1920;
+        public double OriginalVideoRotationDegrees => 90;
         public RelayCommand ToggleRenderedVideoPlaybackCommand { get; }
+        public RelayCommand ToggleOriginalVideoPlaybackCommand { get; }
         public bool IsRenderedVideoPlaying { get => _playing; set => SetProperty(ref _playing, value); }
+        public bool IsOriginalVideoPlaying { get; set; }
         public bool ShowRenderedVideoReplay { get => _replay; set => SetProperty(ref _replay, value); }
     }
 

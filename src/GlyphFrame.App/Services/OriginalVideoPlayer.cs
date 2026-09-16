@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Media;
 
 namespace GlyphFrame.App.Services;
@@ -72,6 +73,12 @@ public interface IOriginalVideoPlayer : IDisposable
 
     void ToggleMute();
 
+    void ShowFullscreen(string fitMode);
+
+    void SetOwner(Window? owner);
+
+    void UpdateFitMode(string fitMode);
+
     void Close();
 }
 
@@ -93,6 +100,8 @@ public sealed class OriginalVideoPlayer : IOriginalVideoPlayer
         CancellationTechnicalDetail: "Original-video playback opening was cancelled.");
 
     private readonly MediaPlaybackController _controller;
+    private readonly IVideoPlaybackFullscreenHost _fullscreenHost;
+    private Window? _owner;
     private bool _disposed;
 
     public OriginalVideoPlayer()
@@ -100,7 +109,8 @@ public sealed class OriginalVideoPlayer : IOriginalVideoPlayer
             new WpfMediaPlaybackBackend(),
             new DispatcherMediaPlaybackPositionTimer(),
             new SystemMediaPlaybackOpenDeadline(),
-            DefaultOpenTimeout)
+            DefaultOpenTimeout,
+            new WpfVideoPlaybackFullscreenHost(VideoPlaybackSurfaceKind.Original))
     {
     }
 
@@ -108,7 +118,8 @@ public sealed class OriginalVideoPlayer : IOriginalVideoPlayer
         IMediaPlaybackBackend backend,
         IMediaPlaybackPositionTimer positionTimer,
         IMediaPlaybackOpenDeadline? openDeadline = null,
-        TimeSpan? openTimeout = null)
+        TimeSpan? openTimeout = null,
+        IVideoPlaybackFullscreenHost? fullscreenHost = null)
     {
         _controller = new MediaPlaybackController(
             backend,
@@ -116,6 +127,7 @@ public sealed class OriginalVideoPlayer : IOriginalVideoPlayer
             openDeadline ?? new SystemMediaPlaybackOpenDeadline(),
             openTimeout ?? DefaultOpenTimeout,
             ControllerOptions);
+        _fullscreenHost = fullscreenHost ?? new NullVideoPlaybackFullscreenHost();
         _controller.StateChanged += OnControllerStateChanged;
     }
 
@@ -177,7 +189,42 @@ public sealed class OriginalVideoPlayer : IOriginalVideoPlayer
 
     public void ToggleMute() => _controller.ToggleMute();
 
-    public void Close() => _controller.Close();
+    public void ShowFullscreen(string fitMode)
+    {
+        if (!_disposed && IsPlaybackReady)
+        {
+            _fullscreenHost.Show(fitMode);
+        }
+    }
+
+    public void SetOwner(Window? owner)
+    {
+        if (ReferenceEquals(owner, _owner))
+        {
+            return;
+        }
+
+        if (_owner is not null)
+        {
+            _owner.Closed -= OnOwnerClosed;
+        }
+
+        _owner = owner;
+        if (_owner is not null)
+        {
+            _owner.Closed += OnOwnerClosed;
+        }
+
+        _fullscreenHost.SetOwner(owner);
+    }
+
+    public void UpdateFitMode(string fitMode) => _fullscreenHost.UpdateFitMode(fitMode);
+
+    public void Close()
+    {
+        _fullscreenHost.Close();
+        _controller.Close();
+    }
 
     public void Dispose()
     {
@@ -186,8 +233,10 @@ public sealed class OriginalVideoPlayer : IOriginalVideoPlayer
             return;
         }
 
+        SetOwner(null);
         _controller.StateChanged -= OnControllerStateChanged;
         _controller.Dispose();
+        _fullscreenHost.Dispose();
         _disposed = true;
     }
 
@@ -202,6 +251,19 @@ public sealed class OriginalVideoPlayer : IOriginalVideoPlayer
         _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null)
     };
 
-    private void OnControllerStateChanged(object? sender, EventArgs e) =>
+    private void OnControllerStateChanged(object? sender, EventArgs e)
+    {
+        if (FallbackRequired)
+        {
+            _fullscreenHost.Close();
+        }
+
         StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnOwnerClosed(object? sender, EventArgs e)
+    {
+        Close();
+        SetOwner(null);
+    }
 }
