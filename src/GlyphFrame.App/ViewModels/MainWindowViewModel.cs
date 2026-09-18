@@ -48,7 +48,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly AsyncRelayCommand _exportVideoCommand;
     private readonly AsyncRelayCommand _openExportFolderCommand;
     private readonly RelayCommand _cancelExportCommand;
-    private readonly RelayCommand _selectOriginalCommand;
+    private readonly AsyncRelayCommand _selectOriginalCommand;
     private readonly RelayCommand _selectSymbolizedCommand;
     private readonly RelayCommand _toggleRenderedVideoPlaybackCommand;
     private readonly RelayCommand _restartRenderedVideoCommand;
@@ -73,6 +73,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private long _exportCompletionPresentationId;
     private long _exportPresentationGeneration;
     private long _originalVideoOpenGeneration;
+    private long _comparisonGeneration;
     private string? _pendingFilePath;
     private DecodedImage? _decodedImage;
     private RenderedImage? _renderedImage;
@@ -132,6 +133,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private long _reviewViewGeneration;
     private TimeSpan _suspendedReviewPosition;
     private TimeSpan _suspendedOriginalPosition;
+    private PendingOriginalComparison? _pendingOriginalComparison;
+    private bool _comparisonFrameRequestActive;
     private readonly bool _videoRenderToolsAvailable;
 
     public MainWindowViewModel(
@@ -220,8 +223,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _exportVideoCommand = new AsyncRelayCommand(ExportVideoAsync, CanExportVideo);
         _openExportFolderCommand = new AsyncRelayCommand(OpenExportFolderAsync, CanOpenExportFolderAction);
         _cancelExportCommand = new RelayCommand(CancelActiveImageOperation, () => CanCancelExport);
-        _selectOriginalCommand = new RelayCommand(
-            SelectOriginalPreview,
+        _selectOriginalCommand = new AsyncRelayCommand(
+            SelectOriginalPreviewAsync,
             () => IsMediaSelected && !IsLoadingMedia && !IsExportActive);
         _selectSymbolizedCommand = new RelayCommand(
             SelectSymbolizedPreview,
@@ -296,7 +299,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public IRelayCommand CancelExportCommand => _cancelExportCommand;
 
-    public IRelayCommand SelectOriginalCommand => _selectOriginalCommand;
+    public IAsyncRelayCommand SelectOriginalCommand => _selectOriginalCommand;
 
     public IRelayCommand SelectSymbolizedCommand => _selectSymbolizedCommand;
 
@@ -1091,8 +1094,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (_previewMode != value)
             {
-                // Tab changes are comparison boundaries: both transports end paused,
-                // and this block deliberately performs no timestamp transfer.
+                // Every tab change is a paused comparison boundary. User-initiated video
+                // switches resolve their timestamp through the playback coordinator first.
                 _videoPlaybackCoordinator.PauseAll();
             }
 
@@ -1273,6 +1276,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         if (result.Success)
         {
+            CancelComparisonSwitch();
             CancelReviewRecovery();
             _reviewRecoveryPending = false;
             CancelOriginalVideoOpen();
@@ -1377,12 +1381,16 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
             if (result.IsReady)
             {
-                _originalVideoPlayer.Seek(resumePosition);
-                StatusMessage = "Original video playback is ready.";
+                if (!TryApplyPendingOriginalComparison(metadata, mediaVersion, generation))
+                {
+                    _originalVideoPlayer.Seek(resumePosition);
+                    StatusMessage = "Original video playback is ready.";
+                }
             }
             else if (result.Outcome == OriginalVideoOpenOutcome.FallbackRequired)
             {
                 StatusMessage = result.UserMessage;
+                await ApplyPendingOriginalFallbackAsync(metadata, mediaVersion, generation);
             }
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
@@ -1632,6 +1640,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         _reviewViewUnloaded = true;
         _reviewViewGeneration++;
+        CancelComparisonSwitch();
         _reviewRecoveryPending = true;
         CancelReviewRecovery();
         _suspendedReviewPosition = _renderedVideoPlayer.Position;
@@ -2902,12 +2911,219 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void SelectOriginalPreview()
+    private async Task SelectOriginalPreviewAsync()
     {
+        if (PreviewMode == PreviewMode.Original)
+        {
+            return;
+        }
+
+        long comparisonGeneration = BeginComparisonSwitch();
+        if (!IsVideoSelected || VideoMetadata is not VideoMetadata metadata)
+        {
+            _videoPlaybackCoordinator.PauseAll();
+            PreviewMode = PreviewMode.Original;
+            return;
+        }
+
+        long mediaVersion = _renderWorkflowState.MediaVersion;
+        long operationId = _imageOperationId;
+        long viewGeneration = _reviewViewGeneration;
+        PlaybackTimestampTransfer transfer = _videoPlaybackCoordinator.PrepareOriginalSwitch(
+            ResolveOriginalComparisonDuration(),
+            ResolveTrustworthyFramesPerSecond(metadata.Fps));
         PreviewMode = PreviewMode.Original;
+        if (!IsCurrentComparison(
+                comparisonGeneration,
+                mediaVersion,
+                operationId,
+                viewGeneration,
+                metadata.FilePath,
+                PreviewMode.Original))
+        {
+            return;
+        }
+
+        if (IsOriginalVideoPlaybackReady)
+        {
+            _videoPlaybackCoordinator.ApplyOriginalTransfer(transfer);
+            NotifyOriginalVideoPlayerProperties();
+            return;
+        }
+
+        PendingOriginalComparison pending = new(
+            comparisonGeneration,
+            mediaVersion,
+            operationId,
+            viewGeneration,
+            metadata.FilePath,
+            _originalVideoOpenGeneration,
+            transfer);
+        if (IsOriginalVideoPlaybackOpening)
+        {
+            _pendingOriginalComparison = pending;
+            return;
+        }
+
+        await ApplyOriginalFallbackComparisonAsync(pending, metadata);
     }
 
-    private void SelectSymbolizedPreview() => PreviewMode = PreviewMode.Symbolized;
+    private void SelectSymbolizedPreview()
+    {
+        if (PreviewMode == PreviewMode.Symbolized)
+        {
+            return;
+        }
+
+        long comparisonGeneration = BeginComparisonSwitch();
+        ManagedVideoArtifact? artifact = _managedVideoArtifactSession.Current;
+        if (IsVideoSelected && artifact is not null && IsAcceptedReviewOpen)
+        {
+            TimeSpan? outgoingTimestamp = IsOriginalVideoPlaybackReady
+                ? null
+                : ResolveTimelineTimestamp(TimelinePosition, ResolveOriginalComparisonDuration());
+            PlaybackTimestampTransfer transfer = _videoPlaybackCoordinator.PrepareRenderedSwitch(
+                ResolveRenderedComparisonDuration(artifact),
+                ResolveTrustworthyFramesPerSecond(artifact.FramesPerSecond),
+                outgoingTimestamp);
+            Guid artifactId = artifact.ArtifactId;
+            long mediaVersion = _renderWorkflowState.MediaVersion;
+            PreviewMode = PreviewMode.Symbolized;
+            if (!_disposed
+                && comparisonGeneration == _comparisonGeneration
+                && mediaVersion == _renderWorkflowState.MediaVersion
+                && _managedVideoArtifactSession.Current?.ArtifactId == artifactId
+                && IsAcceptedReviewOpen)
+            {
+                _videoPlaybackCoordinator.ApplyRenderedTransfer(transfer);
+                NotifyVideoPlayerProperties();
+            }
+            return;
+        }
+
+        _videoPlaybackCoordinator.PauseAll();
+        PreviewMode = PreviewMode.Symbolized;
+    }
+
+    private long BeginComparisonSwitch()
+    {
+        CancelComparisonSwitch();
+        return _comparisonGeneration;
+    }
+
+    private void CancelComparisonSwitch()
+    {
+        Interlocked.Increment(ref _comparisonGeneration);
+        _pendingOriginalComparison = null;
+        if (_comparisonFrameRequestActive)
+        {
+            _comparisonFrameRequestActive = false;
+            CancelVideoFrameRequestCore();
+        }
+    }
+
+    private bool IsCurrentComparison(
+        long comparisonGeneration,
+        long mediaVersion,
+        long operationId,
+        long viewGeneration,
+        string inputPath,
+        PreviewMode targetMode) =>
+        !_disposed
+        && !_reviewViewUnloaded
+        && comparisonGeneration == _comparisonGeneration
+        && mediaVersion == _renderWorkflowState.MediaVersion
+        && operationId == _imageOperationId
+        && viewGeneration == _reviewViewGeneration
+        && PreviewMode == targetMode
+        && VideoMetadata?.FilePath.Equals(inputPath, StringComparison.OrdinalIgnoreCase) == true;
+
+    private bool TryApplyPendingOriginalComparison(
+        VideoMetadata metadata,
+        long mediaVersion,
+        long openGeneration)
+    {
+        PendingOriginalComparison? pending = _pendingOriginalComparison;
+        if (pending is null
+            || pending.OriginalOpenGeneration != openGeneration
+            || !IsCurrentComparison(
+                pending.ComparisonGeneration,
+                mediaVersion,
+                pending.OperationId,
+                pending.ViewGeneration,
+                metadata.FilePath,
+                PreviewMode.Original))
+        {
+            return false;
+        }
+
+        _pendingOriginalComparison = null;
+        _videoPlaybackCoordinator.ApplyOriginalTransfer(pending.Transfer);
+        StatusMessage = "Original video playback is ready at the comparison timestamp.";
+        NotifyOriginalVideoPlayerProperties();
+        return true;
+    }
+
+    private async Task ApplyPendingOriginalFallbackAsync(
+        VideoMetadata metadata,
+        long mediaVersion,
+        long openGeneration)
+    {
+        PendingOriginalComparison? pending = _pendingOriginalComparison;
+        if (pending is null
+            || pending.OriginalOpenGeneration != openGeneration
+            || !IsCurrentComparison(
+                pending.ComparisonGeneration,
+                mediaVersion,
+                pending.OperationId,
+                pending.ViewGeneration,
+                metadata.FilePath,
+                PreviewMode.Original))
+        {
+            return;
+        }
+
+        _pendingOriginalComparison = null;
+        await ApplyOriginalFallbackComparisonAsync(pending, metadata);
+    }
+
+    private async Task ApplyOriginalFallbackComparisonAsync(
+        PendingOriginalComparison pending,
+        VideoMetadata metadata)
+    {
+        if (!IsCurrentComparison(
+                pending.ComparisonGeneration,
+                pending.MediaVersion,
+                pending.OperationId,
+                pending.ViewGeneration,
+                pending.InputPath,
+                PreviewMode.Original))
+        {
+            return;
+        }
+
+        TimeSpan? duration = pending.Transfer.TargetDuration;
+        double normalizedPosition = duration is TimeSpan usableDuration && usableDuration > TimeSpan.Zero
+            ? Math.Clamp(pending.Transfer.TargetTimestamp.TotalSeconds / usableDuration.TotalSeconds, 0d, 1d)
+            : 0d;
+        SetTimelinePositionSilently(normalizedPosition);
+        _comparisonFrameRequestActive = true;
+        try
+        {
+            await LoadVideoFrameAsync(
+                metadata.FilePath,
+                normalizedPosition,
+                pending.MediaVersion,
+                debounce: false);
+        }
+        finally
+        {
+            if (pending.ComparisonGeneration == _comparisonGeneration)
+            {
+                _comparisonFrameRequestActive = false;
+            }
+        }
+    }
 
     private void ToggleRenderedVideoPlayback()
     {
@@ -3070,6 +3286,22 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private TimeSpan ResolveOriginalVideoDuration() => _originalVideoPlayer.Duration > TimeSpan.Zero
         ? _originalVideoPlayer.Duration
         : VideoMetadata?.Duration ?? TimeSpan.Zero;
+
+    private TimeSpan? ResolveOriginalComparisonDuration() =>
+        IsUsableDuration(VideoMetadata?.Duration) ? VideoMetadata!.Duration
+        : IsUsableDuration(_originalVideoPlayer.Duration) ? _originalVideoPlayer.Duration
+        : null;
+
+    private TimeSpan? ResolveRenderedComparisonDuration(ManagedVideoArtifact artifact) =>
+        IsUsableDuration(artifact.Duration) ? artifact.Duration
+        : IsUsableDuration(_renderedVideoPlayer.Duration) ? _renderedVideoPlayer.Duration
+        : null;
+
+    private static bool IsUsableDuration(TimeSpan? duration) =>
+        duration is TimeSpan value && value > TimeSpan.Zero;
+
+    private static double? ResolveTrustworthyFramesPerSecond(double? framesPerSecond) =>
+        framesPerSecond is double fps && double.IsFinite(fps) && fps > 0d ? fps : null;
 
     private static int NormalizeVideoRotation(int rotation)
     {
@@ -3475,6 +3707,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        Interlocked.Increment(ref _comparisonGeneration);
+        _pendingOriginalComparison = null;
+        _comparisonFrameRequestActive = false;
         CancelReviewRecovery();
         _reviewRecoveryCancellation.Dispose();
         CancelOriginalVideoOpen();
@@ -3637,4 +3872,13 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 ? this
                 : this with { Success = true, Frame = frame, Identity = identity };
     }
+
+    private sealed record PendingOriginalComparison(
+        long ComparisonGeneration,
+        long MediaVersion,
+        long OperationId,
+        long ViewGeneration,
+        string InputPath,
+        long OriginalOpenGeneration,
+        PlaybackTimestampTransfer Transfer);
 }

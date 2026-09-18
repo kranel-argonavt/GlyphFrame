@@ -3403,6 +3403,328 @@ public sealed class MainWindowVideoPreviewTests
         Assert.False(harness.RenderedVideoPlayer.IsPlaying);
     }
 
+    [Fact]
+    public async Task OriginalToSymbolized_TransfersTimestampPausedWithoutChangingArtifactIdentity()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("original-to-symbolized.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("comparison-review.mp4"), job.Identity)));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        await viewModel.SelectOriginalCommand.ExecuteAsync(null);
+        viewModel.OriginalVideoVolume = 0.42d;
+        viewModel.ToggleOriginalVideoMuteCommand.Execute(null);
+        viewModel.OriginalVideoPositionSeconds = 7d;
+        viewModel.ToggleOriginalVideoPlaybackCommand.Execute(null);
+        ManagedVideoArtifact retained = harness.ManagedArtifacts.Current!;
+        bool stale = viewModel.IsSymbolizedPreviewStale;
+        int renderCalls = harness.ManagedVideoRenders.Calls;
+        int imageCalls = harness.ImagePipeline.RenderCalls;
+        harness.RenderedVideoPlayer.BeforeSeek = _ => Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        List<string?> changes = [];
+        viewModel.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+
+        viewModel.SelectSymbolizedCommand.Execute(null);
+
+        Assert.Equal(PreviewMode.Symbolized, viewModel.PreviewMode);
+        Assert.Equal(TimeSpan.FromSeconds(7), harness.RenderedVideoPlayer.Position);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        Assert.False(harness.OriginalVideoPlayer.IsTimerRunning);
+        Assert.False(harness.RenderedVideoPlayer.IsPlaying);
+        Assert.False(harness.RenderedVideoPlayer.IsTimerRunning);
+        Assert.Equal(0.42d, harness.OriginalVideoPlayer.Volume, 3);
+        Assert.True(harness.OriginalVideoPlayer.IsMuted);
+        Assert.Same(retained, harness.ManagedArtifacts.Current);
+        Assert.Equal(stale, viewModel.IsSymbolizedPreviewStale);
+        Assert.Equal(renderCalls, harness.ManagedVideoRenders.Calls);
+        Assert.Equal(imageCalls, harness.ImagePipeline.RenderCalls);
+        Assert.Equal(0, harness.VideoPublications.Calls);
+        Assert.Contains(nameof(MainWindowViewModel.RenderedVideoPositionSeconds), changes);
+    }
+
+    [Fact]
+    public async Task SymbolizedToReadyOriginal_UsesMetadataDurationAndPreservesIndependentAudioState()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("symbolized-to-original.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Duration = TimeSpan.FromSeconds(2);
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("source-duration-review.mp4"), job.Identity)));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        harness.RenderedVideoPlayer.SetVolume(0.31d);
+        harness.RenderedVideoPlayer.ToggleMute();
+        harness.RenderedVideoPlayer.Seek(TimeSpan.FromSeconds(6));
+        viewModel.ToggleRenderedVideoPlaybackCommand.Execute(null);
+        harness.OriginalVideoPlayer.BeforeSeek = _ => Assert.False(harness.RenderedVideoPlayer.IsPlaying);
+
+        await viewModel.SelectOriginalCommand.ExecuteAsync(null);
+
+        Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
+        Assert.Equal(TimeSpan.FromSeconds(6), harness.OriginalVideoPlayer.Position);
+        Assert.False(harness.RenderedVideoPlayer.IsPlaying);
+        Assert.False(harness.RenderedVideoPlayer.IsTimerRunning);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        Assert.False(harness.OriginalVideoPlayer.IsTimerRunning);
+        Assert.Equal(0.31d, harness.RenderedVideoPlayer.Volume, 3);
+        Assert.True(harness.RenderedVideoPlayer.IsMuted);
+    }
+
+    [Fact]
+    public async Task SymbolizedToOriginalFallback_LoadsFfmpegFrameWithoutSymbolizationOrHiddenPlayback()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("comparison-fallback.mkv");
+        TestHarness harness = ReadyVideoHarness();
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("fallback-review.mp4"), job.Identity)));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackFallback);
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        DecodedImage comparisonFrame = SolidFrame(12, 34, 56);
+        harness.VideoFrames.Handler = (_, position, metadata, _) =>
+            Task.FromResult(FrameResult(comparisonFrame, position, metadata));
+        harness.RenderedVideoPlayer.Seek(TimeSpan.FromSeconds(4));
+        viewModel.ToggleRenderedVideoPlaybackCommand.Execute(null);
+        int openCalls = harness.OriginalVideoPlayer.OpenCalls;
+        int imageCalls = harness.ImagePipeline.RenderCalls;
+
+        await viewModel.SelectOriginalCommand.ExecuteAsync(null);
+
+        Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
+        Assert.Equal(0.4d, viewModel.TimelinePosition, 3);
+        Assert.Equal(0.4d, harness.VideoFrames.LastNormalizedPosition, 3);
+        Assert.Same(comparisonFrame, harness.ImageSources.LastDecodedImage);
+        Assert.Equal(imageCalls, harness.ImagePipeline.RenderCalls);
+        Assert.Equal(openCalls, harness.OriginalVideoPlayer.OpenCalls);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        Assert.False(harness.RenderedVideoPlayer.IsPlaying);
+    }
+
+    [Fact]
+    public async Task SymbolizedToOriginalFallback_CancelledExtractionRestoresRetainedFramePosition()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("comparison-fallback-cancelled.mkv");
+        TestHarness harness = ReadyVideoHarness();
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("fallback-cancel-review.mp4"), job.Identity)));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackFallback);
+        DecodedImage retained = harness.ImageSources.LastDecodedImage!;
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        harness.RenderedVideoPlayer.Seek(TimeSpan.FromSeconds(7));
+        harness.VideoFrames.Handler = (_, position, _, _) =>
+            Task.FromResult(VideoFrameReadResult.Cancelled(position));
+
+        await viewModel.SelectOriginalCommand.ExecuteAsync(null);
+
+        Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
+        Assert.Equal(0.5d, viewModel.TimelinePosition, 3);
+        Assert.Same(retained, harness.ImageSources.LastDecodedImage);
+        Assert.False(viewModel.HasVideoFrameError);
+        Assert.Equal(
+            "Frame preview was cancelled. The previous original frame remains available.",
+            viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task PendingOriginalOpen_AppliesComparisonOnlyWhileSameTabAndMediaRemainCurrent()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("pending-comparison.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        TaskCompletionSource<OriginalVideoOpenResult> opening = NewCompletion<OriginalVideoOpenResult>();
+        harness.OriginalVideoPlayer.Handler = (_, _) => opening.Task;
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("pending-review.mp4"), job.Identity)));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackOpening);
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        harness.RenderedVideoPlayer.Seek(TimeSpan.FromSeconds(3));
+
+        await viewModel.SelectOriginalCommand.ExecuteAsync(null);
+        Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
+        Assert.Equal(TimeSpan.Zero, harness.OriginalVideoPlayer.Position);
+        opening.SetResult(OriginalReady());
+        await WaitUntilAsync(
+            viewModel,
+            () => harness.OriginalVideoPlayer.Position == TimeSpan.FromSeconds(3));
+
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        Assert.False(harness.RenderedVideoPlayer.IsPlaying);
+        Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
+    }
+
+    [Fact]
+    public async Task PendingOriginalOpen_FallbackAppliesTimestampThroughFfmpegOnly()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("pending-fallback-comparison.mkv");
+        TestHarness harness = ReadyVideoHarness();
+        TaskCompletionSource<OriginalVideoOpenResult> opening = NewCompletion<OriginalVideoOpenResult>();
+        harness.OriginalVideoPlayer.Handler = (_, _) => opening.Task;
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("pending-fallback-review.mp4"), job.Identity)));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackOpening);
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        harness.RenderedVideoPlayer.Seek(TimeSpan.FromSeconds(3));
+        DecodedImage transferredFrame = SolidFrame(11, 99, 44);
+        harness.VideoFrames.Handler = (_, position, metadata, _) =>
+            Task.FromResult(FrameResult(transferredFrame, position, metadata));
+        int imageCalls = harness.ImagePipeline.RenderCalls;
+
+        await viewModel.SelectOriginalCommand.ExecuteAsync(null);
+        opening.SetResult(new OriginalVideoOpenResult(
+            OriginalVideoOpenOutcome.FallbackRequired,
+            OriginalVideoPlayer.PlaybackUnavailableMessage,
+            "Controlled pending fallback."));
+        await WaitUntilAsync(
+            viewModel,
+            () => ReferenceEquals(harness.ImageSources.LastDecodedImage, transferredFrame));
+
+        Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
+        Assert.Equal(0.3d, viewModel.TimelinePosition, 3);
+        Assert.Equal(0.3d, harness.VideoFrames.LastNormalizedPosition, 3);
+        Assert.Equal(imageCalls, harness.ImagePipeline.RenderCalls);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        Assert.False(harness.RenderedVideoPlayer.IsPlaying);
+    }
+
+    [Fact]
+    public async Task DisposalWhileOriginalComparisonIsPending_PreventsLateSeek()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("disposed-pending-comparison.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        TaskCompletionSource<OriginalVideoOpenResult> opening = NewCompletion<OriginalVideoOpenResult>();
+        harness.OriginalVideoPlayer.Handler = (_, _) => opening.Task;
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("disposed-pending-review.mp4"), job.Identity)));
+        MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackOpening);
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        harness.RenderedVideoPlayer.Seek(TimeSpan.FromSeconds(4));
+        await viewModel.SelectOriginalCommand.ExecuteAsync(null);
+
+        viewModel.Dispose();
+        opening.SetResult(OriginalReady());
+        await Task.Yield();
+
+        Assert.Null(harness.OriginalVideoPlayer.SourcePath);
+        Assert.Equal(TimeSpan.Zero, harness.OriginalVideoPlayer.Position);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+    }
+
+    [Fact]
+    public async Task UnloadWhileOriginalComparisonIsPending_PreventsLateSeek()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("unloaded-pending-comparison.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        TaskCompletionSource<OriginalVideoOpenResult> opening = NewCompletion<OriginalVideoOpenResult>();
+        harness.OriginalVideoPlayer.Handler = (_, _) => opening.Task;
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("unloaded-pending-review.mp4"), job.Identity)));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackOpening);
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        harness.RenderedVideoPlayer.Seek(TimeSpan.FromSeconds(4));
+        await viewModel.SelectOriginalCommand.ExecuteAsync(null);
+
+        viewModel.UnloadReviewView();
+        opening.SetResult(OriginalReady());
+        await Task.Yield();
+
+        Assert.Null(harness.OriginalVideoPlayer.SourcePath);
+        Assert.Equal(TimeSpan.Zero, harness.OriginalVideoPlayer.Position);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+        Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
+    }
+
+    [Fact]
+    public async Task MediaReplacementWhileOriginalComparisonIsPending_RejectsObsoleteTransfer()
+    {
+        using TestMediaFiles files = new();
+        string firstPath = files.Create("replaced-pending-comparison.mp4");
+        string secondPath = files.Create("replacement-current.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        TaskCompletionSource<OriginalVideoOpenResult> firstOpening = NewCompletion<OriginalVideoOpenResult>();
+        harness.OriginalVideoPlayer.Handler = (path, _) => path == firstPath
+            ? firstOpening.Task
+            : Task.FromResult(OriginalReady());
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("replaced-pending-review.mp4"), job.Identity)));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([firstPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackOpening);
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        harness.RenderedVideoPlayer.Seek(TimeSpan.FromSeconds(4));
+        await viewModel.SelectOriginalCommand.ExecuteAsync(null);
+
+        await viewModel.DropMediaCommand.ExecuteAsync([secondPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackReady);
+        firstOpening.SetResult(OriginalReady());
+        await Task.Yield();
+
+        Assert.Equal(secondPath, viewModel.VideoMetadata?.FilePath);
+        Assert.Equal(secondPath, harness.OriginalVideoPlayer.SourcePath);
+        Assert.Equal(TimeSpan.Zero, harness.OriginalVideoPlayer.Position);
+        Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
+        Assert.False(harness.OriginalVideoPlayer.IsPlaying);
+    }
+
+    [Fact]
+    public async Task SupersededFallbackComparison_CannotReplaceNewerSymbolizedSelection()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("superseded-fallback-comparison.mkv");
+        TestHarness harness = ReadyVideoHarness();
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("superseded-review.mp4"), job.Identity)));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await WaitUntilAsync(viewModel, () => viewModel.IsOriginalVideoPlaybackFallback);
+        DecodedImage retained = harness.ImageSources.LastDecodedImage!;
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        harness.RenderedVideoPlayer.Seek(TimeSpan.FromSeconds(8));
+        TaskCompletionSource started = NewCompletion();
+        TaskCompletionSource<VideoFrameReadResult> release = NewCompletion<VideoFrameReadResult>();
+        harness.VideoFrames.Handler = (_, _, _, _) =>
+        {
+            started.TrySetResult();
+            return release.Task;
+        };
+
+        Task switchToOriginal = viewModel.SelectOriginalCommand.ExecuteAsync(null);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        viewModel.SelectSymbolizedCommand.Execute(null);
+        DecodedImage obsolete = SolidFrame(200, 10, 10);
+        release.SetResult(FrameResult(obsolete, 0.8d, VideoMetadataFor(videoPath)));
+        await switchToOriginal;
+
+        Assert.Equal(PreviewMode.Symbolized, viewModel.PreviewMode);
+        Assert.Same(retained, harness.ImageSources.LastDecodedImage);
+        Assert.NotSame(obsolete, harness.ImageSources.LastDecodedImage);
+        Assert.True(viewModel.ShowRenderedVideoPlayer);
+    }
+
     [Theory]
     [InlineData(0, 0, 64, 48)]
     [InlineData(90, 90, 48, 64)]
@@ -3834,6 +4156,12 @@ public sealed class MainWindowVideoPreviewTests
 
         public int CloseCalls { get; private set; }
 
+        public int PauseCalls { get; private set; }
+
+        public int SeekCalls { get; private set; }
+
+        public Action<TimeSpan>? BeforeSeek { get; set; }
+
         private long _openGeneration;
 
         public Func<string, CancellationToken, Task<RenderedVideoOpenResult>> Handler { get; set; } =
@@ -3869,6 +4197,7 @@ public sealed class MainWindowVideoPreviewTests
 
         public void Pause()
         {
+            PauseCalls++;
             IsPlaying = false;
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -3881,6 +4210,8 @@ public sealed class MainWindowVideoPreviewTests
 
         public void Seek(TimeSpan position)
         {
+            BeforeSeek?.Invoke(position);
+            SeekCalls++;
             Position = position;
             HasEnded = false;
             StateChanged?.Invoke(this, EventArgs.Empty);
@@ -3958,6 +4289,8 @@ public sealed class MainWindowVideoPreviewTests
         public int OpenCalls { get; private set; }
         public int CloseCalls { get; private set; }
         public int PauseCalls { get; private set; }
+        public int SeekCalls { get; private set; }
+        public Action<TimeSpan>? BeforeSeek { get; set; }
         public int FullscreenCalls { get; private set; }
         public string? LastFullscreenFitMode { get; private set; }
         public Func<string, CancellationToken, Task<OriginalVideoOpenResult>> Handler { get; set; } =
@@ -4015,6 +4348,8 @@ public sealed class MainWindowVideoPreviewTests
 
         public void Seek(TimeSpan position)
         {
+            BeforeSeek?.Invoke(position);
+            SeekCalls++;
             Position = position < TimeSpan.Zero ? TimeSpan.Zero : position;
             HasEnded = false;
             StateChanged?.Invoke(this, EventArgs.Empty);

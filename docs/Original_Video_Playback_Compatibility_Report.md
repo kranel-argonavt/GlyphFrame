@@ -30,7 +30,7 @@ WPF `MediaPlayer` uses Windows media components and therefore remains dependent 
 - The rendered-video player is coupled to managed-artifact review semantics and user messages. It borrows the artifact; the managed session remains the file owner.
 - Original-frame preview is independent. `FfprobeVideoMetadataReader` obtains authoritative metadata and `FfmpegVideoFrameReader` extracts a display-oriented owned RGBA frame with bundled FFmpeg. This path supports Unicode paths and applies rotation metadata.
 - `MainWindowViewModel` owns both facades but coordinates them without sharing transport state. The reusable player surface presents Original controls only while runtime readiness is established; otherwise the existing FFmpeg frame surface and frame-position controls remain available.
-- Trusted quarter-turn metadata rotates only the WPF Original visual. A small coordinator pauses both players on tab switches and pauses the opposite player before playback starts. Timestamp transfer remains a later comparison block.
+- Trusted quarter-turn metadata rotates only the WPF Original visual. A small coordinator pauses both players on tab switches and pauses the opposite player before playback starts. Deterministic comparison switching transfers a clamped absolute timestamp while leaving both transports paused; representative real audiovisual validation is complete.
 
 Reusing the transport technology does not require sharing one player instance. Original media and the accepted symbolized artifact have different ownership, failure, duration, and lifecycle rules.
 
@@ -48,7 +48,7 @@ For each case, the harness:
 6. rendered the real WPF `VideoDrawing` into a `RenderTargetBitmap` and checked for visible pixels and frame changes;
 7. closed the backend and opened the source with exclusive `FileShare.None` access.
 
-The bitmap checks are component-level visual evidence: decoded WPF pixels were inspected programmatically, not watched in a live application window. No case was listened to, so audible playback, mute, channel correctness, and audio/video synchronization remain unverified. Desktop automation was unavailable in this session, so no live interactive playback claim is made.
+The bitmap checks are component-level visual evidence: decoded WPF pixels were inspected programmatically, not watched in a live application window. No case was listened to during that original harness run, and desktop automation was unavailable in that session. A separate user-performed interactive follow-up on 2026-09-18 supplied the live audiovisual, control, fullscreen, and multi-monitor evidence described below.
 
 ## Fixtures
 
@@ -109,7 +109,7 @@ The Unicode case is a byte-for-byte copy into a mixed Cyrillic/Japanese path; co
 - WPF natural duration was 1.0 s for multiple 1.2–1.221 s sources. Position transfer must clamp against the actual target and must not promise frame-exact synchronization from these duration values.
 - Paused position changes rendered a different frame for every dynamic supported case. This is component evidence for scrubbing, not a human observation of the screen.
 - `Close` released the source handle for every success, false-positive open, and failure case tested.
-- Actual audible playback and audio/video synchronization were not verified.
+- The original harness did not verify audible playback or audio/video synchronization; the later user-performed interactive pass confirmed the user-facing audio controls and single-audio tab-switching behavior.
 
 ## Backend options
 
@@ -216,23 +216,25 @@ A proxy is not necessary for the approved Phase 11B.5B fallback contract and mus
 
 ## Approved Phase 11B.5B implementation boundaries
 
-Phase 11B.5B should implement:
+The Phase 11B.5B implementation and validation scope is:
 
 - a dedicated original-player facade and small two-player coordinator in the App layer;
 - runtime readiness/fallback state without changing Core's media processing contracts;
 - Original-tab transport controls only when playback is ready;
 - orientation-correct Original presentation;
-- deterministic tab timestamp transfer with the incoming tab paused;
+- deterministic tab timestamp transfer with the incoming tab paused, authoritative target-duration precedence, one-frame end clamping when target FPS is trustworthy, and generation-bound FFmpeg fallback;
 - single-audio enforcement and lifecycle cleanup;
 - fallback to the current FFmpeg frame surface and `Preview Frame`;
-- deterministic unit/STA tests plus a documented manual audiovisual matrix.
+- deterministic unit/STA tests, followed by a documented manual audiovisual matrix before Phase 11B.5 closure.
 
 It should not add a third-party backend, proxy generation, new import containers, realtime symbolization, artifact publication changes, or Phase 12 logging/error-detail UI.
 
-## Remaining evidence gaps
+## Interactive follow-up and remaining evidence gaps
 
-- No audible playback, mute, volume, channel, or audio/video synchronization check was performed.
-- No live human-observed paused-seek, replay, fullscreen, focus, keyboard, minimum-window, or multi-monitor DPI check was performed.
+On 2026-09-18, a user-performed pass completed the checks that could not be observed through the automated environment: displayed paused frames and approximate tab alignment, final-frame/replay behavior, audible playback with mute and volume, prevention of overlapping Original and Symbolized audio, interactive fullscreen controls, Fit/Fill/100% presentation, runtime fallback, main-window/fullscreen cleanup, and multi-monitor DPI behavior. The focused automated rerun also passed 79 WPF/player/comparison tests and 54 real FFmpeg/container/Unicode/rotation/audio integration tests.
+
+The remaining gaps are broader compatibility risks rather than Phase 11B.5 acceptance blockers:
+
 - The compatibility matrix represents one Windows installation. Clean Windows 10 and Windows 11 machines, N/KN editions, and systems with different media-feature/codec installations remain untested.
 - H.264 profiles/levels beyond these tiny fixtures, variable frame rate, unusual timestamps/start offsets, interlaced video, and damaged-but-partially-decodable sources remain untested.
 - The positive-natural-dimensions gate eliminates the observed FFV1 false positive but is not proof that every subsequent frame or audio sample will decode.
