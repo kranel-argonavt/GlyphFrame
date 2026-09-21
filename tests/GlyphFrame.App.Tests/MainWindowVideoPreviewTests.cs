@@ -9,6 +9,7 @@ using GlyphFrame.Core.Interfaces;
 using GlyphFrame.Core.Models;
 using GlyphFrame.Core.Presets;
 using GlyphFrame.Core.Settings;
+using GlyphFrame.Infrastructure.Media;
 using ImageMetadata = GlyphFrame.Core.Models.ImageMetadata;
 
 namespace GlyphFrame.App.Tests;
@@ -204,8 +205,48 @@ public sealed class MainWindowVideoPreviewTests
 
         Assert.False(viewModel.IsExportActive);
         Assert.True(viewModel.ExportVideoCommand.CanExecute(null));
-        Assert.Contains("could not finish", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        ErrorPresentation error = Assert.IsType<ErrorPresentation>(viewModel.VideoPublicationErrorPresentation);
+        Assert.Equal(ApplicationErrorCode.AtomicPublicationFailed, error.Code);
+        Assert.Equal(error.UserMessage, viewModel.StatusMessage);
+        Assert.Contains("GlyphFrame could not finish encoding the MP4 video.", error.TechnicalDetail);
+        Assert.Contains("raw encoder detail", error.TechnicalDetail);
         Assert.DoesNotContain("raw encoder detail", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(VideoExportErrorCategory.DestinationAccessDenied, ApplicationErrorCode.DestinationAccessDenied)]
+    [InlineData(VideoExportErrorCategory.InsufficientDiskSpace, ApplicationErrorCode.InsufficientDiskSpace)]
+    [InlineData(VideoExportErrorCategory.DestinationConflict, ApplicationErrorCode.DestinationConflict)]
+    [InlineData(VideoExportErrorCategory.OutputFinalizationFailed, ApplicationErrorCode.AtomicPublicationFailed)]
+    public async Task VideoExport_FilesystemFailureIdentityReachesPublicationPresentation(
+        VideoExportErrorCategory category,
+        ApplicationErrorCode expectedCode)
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("publication-category.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        harness.SaveDialogs.VideoOutputPath = files.PathFor("publication-category-output.mp4");
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.PathFor("publication-review.mp4"), job.Identity)));
+        harness.VideoPublications.Handler = (_, _, _) => Task.FromResult(VideoExportResult.Failure(
+            category,
+            "raw publication message",
+            "raw publication technical detail"));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+
+        await viewModel.ExportVideoCommand.ExecuteAsync(null);
+
+        ErrorPresentation error = Assert.IsType<ErrorPresentation>(viewModel.VideoPublicationErrorPresentation);
+        Assert.Equal(expectedCode, error.Code);
+        Assert.Equal(ErrorPresentationContext.VideoPublication, error.Context);
+        Assert.Contains("raw publication message", error.TechnicalDetail);
+        Assert.Contains("raw publication technical detail", error.TechnicalDetail);
+        Assert.DoesNotContain("raw publication", error.UserMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.True(viewModel.HasVideoArtifact);
+        Assert.True(viewModel.ExportVideoCommand.CanExecute(null));
+        Assert.Null(viewModel.VideoRenderErrorPresentation);
     }
 
     [Fact]
@@ -809,7 +850,7 @@ public sealed class MainWindowVideoPreviewTests
         Assert.True(viewModel.ShowVideoFrameError);
         Assert.Contains("could not decode", viewModel.VideoFrameStatusMessage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("decoder detail", viewModel.VideoFrameStatusMessage, StringComparison.Ordinal);
-        Assert.Equal("decoder detail", viewModel.VideoFrameTechnicalDetail);
+        Assert.Contains("decoder detail", viewModel.VideoFrameTechnicalDetail);
     }
 
     [Fact]
@@ -1136,6 +1177,10 @@ public sealed class MainWindowVideoPreviewTests
         Assert.True(viewModel.ShowImageExportControls);
         Assert.True(viewModel.ExportImageCommand.CanExecute(null));
         Assert.DoesNotContain("raw export failure", viewModel.StatusMessage, StringComparison.Ordinal);
+        ErrorPresentation exportError = Assert.IsType<ErrorPresentation>(viewModel.ImageExportErrorPresentation);
+        Assert.Equal(ApplicationErrorCode.DestinationUnavailable, exportError.Code);
+        Assert.Contains("raw export failure", exportError.TechnicalDetail, StringComparison.Ordinal);
+        Assert.Null(viewModel.ImageRenderErrorPresentation);
 
         harness.SaveDialogs.ImageOutputPaths.Enqueue(files.PathFor("retry-output.png"));
         harness.ImageExporter.Handler = (_, _, _, _, _) => Task.CompletedTask;
@@ -1146,6 +1191,7 @@ public sealed class MainWindowVideoPreviewTests
         Assert.Equal(RenderWorkflowStatus.Exported, viewModel.WorkflowStatus);
         Assert.Equal(renderCalls, harness.ImagePipeline.RenderCalls);
         Assert.Equal(2, harness.ImageExporter.Calls);
+        Assert.Null(viewModel.ImageExportErrorPresentation);
     }
 
     [Fact]
@@ -1170,6 +1216,10 @@ public sealed class MainWindowVideoPreviewTests
         Assert.Equal("Render Image", viewModel.ImageRenderActionLabel);
         Assert.Equal(PreviewMode.Original, viewModel.PreviewMode);
         Assert.DoesNotContain("raw render failure", viewModel.StatusMessage, StringComparison.Ordinal);
+        ErrorPresentation renderError = Assert.IsType<ErrorPresentation>(viewModel.ImageRenderErrorPresentation);
+        Assert.Equal(ApplicationErrorCode.ImageRenderFailed, renderError.Code);
+        Assert.Contains("raw render failure", renderError.TechnicalDetail, StringComparison.Ordinal);
+        Assert.Null(viewModel.ImageExportErrorPresentation);
     }
 
     [Fact]
@@ -1194,6 +1244,7 @@ public sealed class MainWindowVideoPreviewTests
         Assert.True(viewModel.HasImageRender);
         Assert.True(viewModel.ShowImageExportControls);
         Assert.True(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.Null(viewModel.ImageExportErrorPresentation);
         Assert.False(retained.IsDisposed);
         Assert.Equal("Render Again", viewModel.ImageRenderActionLabel);
     }
@@ -1227,6 +1278,7 @@ public sealed class MainWindowVideoPreviewTests
         Assert.False(viewModel.ShowImageRenderMetrics);
         Assert.False(viewModel.ExportImageCommand.CanExecute(null));
         Assert.Equal("Render Image", viewModel.ImageRenderActionLabel);
+        Assert.Null(viewModel.ImageRenderErrorPresentation);
     }
 
     [Fact]
@@ -1258,6 +1310,7 @@ public sealed class MainWindowVideoPreviewTests
         Assert.True(viewModel.HasImageRender);
         Assert.True(viewModel.ShowImageExportControls);
         Assert.True(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.Null(viewModel.ImageExportErrorPresentation);
 
         harness.ImageExporter.Handler = (_, _, _, _, _) => Task.CompletedTask;
         await viewModel.ExportImageCommand.ExecuteAsync(null);
@@ -1426,9 +1479,68 @@ public sealed class MainWindowVideoPreviewTests
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
 
         Assert.True(viewModel.HasVideoFrameError);
-        Assert.Equal("GlyphFrame could not load this video frame.", viewModel.VideoFrameStatusMessage);
+        ErrorPresentation error = Assert.IsType<ErrorPresentation>(viewModel.VideoFrameErrorPresentation);
+        Assert.Equal(ApplicationErrorCode.FrameDecodeFailed, error.Code);
+        Assert.Equal("GlyphFrame could not decode this video frame. Try another position or video.", viewModel.VideoFrameStatusMessage);
         Assert.DoesNotContain("raw native failure", viewModel.VideoFrameStatusMessage, StringComparison.Ordinal);
         Assert.Contains("raw native failure", viewModel.VideoFrameTechnicalDetail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SuccessfulMediaReplacement_ClearsPreviousVideoFrameErrorPresentation()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("frame-error-before-replacement.mp4");
+        string imagePath = files.Create("replacement-image.png");
+        TestHarness harness = ReadyVideoHarness();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(
+            path == videoPath ? VideoResult(path) : ImageResult(path!));
+        harness.VideoFrames.Handler = (_, position, _, _) => Task.FromResult(VideoFrameReadResult.Failure(
+            VideoFrameReadStatus.Failed,
+            VideoFrameReadErrorCategory.DecodeFailed,
+            position,
+            "raw old frame message",
+            "raw old frame technical detail"));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+
+        Assert.NotNull(viewModel.VideoFrameErrorPresentation);
+        Assert.True(viewModel.HasVideoFrameError);
+        Assert.Contains("raw old frame", viewModel.VideoFrameTechnicalDetail, StringComparison.Ordinal);
+
+        await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
+
+        Assert.True(viewModel.IsImageSelected);
+        Assert.Null(viewModel.VideoFrameErrorPresentation);
+        Assert.Null(viewModel.VideoFrameTechnicalDetail);
+        Assert.DoesNotContain("old frame", viewModel.VideoFrameStatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("old frame", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.True(viewModel.RenderImageCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task RecoverableMediaInputException_IsNormalizedButProgrammerDefectPropagates()
+    {
+        using TestMediaFiles files = new();
+        string firstPath = files.Create("recoverable-input.mp4");
+        string secondPath = files.Create("programmer-defect.mp4");
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (path, _) => path == firstPath
+            ? Task.FromException<MediaInputResult>(new IOException("controlled filesystem failure"))
+            : Task.FromException<MediaInputResult>(new NullReferenceException("controlled programmer defect"));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([firstPath]);
+
+        ErrorPresentation recoverable = Assert.IsType<ErrorPresentation>(viewModel.MediaInputErrorPresentation);
+        Assert.Equal(ApplicationErrorCode.UnexpectedFailure, recoverable.Code);
+        Assert.Contains("controlled filesystem failure", recoverable.TechnicalDetail, StringComparison.Ordinal);
+        Assert.DoesNotContain("controlled filesystem failure", viewModel.StatusMessage, StringComparison.Ordinal);
+
+        await Assert.ThrowsAsync<NullReferenceException>(() =>
+            viewModel.DropMediaCommand.ExecuteAsync([secondPath]));
+        Assert.DoesNotContain("controlled programmer defect", viewModel.StatusMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1826,6 +1938,72 @@ public sealed class MainWindowVideoPreviewTests
         Assert.True(viewModel.HasVideoArtifact);
         Assert.Equal(cancelled ? RenderWorkflowStatus.Cancelled : RenderWorkflowStatus.Failed, viewModel.WorkflowStatus);
         Assert.Equal("Render Again", viewModel.VideoRenderActionLabel);
+        if (cancelled)
+        {
+            Assert.Null(viewModel.VideoRenderErrorPresentation);
+        }
+        else
+        {
+            ErrorPresentation error = Assert.IsType<ErrorPresentation>(viewModel.VideoRenderErrorPresentation);
+            Assert.Equal(ApplicationErrorCode.VideoRenderFailed, error.Code);
+        }
+    }
+
+    [Theory]
+    [InlineData(VideoExportErrorCategory.DecodeFailed, ApplicationErrorCode.VideoDecodeFailed)]
+    [InlineData(VideoExportErrorCategory.RenderingFailed, ApplicationErrorCode.VideoRenderFailed)]
+    [InlineData(VideoExportErrorCategory.EncoderFailed, ApplicationErrorCode.VideoEncodeFailed)]
+    [InlineData(VideoExportErrorCategory.AudioProbeFailed, ApplicationErrorCode.AudioProbeFailed)]
+    [InlineData(VideoExportErrorCategory.AudioMuxFailed, ApplicationErrorCode.AudioMuxFailed)]
+    [InlineData(VideoExportErrorCategory.OutputFinalizationFailed, ApplicationErrorCode.VideoFinalizationFailed)]
+    public async Task FullVideoPipelineFailureIdentity_ReachesViewModelPresentation(
+        VideoExportErrorCategory category,
+        ApplicationErrorCode expectedCode)
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("pipeline-category.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        PipelineVideoExportService exporter = new(VideoExportResult.Failure(
+            category,
+            "raw pipeline message",
+            "raw pipeline technical detail"));
+        FailureArtifactStore store = new(files.PathFor("managed-pipeline-cache"));
+        ManagedVideoRenderService managedService = new(exporter, store);
+        using MainWindowViewModel viewModel = harness.CreateViewModel(
+            managedVideoRenderService: managedService);
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+
+        ErrorPresentation error = Assert.IsType<ErrorPresentation>(viewModel.VideoRenderErrorPresentation);
+        Assert.Equal(expectedCode, error.Code);
+        Assert.Equal(ErrorPresentationContext.VideoRendering, error.Context);
+        Assert.Contains("raw pipeline message", error.TechnicalDetail);
+        Assert.Contains("raw pipeline technical detail", error.TechnicalDetail);
+        Assert.DoesNotContain("raw pipeline", error.UserMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, exporter.Calls);
+        Assert.Equal(RenderWorkflowStatus.Failed, viewModel.WorkflowStatus);
+        Assert.Null(viewModel.VideoPublicationErrorPresentation);
+    }
+
+    [Fact]
+    public async Task FullVideoPipelineCancellation_DoesNotCreateErrorPresentation()
+    {
+        using TestMediaFiles files = new();
+        string videoPath = files.Create("pipeline-cancelled.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        PipelineVideoExportService exporter = new(VideoExportResult.Cancelled());
+        FailureArtifactStore store = new(files.PathFor("managed-cancel-cache"));
+        ManagedVideoRenderService managedService = new(exporter, store);
+        using MainWindowViewModel viewModel = harness.CreateViewModel(
+            managedVideoRenderService: managedService);
+        await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
+
+        await viewModel.RenderVideoCommand.ExecuteAsync(null);
+
+        Assert.Equal(RenderWorkflowStatus.Cancelled, viewModel.WorkflowStatus);
+        Assert.Null(viewModel.VideoRenderErrorPresentation);
+        Assert.Null(viewModel.VideoPublicationErrorPresentation);
     }
 
     [Fact]
@@ -1911,8 +2089,14 @@ public sealed class MainWindowVideoPreviewTests
         Assert.False(viewModel.IsVideoResultSuccess);
         Assert.True(viewModel.IsVideoResultFailure);
         Assert.Equal("Video Review Unavailable", viewModel.VideoResultTitle);
-        Assert.Equal("codec failure", viewModel.VideoRenderTechnicalDetail);
+        Assert.Contains("Review could not be opened.", viewModel.VideoRenderTechnicalDetail);
+        Assert.Contains("codec failure", viewModel.VideoRenderTechnicalDetail);
         Assert.False(viewModel.ShowRenderedVideoPlayer);
+        ErrorPresentation reviewError = Assert.IsType<ErrorPresentation>(viewModel.VideoReviewErrorPresentation);
+        Assert.Equal(ErrorPresentationContext.SymbolizedPlayback, reviewError.Context);
+        Assert.Equal(ApplicationErrorCode.SymbolizedPlaybackUnavailable, reviewError.Code);
+        Assert.Null(viewModel.VideoRenderErrorPresentation);
+        Assert.Null(viewModel.VideoPublicationErrorPresentation);
     }
 
     [Fact]
@@ -2397,7 +2581,7 @@ public sealed class MainWindowVideoPreviewTests
         Assert.False(vm.IsVideoResultSuccess);
         Assert.False(vm.IsVideoResultWarning);
         Assert.False(vm.IsSymbolizedPreviewStale);
-        Assert.Equal("recovery codec detail", vm.VideoRenderTechnicalDetail);
+        Assert.Contains("recovery codec detail", vm.VideoRenderTechnicalDetail);
         Assert.NotEqual(100, vm.ExportProgress);
         Assert.Equal(2, harness.RenderedVideoPlayer.OpenCalls);
     }
@@ -2485,7 +2669,18 @@ public sealed class MainWindowVideoPreviewTests
         Assert.False(vm.IsVideoResultSuccess);
         Assert.False(vm.IsVideoResultWarning);
         Assert.Contains("Controlled playback failure", vm.VideoRenderTechnicalDetail);
-        if (!cancel) Assert.Contains("render diagnostic", vm.VideoRenderTechnicalDetail);
+        ErrorPresentation reviewError = Assert.IsType<ErrorPresentation>(vm.VideoReviewErrorPresentation);
+        Assert.Equal(ApplicationErrorCode.SymbolizedPlaybackUnavailable, reviewError.Code);
+        if (!cancel)
+        {
+            Assert.Contains("render diagnostic", vm.VideoRenderTechnicalDetail);
+            Assert.Equal(ApplicationErrorCode.VideoRenderFailed, vm.VideoRenderErrorPresentation?.Code);
+        }
+        else
+        {
+            Assert.Null(vm.VideoRenderErrorPresentation);
+        }
+        Assert.Null(vm.VideoPublicationErrorPresentation);
         foreach (string name in new[] { nameof(vm.VideoResultTitle), nameof(vm.VideoResultSummary), nameof(vm.IsVideoResultFailure), nameof(vm.IsVideoResultWarning), nameof(vm.VideoRenderTechnicalDetail) })
         {
             Assert.Contains(name, changes);
@@ -2558,7 +2753,7 @@ public sealed class MainWindowVideoPreviewTests
         Assert.False(harness.RenderedVideoPlayer.IsOpen);
         Assert.True(vm.HasVideoArtifact);
         Assert.Equal("Video Review Unavailable", vm.VideoResultTitle);
-        Assert.Equal("current recovery", vm.VideoRenderTechnicalDetail);
+        Assert.Contains("current recovery", vm.VideoRenderTechnicalDetail);
         Assert.False(vm.IsVideoResultSuccess);
     }
 
@@ -2583,7 +2778,7 @@ public sealed class MainWindowVideoPreviewTests
         Assert.True(harness.RenderedVideoPlayer.IsOpen);
         Assert.False(vm.ShowRenderedVideoReviewError);
         Assert.Equal("Video Render Failed", vm.VideoResultTitle);
-        Assert.Equal("replacement diagnostic", vm.VideoRenderTechnicalDetail);
+        Assert.Contains("replacement diagnostic", vm.VideoRenderTechnicalDetail);
         Assert.True(vm.IsVideoResultFailure);
         Assert.False(vm.IsVideoResultSuccess);
         Assert.False(vm.IsVideoResultWarning);
@@ -3160,6 +3355,9 @@ public sealed class MainWindowVideoPreviewTests
         Assert.False(viewModel.ToggleOriginalVideoPlaybackCommand.CanExecute(null));
         Assert.True(viewModel.PreviewFrameCommand.CanExecute(null));
         Assert.True(viewModel.RenderVideoCommand.CanExecute(null));
+        ErrorPresentation error = Assert.IsType<ErrorPresentation>(viewModel.OriginalPlaybackErrorPresentation);
+        Assert.Equal(ApplicationErrorCode.OriginalPlaybackUnavailable, error.Code);
+        Assert.Equal(ErrorPresentationContext.OriginalPlayback, error.Context);
         Assert.Contains("Frame preview and rendering remain available", viewModel.OriginalVideoPlaybackLimitationMessage);
     }
 
@@ -3316,9 +3514,11 @@ public sealed class MainWindowVideoPreviewTests
         Assert.Same(retainedSymbolized, viewModel.SymbolizedImageSource);
         Assert.Equal(0.5d, viewModel.TimelinePosition, 3);
         Assert.True(viewModel.HasVideoFrameError);
-        Assert.Equal("The requested frame could not be decoded.", viewModel.VideoFrameStatusMessage);
-        Assert.Equal("controlled decoder failure", viewModel.VideoFrameTechnicalDetail);
-        Assert.Equal("The requested frame could not be decoded.", viewModel.StatusMessage);
+        ErrorPresentation error = Assert.IsType<ErrorPresentation>(viewModel.VideoFrameErrorPresentation);
+        Assert.Equal(ApplicationErrorCode.FrameDecodeFailed, error.Code);
+        Assert.Equal("GlyphFrame could not decode this video frame. Try another position or video.", viewModel.VideoFrameStatusMessage);
+        Assert.Contains("controlled decoder failure", viewModel.VideoFrameTechnicalDetail);
+        Assert.Equal(error.UserMessage, viewModel.StatusMessage);
         Assert.False(viewModel.IsVideoFrameLoading);
         Assert.True(viewModel.PreviewFrameCommand.CanExecute(null));
     }
@@ -4011,6 +4211,7 @@ public sealed class MainWindowVideoPreviewTests
             bool allowNullExportStatusPresentationService = false,
             IFolderLauncher? folderLauncher = null,
             bool allowNullFolderLauncher = false,
+            IManagedVideoRenderService? managedVideoRenderService = null,
             IManagedVideoArtifactSession? managedVideoArtifactSession = null,
             bool allowNullManagedVideoArtifactSession = false) => new(
             ApplicationInfo.Phase11B4,
@@ -4020,7 +4221,7 @@ public sealed class MainWindowVideoPreviewTests
             MediaInput,
             allowNull ? videoFrameReader! : videoFrameReader ?? VideoFrames,
             VideoPublications,
-            ManagedVideoRenders,
+            managedVideoRenderService ?? ManagedVideoRenders,
             allowNullManagedVideoArtifactSession
                 ? managedVideoArtifactSession!
                 : managedVideoArtifactSession ?? ManagedArtifacts,
@@ -4037,7 +4238,70 @@ public sealed class MainWindowVideoPreviewTests
             new CharacterPresetProvider(),
             allowNullExportStatusPresentationService
                 ? exportStatusPresentationService!
-                : exportStatusPresentationService ?? ExportStatusPresentation);
+                : exportStatusPresentationService ?? ExportStatusPresentation,
+            new ErrorPresentationService());
+    }
+
+    private sealed class PipelineVideoExportService(VideoExportResult result) : IVideoExportService
+    {
+        public int Calls { get; private set; }
+
+        public Task<VideoExportResult> ExportAsync(
+            VideoExportJob job,
+            CancellationToken cancellationToken = default,
+            IProgress<VideoExportProgress>? progress = null)
+        {
+            Calls++;
+            return Task.FromResult(result);
+        }
+    }
+
+    private sealed class FailureArtifactStore : IManagedVideoArtifactStore
+    {
+        public FailureArtifactStore(string sessionDirectory)
+        {
+            SessionDirectory = sessionDirectory;
+            CacheRoot = Path.GetDirectoryName(sessionDirectory)!;
+            Directory.CreateDirectory(SessionDirectory);
+        }
+
+        public string CacheRoot { get; }
+
+        public string SessionDirectory { get; }
+
+        public ManagedVideoArtifactTarget CreateTarget()
+        {
+            Guid id = Guid.NewGuid();
+            string stem = Path.Combine(SessionDirectory, $"artifact-{id:N}");
+            return new ManagedVideoArtifactTarget(id, "test-session", $"{stem}.pending.mp4", $"{stem}.mp4");
+        }
+
+        public bool OwnsPath(string path) => Path.GetDirectoryName(path) == SessionDirectory;
+
+        public void ValidateCompletedArtifact(ManagedVideoArtifact artifact, bool requireNonEmptyFile) =>
+            throw new NotSupportedException();
+
+        public Task PromoteAsync(ManagedVideoArtifactTarget target, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<ArtifactCleanupResult> DeleteAsync(
+            ManagedVideoArtifactTarget target,
+            CancellationToken cancellationToken = default)
+        {
+            File.Delete(target.PendingPath);
+            File.Delete(target.CompletedPath);
+            return Task.FromResult(new ArtifactCleanupResult(0, []));
+        }
+
+        public Task<ArtifactCleanupResult> DeleteArtifactAsync(
+            ManagedVideoArtifact artifact,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<ArtifactCleanupResult> RecoverOrphansAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<ArtifactCleanupResult> CleanupSessionAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class FakeManagedVideoArtifactSession : IManagedVideoArtifactSession

@@ -4,7 +4,7 @@ GlyphFrame is a Windows desktop application for converting local videos and imag
 
 ## Status
 
-Phase 11B.4 — Publish the Reviewed Video Artifact is complete, including its automated coverage and user-performed publication follow-up checks. It provides the completed Render → Review → Export workflow: video mode exposes independent `Preview Frame` and `Render Video` actions, renders a complete symbolized MP4 with the captured Keep Audio or Remove Audio choice, and opens that managed artifact in Symbolized. `Export Video` in the persistent result panel copies the exact accepted artifact to a chosen destination without rendering, encoding, or muxing again. The transitional direct-export Output card is removed. Phase 11B.5 is also complete: its approved architecture, independent Original and Rendered players, Original-tab controls, orientation correction, runtime FFmpeg-frame fallback, fullscreen, single-audio switching, deterministic paused timestamp transfer, automated coverage, and user-performed interactive validation are in place.
+Phase 11B.4 — Publish the Reviewed Video Artifact is complete, including its automated coverage and user-performed publication follow-up checks. It provides the completed Render → Review → Export workflow: video mode exposes independent `Preview Frame` and `Render Video` actions, renders a complete symbolized MP4 with the captured Keep Audio or Remove Audio choice, and opens that managed artifact in Symbolized. `Export Video` in the persistent result panel copies the exact accepted artifact to a chosen destination without rendering, encoding, or muxing again. The transitional direct-export Output card is removed. Phase 11B.5 is also complete: its approved architecture, independent Original and Rendered players, Original-tab controls, orientation correction, runtime FFmpeg-frame fallback, fullscreen, single-audio switching, deterministic paused timestamp transfer, automated coverage, and user-performed interactive validation are in place. Phase 12A is complete: recoverable failures now use one application-level presentation contract that separates stable error identity, operation context, concise user guidance, and hidden technical diagnostics. Phase 12 as a whole remains in progress.
 
 ## Platform and target framework
 
@@ -84,7 +84,7 @@ Preferences are stored for the current Windows user under `%LocalAppData%\GlyphF
 └── logs\
 ```
 
-The logs directory is prepared for later logging work; Phase 4 does not create fabricated log entries. The persisted defaults are Detailed ASCII, Cascadia Mono at size 10, same-as-source resolution, Light on Dark symbol polarity, PNG image export, and Keep Audio for video. Available accents are Violet, Purple, Blue, Cyan, Emerald, and Rose, with Violet as the default.
+The logs directory is prepared for later logging work; Phase 12A does not write log entries. Local diagnostic logging remains Phase 12C. The persisted defaults are Detailed ASCII, Cascadia Mono at size 10, same-as-source resolution, Light on Dark symbol polarity, PNG image export, and Keep Audio for video. Available accents are Violet, Purple, Blue, Cyan, Emerald, and Rose, with Violet as the default.
 
 Settings are written through a temporary file before replacing `settings.json`. Missing and partial settings use approved defaults, invalid values are normalized, and malformed JSON is preserved as `settings.invalid.json` (or the next numbered name) before recovery.
 
@@ -204,6 +204,14 @@ Tools/ffmpeg/
 
 GlyphFrame resolves these tools relative to the running application directory, never the current working directory. It validates each executable with `-version` asynchronously at startup and caches the result for the session. Settings → Application shows availability, separate FFmpeg and ffprobe versions, the resolved folder, technical details, and a Refresh action. Missing or invalid tools do not prevent the main window from opening. Users do not need to install FFmpeg or modify `PATH`.
 
+## Error presentation
+
+Phase 12A gives recoverable media-input, frame-preview, image render/export, video render/publication, managed-artifact, playback, and bundled-tool failures one application-level presentation policy. Every presentation keeps a stable error code and affected operation, uses catalog-owned user guidance in the existing UI locations, and retains lower-level exception or process diagnostics separately for later diagnostic features. Raw paths, stack traces, HRESULT values, and FFmpeg output are never used as the primary message.
+
+Managed full-video failures retain their originating decoder, renderer, encoder, audio-probe, audio-mux, or finalization category through the review-artifact layer. Reviewed-video publication likewise preserves destination access denial, reliably identified disk-full conditions, destination changes, and generic atomic-publication failures before the application converts them to friendly guidance.
+
+Error state remains scoped to the workflow it affects: an export failure does not replace a retained playback failure, a render retry does not erase publication history, and obsolete operation callbacks cannot overwrite a newer context. Ordinary user cancellation, supersession, unload, and shutdown remain expected workflow outcomes rather than errors. Phase 12A adds no new error panel, telemetry, or local log writes. Technical `Show Details` is deferred to Phase 12B, and local logging and retention policy are deferred to Phase 12C.
+
 ## Documentation
 
 - [GlyphFrame Technical Specification v1.0](docs/GlyphFrame_Technical_Specification_v1.0.md)
@@ -212,7 +220,7 @@ GlyphFrame resolves these tools relative to the running application directory, n
 
 ## Upcoming phases
 
-- Phase 12 then adds expanded friendly-error presentation, technical Show Details, and local logging on top of the final workflow states.
+- Phase 12B adds technical Show Details on top of the Phase 12A presentation contract; Phase 12C adds local diagnostic logging and retention.
 - Later phases cover UI polish, comprehensive testing, and portable packaging.
 
 The technical specification records the detailed phase boundaries. Natural-size review is one media pixel per physical display pixel with scrolling; fullscreen controls stay visible and auto-hide remains deferred. The Original-player backend, runtime fallback, view-level orientation, independent fullscreen, single-audio coordination, paused timestamp comparison, no-proxy decisions, and representative interactive validation are complete. Broader clean-machine and unusual-codec coverage remains future compatibility testing rather than an unfulfilled Phase 11B.5 implementation requirement.

@@ -20,7 +20,8 @@ public sealed class SettingsViewModelFfmpegTests
             new FakeAccentThemeService(),
             new FakeFolderLauncher(),
             new FakeUserDialogService(),
-            null!));
+            null!,
+            new ErrorPresentationService()));
     }
 
     [Fact]
@@ -90,8 +91,15 @@ public sealed class SettingsViewModelFfmpegTests
         Assert.Equal("Unavailable", viewModel.FfmpegAvailability);
         Assert.Equal("Unavailable", viewModel.FfmpegVersion);
         Assert.Equal("9.0-ffprobe-test", viewModel.FfprobeVersion);
-        Assert.Contains("unavailable", viewModel.FfmpegStatusMessage, StringComparison.OrdinalIgnoreCase);
+        ErrorPresentation presentation = Assert.IsType<ErrorPresentation>(viewModel.FfmpegErrorPresentation);
+        Assert.Equal(
+            status == FfmpegToolValidationStatus.Missing
+                ? ApplicationErrorCode.ToolMissing
+                : ApplicationErrorCode.ToolInvalid,
+            presentation.Code);
+        Assert.Equal(presentation.UserMessage, viewModel.FfmpegStatusMessage);
         Assert.DoesNotContain("System.", viewModel.FfmpegStatusMessage, StringComparison.Ordinal);
+        Assert.Contains("current failure technical", presentation.TechnicalDetail);
     }
 
     [Fact]
@@ -134,6 +142,7 @@ public sealed class SettingsViewModelFfmpegTests
         Assert.Equal("Unavailable", viewModel.BundledToolsDirectory);
         Assert.Contains("cancelled", viewModel.FfmpegStatusMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("cancelled", viewModel.FfmpegTechnicalDetails, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(viewModel.FfmpegErrorPresentation);
     }
 
     [Fact]
@@ -150,6 +159,9 @@ public sealed class SettingsViewModelFfmpegTests
         Assert.Equal("Unavailable", viewModel.FfmpegAvailability);
         Assert.DoesNotContain(rawFailure, viewModel.FfmpegStatusMessage, StringComparison.Ordinal);
         Assert.Contains(rawFailure, viewModel.FfmpegTechnicalDetails, StringComparison.Ordinal);
+        ErrorPresentation error = Assert.IsType<ErrorPresentation>(viewModel.FfmpegErrorPresentation);
+        Assert.Equal(ApplicationErrorCode.ToolInvalid, error.Code);
+        Assert.Contains(rawFailure, error.TechnicalDetail, StringComparison.Ordinal);
         Assert.Equal("Unavailable", viewModel.FfmpegVersion);
         Assert.Equal("Unavailable", viewModel.FfprobeVersion);
         Assert.Equal("Unavailable", viewModel.BundledToolsDirectory);
@@ -199,7 +211,8 @@ public sealed class SettingsViewModelFfmpegTests
         new FakeAccentThemeService(),
         new FakeFolderLauncher(),
         new FakeUserDialogService(),
-        validationService);
+        validationService,
+        new ErrorPresentationService());
 
     private static TaskCompletionSource<FfmpegValidationResult> NewPendingValidation() =>
         new(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Phase 11B.4 reviewed-artifact publication and Phase 11B.5 Original playback/tab comparison complete, including representative automated and user-performed interactive validation
+Status: Updated through Phase 12A — Error Presentation Foundation; Phase 12B Show Details and Phase 12C local logging specified
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -1355,7 +1355,7 @@ GlyphFrame must follow these privacy rules:
 - No file upload.
 - No telemetry.
 - No analytics.
-- Logs are stored locally.
+- When Phase 12C logging is implemented, logs are stored locally.
 - Logs must not contain image pixels, video frames, or media content.
 - Temporary files are removed after success, failure, or cancel.
 - Settings are stored locally.
@@ -1378,9 +1378,16 @@ The app must show friendly messages for:
 - Video open, seek, frame decode, timeout, or incomplete binary-frame failure.
 - Encoding error.
 - Audio muxing error.
-- Export cancellation.
 
-Primary UI messages must be user-friendly. Technical details may be available behind `Show Details`.
+Phase 12A implements one immutable application-level presentation contract for recoverable failures. It contains a stable error code, the affected operation context, a non-empty catalog-owned user message, and optional technical detail. Raw exception messages, stack traces, media paths, HRESULT values, FFmpeg/ffprobe stderr, and process diagnostics are retained only as technical detail and must never become the primary message. Mapping is centralized for media input, frame extraction and symbolization, image render/export, full-video rendering, reviewed-artifact publication, managed artifacts, Original and Symbolized playback, and bundled-tool validation.
+
+Managed video-render results preserve an optional originating `VideoExportErrorCategory` only for failures returned by the video pipeline, allowing decoder, renderer, encoder, audio-probe, audio-mux, and finalization identities to survive the managed-artifact boundary. Publication classifies destination access denial, Windows disk-full conditions, destination changes after confirmation, and generic atomic publication/finalization failure while the exception type and native error code remain available; cache and artifact-lifecycle failures do not fabricate a pipeline category.
+
+Error presentations remain independent by workflow context. In particular, media-input, frame-preview, retained playback/review, latest render, and publication failures do not overwrite one another. A recoverable failure must preserve any retained image or video result and its established retry, stale-result, generation, ownership, cleanup, and player-lifetime rules.
+
+Cancellation, request supersession, view unload, and shutdown are expected workflow outcomes, not application errors. They retain their existing state-specific messages and do not create an error presentation. Unexpected exceptions at established recoverable operation boundaries receive safe catalog guidance while their complete exception diagnostics remain available separately. Process-corrupting exceptions such as `OutOfMemoryException`, `StackOverflowException`, and `AccessViolationException` must not be normalized or broadly swallowed.
+
+Phase 12A continues to show only concise friendly text in the existing UI locations. Technical `Show Details` is Phase 12B. Local diagnostic file writing, retention, and rotation are Phase 12C. Phase 12A adds neither logging nor telemetry.
 
 ## 18. Performance Requirements
 
@@ -1710,15 +1717,10 @@ If Original is still opening, the requested comparison timestamp is retained onl
 
 ### Phase 12 - Error Handling
 
-- Friendly errors.
-- Show Details.
-- Local logs.
-- Invalid input.
-- Missing FFmpeg.
-- Write-permission errors.
-- Insufficient disk space.
-- Encoder failures.
-- Overwrite confirmation.
+- **Phase 12A — Error Presentation Foundation (implemented):** immutable error identity/context plus catalog-owned friendly messages and separate hidden technical diagnostics; centralized normalization for input, processing, playback, tool, managed-artifact, and publication failures; independent workflow error contexts; cancellation remains a non-error outcome.
+- **Phase 12B — Show Details (planned):** expose retained technical diagnostics through an explicit details UI and copying workflow without replacing the friendly primary presentation.
+- **Phase 12C — Local Logging (planned):** write privacy-safe local diagnostics with bounded retention and rotation. Do not log media content, decoded frames, or fabricated events.
+- Existing overwrite confirmation remains part of safe publication rather than an error state. Destination conflicts, permission failures, insufficient space, encoder failures, and missing tools use the Phase 12A presentation policy.
 
 ### Phase 13 - UI Polish
 

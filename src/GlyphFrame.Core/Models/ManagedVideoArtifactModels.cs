@@ -39,6 +39,7 @@ public sealed record ManagedVideoRenderJob(
 public sealed record ManagedVideoRenderResult(
     ManagedVideoArtifactStatus Status,
     ManagedVideoArtifactErrorCategory ErrorCategory,
+    VideoExportErrorCategory? PipelineErrorCategory,
     string UserMessage,
     string? TechnicalDetail,
     ManagedVideoArtifact? Artifact)
@@ -48,6 +49,7 @@ public sealed record ManagedVideoRenderResult(
     public static ManagedVideoRenderResult Completed(ManagedVideoArtifact artifact) => new(
         ManagedVideoArtifactStatus.Completed,
         ManagedVideoArtifactErrorCategory.None,
+        null,
         "The managed symbolized video artifact is ready for review.",
         null,
         artifact);
@@ -55,9 +57,11 @@ public sealed record ManagedVideoRenderResult(
     public static ManagedVideoRenderResult Failure(
         ManagedVideoArtifactErrorCategory category,
         string userMessage,
-        string? technicalDetail = null) => new(
+        string? technicalDetail = null,
+        VideoExportErrorCategory? pipelineErrorCategory = null) => new(
         ManagedVideoArtifactStatus.Failed,
         category,
+        pipelineErrorCategory,
         userMessage,
         technicalDetail,
         null);
@@ -65,6 +69,7 @@ public sealed record ManagedVideoRenderResult(
     public static ManagedVideoRenderResult Cancelled() => new(
         ManagedVideoArtifactStatus.Cancelled,
         ManagedVideoArtifactErrorCategory.Cancelled,
+        null,
         "Video rendering was cancelled. No managed artifact was retained.",
         null,
         null);

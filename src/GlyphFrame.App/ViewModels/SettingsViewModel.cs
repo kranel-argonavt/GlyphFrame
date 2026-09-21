@@ -18,6 +18,7 @@ public sealed class SettingsViewModel : ObservableObject
     private readonly IFolderLauncher _folderLauncher;
     private readonly IUserDialogService _dialogService;
     private readonly IFfmpegValidationService _ffmpegValidationService;
+    private readonly IErrorPresentationService _errorPresentationService;
     private AccentPreset _selectedAccentPreset;
     private CharacterPresetOption _selectedCharacterPreset = CharacterPresetOption.Default;
     private string _selectedFontFamily = AppSettingsCatalog.Defaults.DefaultFontFamily;
@@ -36,6 +37,7 @@ public sealed class SettingsViewModel : ObservableObject
     private string _ffprobeVersion = "Unknown";
     private string _bundledToolsDirectory = "Resolving bundled tools path…";
     private string _ffmpegTechnicalDetails = "Validation has not completed yet.";
+    private ErrorPresentation? _ffmpegErrorPresentation;
 
     public SettingsViewModel(
         IApplicationSettingsManager settingsManager,
@@ -43,7 +45,8 @@ public sealed class SettingsViewModel : ObservableObject
         IAccentThemeService themeService,
         IFolderLauncher folderLauncher,
         IUserDialogService dialogService,
-        IFfmpegValidationService ffmpegValidationService)
+        IFfmpegValidationService ffmpegValidationService,
+        IErrorPresentationService errorPresentationService)
     {
         _settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
@@ -51,6 +54,8 @@ public sealed class SettingsViewModel : ObservableObject
         _folderLauncher = folderLauncher ?? throw new ArgumentNullException(nameof(folderLauncher));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _ffmpegValidationService = ffmpegValidationService ?? throw new ArgumentNullException(nameof(ffmpegValidationService));
+        _errorPresentationService = errorPresentationService
+            ?? throw new ArgumentNullException(nameof(errorPresentationService));
 
         SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsBusy);
         CancelCommand = new RelayCommand(Cancel, () => !IsBusy);
@@ -117,6 +122,12 @@ public sealed class SettingsViewModel : ObservableObject
     {
         get => _ffmpegTechnicalDetails;
         private set => SetProperty(ref _ffmpegTechnicalDetails, value);
+    }
+
+    public ErrorPresentation? FfmpegErrorPresentation
+    {
+        get => _ffmpegErrorPresentation;
+        private set => SetProperty(ref _ffmpegErrorPresentation, value);
     }
 
     public bool IsFfmpegChecking
@@ -367,7 +378,18 @@ public sealed class SettingsViewModel : ObservableObject
             FfmpegValidationResult result = await _ffmpegValidationService.ValidateAsync(forceRefresh);
             FfmpegStatusPresentation presentation = FfmpegStatusPresentation.FromValidation(result);
             FfmpegAvailability = presentation.Availability;
-            FfmpegStatusMessage = presentation.Message;
+            FfmpegToolValidationResult? failedTool = new[] { result.Ffmpeg, result.Ffprobe }
+                .FirstOrDefault(tool => !tool.IsAvailable);
+            ErrorPresentation? error = failedTool is null
+                ? null
+                : _errorPresentationService.From(failedTool);
+            FfmpegErrorPresentation = error is null
+                ? null
+                : ErrorPresentation.Create(
+                    error.Code,
+                    error.Context,
+                    presentation.TechnicalDetails);
+            FfmpegStatusMessage = FfmpegErrorPresentation?.UserMessage ?? presentation.Message;
             FfmpegVersion = presentation.FfmpegVersion;
             FfprobeVersion = presentation.FfprobeVersion;
             BundledToolsDirectory = presentation.ToolsDirectory;
@@ -375,18 +397,22 @@ public sealed class SettingsViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
+            FfmpegErrorPresentation = null;
             SetFfmpegUnavailableState(
                 "FFmpeg validation was cancelled. Select Refresh to try again.",
                 "Validation was cancelled before it completed.");
         }
-        catch (Exception exception) when (exception is IOException
-            or UnauthorizedAccessException
-            or System.ComponentModel.Win32Exception
-            or InvalidOperationException)
+        catch (Exception exception) when (_errorPresentationService.IsRecoverable(
+            ErrorPresentationContext.ToolValidation,
+            exception))
         {
+            FfmpegErrorPresentation = _errorPresentationService.FromException(
+                ErrorPresentationContext.ToolValidation,
+                exception);
             SetFfmpegUnavailableState(
-                "GlyphFrame could not validate the bundled FFmpeg tools.",
-                exception.ToString());
+                FfmpegErrorPresentation?.UserMessage
+                    ?? "GlyphFrame could not validate the bundled video tools.",
+                FfmpegErrorPresentation?.TechnicalDetail ?? exception.ToString());
         }
         finally
         {
@@ -403,6 +429,7 @@ public sealed class SettingsViewModel : ObservableObject
         FfprobeVersion = "Checking";
         BundledToolsDirectory = "Resolving bundled tools path…";
         FfmpegTechnicalDetails = "Validation is in progress.";
+        FfmpegErrorPresentation = null;
     }
 
     private void SetFfmpegUnavailableState(string message, string technicalDetails)

@@ -69,7 +69,10 @@ public sealed class ManagedVideoRenderService(
                 return ManagedVideoRenderResult.Failure(
                     ManagedVideoArtifactErrorCategory.RenderFailed,
                     export.UserMessage,
-                    export.TechnicalDetail);
+                    export.TechnicalDetail,
+                    export.Success || export.ErrorCategory is VideoExportErrorCategory.None or VideoExportErrorCategory.Cancelled
+                        ? null
+                        : export.ErrorCategory);
             }
 
             cancellationToken.ThrowIfCancellationRequested();

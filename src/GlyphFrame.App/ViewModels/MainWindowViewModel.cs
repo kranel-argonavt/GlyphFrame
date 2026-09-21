@@ -36,6 +36,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly IFolderLauncher _folderLauncher;
     private readonly ICharacterPresetProvider _presetProvider;
     private readonly IExportStatusPresentationService _exportStatusPresentationService;
+    private readonly IErrorPresentationService _errorPresentationService;
     private readonly SynchronizationContext? _synchronizationContext;
     private readonly DispatcherTimer _exportElapsedTimer;
     private readonly Stopwatch _exportStopwatch = new();
@@ -120,9 +121,15 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private bool _disposed;
     private string? _videoFrameError;
     private string? _videoFrameTechnicalDetail;
-    private string? _videoRenderTechnicalDetail;
     private bool _videoReviewUnavailable;
-    private string? _videoReviewTechnicalDetail;
+    private ErrorPresentation? _mediaInputErrorPresentation;
+    private ErrorPresentation? _videoFrameErrorPresentation;
+    private ErrorPresentation? _imageRenderErrorPresentation;
+    private ErrorPresentation? _imageExportErrorPresentation;
+    private ErrorPresentation? _videoRenderErrorPresentation;
+    private ErrorPresentation? _videoPublicationErrorPresentation;
+    private ErrorPresentation? _videoReviewErrorPresentation;
+    private ErrorPresentation? _originalPlaybackErrorPresentation;
     private readonly SemaphoreSlim _reviewRecoveryGate = new(1, 1);
     private CancellationTokenSource _reviewRecoveryCancellation = new();
     private bool _reviewRecoveryPending;
@@ -158,7 +165,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         IUserDialogService userDialogService,
         IFolderLauncher folderLauncher,
         ICharacterPresetProvider presetProvider,
-        IExportStatusPresentationService exportStatusPresentationService)
+        IExportStatusPresentationService exportStatusPresentationService,
+        IErrorPresentationService errorPresentationService)
     {
         ArgumentNullException.ThrowIfNull(applicationInfo);
         _settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
@@ -185,6 +193,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _presetProvider = presetProvider ?? throw new ArgumentNullException(nameof(presetProvider));
         _exportStatusPresentationService = exportStatusPresentationService
             ?? throw new ArgumentNullException(nameof(exportStatusPresentationService));
+        _errorPresentationService = errorPresentationService
+            ?? throw new ArgumentNullException(nameof(errorPresentationService));
         _synchronizationContext = SynchronizationContext.Current;
         _exportElapsedTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -345,6 +355,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public bool HasMediaInputError => _mediaInputState.Status == MediaInputStatus.Failed;
 
+    public ErrorPresentation? MediaInputErrorPresentation => _mediaInputErrorPresentation;
+
     public bool ShowEmptyPreview => IsNoMediaSelected && !IsLoadingMedia && !HasMediaInputError;
 
     public bool ShowLoadingPreview => IsLoadingMedia;
@@ -363,6 +375,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         ?? (IsVideoFrameLoading ? "Loading the selected video frame locally..." : "Video frame preview is ready.");
 
     public string? VideoFrameTechnicalDetail => _videoFrameTechnicalDetail;
+
+    public ErrorPresentation? VideoFrameErrorPresentation => _videoFrameErrorPresentation;
 
     public bool ShowVideoFrameLoading => IsVideoSelected
         && IsVideoFrameLoading
@@ -494,10 +508,13 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public ImageSource OriginalVideoPlaybackSource => _originalVideoPlayer.PlaybackSource;
 
-    public string OriginalVideoPlaybackLimitationMessage => _originalVideoPlayer.FailureMessage
+    public string OriginalVideoPlaybackLimitationMessage => _originalPlaybackErrorPresentation?.UserMessage
         ?? OriginalVideoPlayer.PlaybackUnavailableMessage;
 
-    public string? OriginalVideoPlaybackTechnicalDetail => _originalVideoPlayer.TechnicalDetail;
+    public string? OriginalVideoPlaybackTechnicalDetail => _originalPlaybackErrorPresentation?.TechnicalDetail
+        ?? _originalVideoPlayer.TechnicalDetail;
+
+    public ErrorPresentation? OriginalPlaybackErrorPresentation => _originalPlaybackErrorPresentation;
 
     public bool ShowRenderedVideoReviewError => IsVideoSelected
         && IsSymbolizedPreviewSelected
@@ -592,7 +609,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             if (_renderWorkflowState.OutcomeOperation == RenderWorkflowOperation.ExportVideo
                 && _renderWorkflowState.Status is RenderWorkflowStatus.Failed or RenderWorkflowStatus.Cancelled)
             {
-                return "Export did not complete. The managed review is retained"
+                string outcome = _renderWorkflowState.Status == RenderWorkflowStatus.Failed
+                    ? _videoPublicationErrorPresentation?.UserMessage ?? "Video export did not complete."
+                    : "Video export was cancelled.";
+                return $"{outcome} The managed review is retained"
                     + (_renderWorkflowState.IsVideoArtifactStale ? " and remains stale." : " and remains current.");
             }
 
@@ -610,9 +630,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
             if (_renderWorkflowState.Status == RenderWorkflowStatus.Failed)
             {
+                string failure = _videoRenderErrorPresentation?.UserMessage
+                    ?? "GlyphFrame could not render the complete video. You can try again.";
                 return HasVideoArtifact
-                    ? "Rendering failed. The previous managed video remains available for review."
-                    : "GlyphFrame could not render the complete video. You can try again.";
+                    ? $"{failure} The previous managed video remains available for review."
+                    : failure;
             }
 
             return _managedVideoArtifactSession.Current is not null
@@ -641,10 +663,25 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         ? FormatAudioOutcomeDescription(artifact.AudioOutcome)
         : null;
 
-    public string? VideoRenderTechnicalDetail => _videoReviewTechnicalDetail is not null
-        && _videoRenderTechnicalDetail is not null
-        ? $"Review: {_videoReviewTechnicalDetail}\nLatest operation: {_videoRenderTechnicalDetail}"
-        : _videoReviewTechnicalDetail ?? _videoRenderTechnicalDetail;
+    public ErrorPresentation? ImageRenderErrorPresentation => _imageRenderErrorPresentation;
+
+    public ErrorPresentation? ImageExportErrorPresentation => _imageExportErrorPresentation;
+
+    public ErrorPresentation? VideoRenderErrorPresentation => _videoRenderErrorPresentation;
+
+    public ErrorPresentation? VideoPublicationErrorPresentation => _videoPublicationErrorPresentation;
+
+    public ErrorPresentation? VideoReviewErrorPresentation => _videoReviewErrorPresentation;
+
+    private ErrorPresentation? CurrentVideoOperationError =>
+        _renderWorkflowState.OutcomeOperation == RenderWorkflowOperation.ExportVideo
+            ? _videoPublicationErrorPresentation
+            : _videoRenderErrorPresentation;
+
+    public string? VideoRenderTechnicalDetail => _videoReviewErrorPresentation?.TechnicalDetail is string review
+        && CurrentVideoOperationError?.TechnicalDetail is string operation
+        ? $"Review: {review}\nLatest operation: {operation}"
+        : _videoReviewErrorPresentation?.TechnicalDetail ?? CurrentVideoOperationError?.TechnicalDetail;
 
     public bool ShowImageExportControls => HasImageRender;
 
@@ -712,11 +749,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             => "Rendering was cancelled. The original image remains available.",
         RenderWorkflowStatus.Failed
             when _renderWorkflowState.OutcomeOperation == RenderWorkflowOperation.ExportImage
-            => "GlyphFrame could not export the image. The rendered image remains ready to try again.",
+            => $"{_imageExportErrorPresentation?.UserMessage ?? "GlyphFrame could not export the image."} The rendered image remains ready to try again.",
         RenderWorkflowStatus.Failed when HasImageRender
-            => "GlyphFrame could not render the image. Your previous rendered image is still available.",
+            => $"{_imageRenderErrorPresentation?.UserMessage ?? "GlyphFrame could not render the image."} Your previous rendered image is still available.",
         RenderWorkflowStatus.Failed
-            => "GlyphFrame could not render this image. You can try again.",
+            => _imageRenderErrorPresentation?.UserMessage ?? "GlyphFrame could not render this image. You can try again.",
         _ => string.IsNullOrWhiteSpace(_lastGridSummary)
             ? "The symbolized image is ready for review and export."
             : "Ready for review and export."
@@ -918,7 +955,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         MediaInputStatus.VideoSelected when HasVideoFrameError => VideoFrameStatusMessage,
         MediaInputStatus.VideoSelected when HasVideoFrame => "Video metadata and the current preview frame are ready.",
         MediaInputStatus.VideoSelected => "Video metadata loaded. Choose a position to retry the frame preview.",
-        MediaInputStatus.Failed => _mediaInputState.LastFailure?.UserMessage ?? "GlyphFrame could not read this media.",
+        MediaInputStatus.Failed => _mediaInputErrorPresentation?.UserMessage
+            ?? "GlyphFrame could not read this media. Choose another file and try again.",
         _ => "Browse or drop one supported image or video."
     };
 
@@ -1225,10 +1263,30 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         long requestId = Interlocked.Increment(ref _mediaRequestId);
         _pendingFilePath = path;
+        _mediaInputErrorPresentation = null;
         ApplyMediaInputState(_mediaInputState.BeginLoading(requestId, GetSafeFileName(path)));
         StatusMessage = $"Validating {GetSafeFileName(path)} locally...";
 
-        MediaInputResult result = await _mediaInputService.LoadAsync(path, cancellation.Token);
+        MediaInputResult result;
+        try
+        {
+            result = await _mediaInputService.LoadAsync(path, cancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            result = MediaInputResult.Failure(
+                MediaInputErrorCategory.Cancelled,
+                "Media loading was cancelled.");
+        }
+        catch (Exception exception) when (_errorPresentationService.IsRecoverable(
+            ErrorPresentationContext.MediaInput,
+            exception))
+        {
+            result = MediaInputResult.Failure(
+                MediaInputErrorCategory.UnexpectedFailure,
+                "GlyphFrame could not read the selected media.",
+                exception.ToString());
+        }
         DecodedImage? decodedImage = null;
 
         if (result.Success && result.ImageMetadata is not null)
@@ -1254,6 +1312,15 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                     exception.UserMessage,
                     exception.TechnicalDetail);
             }
+            catch (Exception exception) when (_errorPresentationService.IsRecoverable(
+                ErrorPresentationContext.MediaInput,
+                exception))
+            {
+                result = MediaInputResult.Failure(
+                    MediaInputErrorCategory.InvalidImage,
+                    "GlyphFrame could not decode the selected image.",
+                    exception.ToString());
+            }
         }
 
         MediaInputState completed = _mediaInputState.Complete(requestId, result);
@@ -1271,6 +1338,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         if (!result.Success)
         {
+            _mediaInputErrorPresentation = _errorPresentationService.From(result);
             ApplyMediaInputState(completed);
         }
 
@@ -1293,9 +1361,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             PreviewMode = PreviewMode.Original;
             _lastVideoExportPath = null;
             _lastVideoExportArtifactId = null;
-            _videoRenderTechnicalDetail = null;
+            _mediaInputErrorPresentation = null;
+            _imageRenderErrorPresentation = null;
+            _imageExportErrorPresentation = null;
+            _videoRenderErrorPresentation = null;
+            _videoPublicationErrorPresentation = null;
             _videoReviewUnavailable = false;
-            _videoReviewTechnicalDetail = null;
+            _videoReviewErrorPresentation = null;
+            _originalPlaybackErrorPresentation = null;
             _renderWorkflowState = _renderWorkflowState.SelectMedia(
                 result.MediaType,
                 requestId,
@@ -1341,7 +1414,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
         else if (result.ErrorCategory != MediaInputErrorCategory.Cancelled)
         {
-            StatusMessage = result.UserMessage;
+            StatusMessage = _mediaInputErrorPresentation?.UserMessage
+                ?? "GlyphFrame could not read this media. Choose another file and try again.";
         }
     }
 
@@ -1381,6 +1455,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
             if (result.IsReady)
             {
+                _originalPlaybackErrorPresentation = null;
                 if (!TryApplyPendingOriginalComparison(metadata, mediaVersion, generation))
                 {
                     _originalVideoPlayer.Seek(resumePosition);
@@ -1389,22 +1464,28 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             }
             else if (result.Outcome == OriginalVideoOpenOutcome.FallbackRequired)
             {
-                StatusMessage = result.UserMessage;
+                _originalPlaybackErrorPresentation = _errorPresentationService.PlaybackFailure(
+                    ErrorPresentationContext.OriginalPlayback,
+                    result.UserMessage,
+                    result.TechnicalDetail);
+                StatusMessage = _originalPlaybackErrorPresentation.UserMessage;
                 await ApplyPendingOriginalFallbackAsync(metadata, mediaVersion, generation);
             }
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
         }
-        catch (Exception exception) when (exception is IOException
-            or UnauthorizedAccessException
-            or ArgumentException
-            or InvalidOperationException
-            or NotSupportedException)
+        catch (Exception exception) when (_errorPresentationService.IsRecoverable(
+            ErrorPresentationContext.OriginalPlayback,
+            exception))
         {
             if (IsCurrentOriginalVideoOpen(metadata, mediaVersion, generation, cancellation))
             {
-                StatusMessage = OriginalVideoPlayer.PlaybackUnavailableMessage;
+                _originalPlaybackErrorPresentation = _errorPresentationService.PlaybackFailure(
+                    ErrorPresentationContext.OriginalPlayback,
+                    OriginalVideoPlayer.PlaybackUnavailableMessage,
+                    exception.ToString());
+                StatusMessage = _originalPlaybackErrorPresentation.UserMessage;
             }
         }
         finally
@@ -1474,6 +1555,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _renderWorkflowState = _renderWorkflowState.SourceChanged();
         _videoFrameError = null;
         _videoFrameTechnicalDetail = null;
+        _videoFrameErrorPresentation = null;
         IsVideoFrameLoading = true;
         PreviewMode = PreviewMode.Original;
         StatusMessage = $"Loading video frame at {normalizedPosition:P0}...";
@@ -1525,6 +1607,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 _resolvedVideoFrameIndex = result.ActualFrameIndex;
                 _videoFrameError = null;
                 _videoFrameTechnicalDetail = null;
+                _videoFrameErrorPresentation = null;
                 SetTimelinePositionSilently(_resolvedVideoPosition);
                 if (!IsExportActive)
                 {
@@ -1551,12 +1634,12 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             }
             else
             {
-                _videoFrameError = result.UserMessage;
-                _videoFrameTechnicalDetail = result.TechnicalDetail;
+                ApplyVideoFrameFailure(_errorPresentationService.From(result));
                 SetTimelinePositionSilently(_resolvedVideoPosition);
                 if (!IsExportActive)
                 {
-                    StatusMessage = result.UserMessage;
+                    StatusMessage = _videoFrameError
+                        ?? "GlyphFrame could not load this video frame. Try another position.";
                 }
             }
         }
@@ -1564,31 +1647,19 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             // A superseded seek is an expected state transition and is not presented as an error.
         }
-        catch (Exception exception) when (exception is IOException
-            or UnauthorizedAccessException
-            or InvalidOperationException)
+        catch (Exception exception) when (_errorPresentationService.IsRecoverable(
+            ErrorPresentationContext.VideoFramePreview,
+            exception))
         {
             if (IsCurrentVideoFrameRequest(requestId, mediaVersion, inputPath))
             {
-                _videoFrameError = "GlyphFrame could not load this video frame.";
-                _videoFrameTechnicalDetail = exception.ToString();
+                ApplyVideoFrameFailure(_errorPresentationService.FromException(
+                    ErrorPresentationContext.VideoFramePreview,
+                    exception));
                 SetTimelinePositionSilently(_resolvedVideoPosition);
                 if (!IsExportActive)
                 {
-                    StatusMessage = _videoFrameError;
-                }
-            }
-        }
-        catch (Exception exception)
-        {
-            if (IsCurrentVideoFrameRequest(requestId, mediaVersion, inputPath))
-            {
-                _videoFrameError = "GlyphFrame could not load this video frame.";
-                _videoFrameTechnicalDetail = exception.ToString();
-                SetTimelinePositionSilently(_resolvedVideoPosition);
-                if (!IsExportActive)
-                {
-                    StatusMessage = _videoFrameError;
+                    StatusMessage = _videoFrameError!;
                 }
             }
         }
@@ -1630,6 +1701,15 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         && IsCurrentVideoFrameRequest(result.RequestId, result.MediaVersion, result.InputPath)
         && ReferenceEquals(result.Frame, _decodedImage)
         && result.Identity == _renderWorkflowState.CurrentIdentity;
+
+    private void ApplyVideoFrameFailure(ErrorPresentation? presentation)
+    {
+        _videoFrameErrorPresentation = presentation ?? ErrorPresentation.Create(
+            ApplicationErrorCode.FrameDecodeFailed,
+            ErrorPresentationContext.VideoFramePreview);
+        _videoFrameError = _videoFrameErrorPresentation.UserMessage;
+        _videoFrameTechnicalDetail = _videoFrameErrorPresentation.TechnicalDetail;
+    }
 
     public void UnloadReviewView()
     {
@@ -1734,8 +1814,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             return false;
         }
-        catch (Exception exception) when (exception is InvalidOperationException
-            or IOException or UnauthorizedAccessException or NotSupportedException)
+        catch (Exception exception) when (_errorPresentationService.IsRecoverable(
+            ErrorPresentationContext.SymbolizedPlayback,
+            exception))
         {
             if (Current())
             {
@@ -1769,13 +1850,16 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private void SetReviewUnavailable(string? detail)
     {
         _videoReviewUnavailable = true;
-        _videoReviewTechnicalDetail = detail;
+        _videoReviewErrorPresentation = _errorPresentationService.PlaybackFailure(
+            ErrorPresentationContext.SymbolizedPlayback,
+            _renderedVideoPlayer.FailureMessage,
+            detail);
     }
 
     private void ClearReviewFailure()
     {
         _videoReviewUnavailable = false;
-        _videoReviewTechnicalDetail = null;
+        _videoReviewErrorPresentation = null;
     }
 
     private Task RenderImageAsync() => RenderCurrentSourceAsync(RenderWorkflowOperation.RenderImage);
@@ -1822,7 +1906,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         if (!File.Exists(metadata.FilePath))
         {
-            StatusMessage = "The selected video no longer exists. Choose the video again to continue.";
+            _videoRenderErrorPresentation = ErrorPresentation.Create(
+                ApplicationErrorCode.InputNotFound,
+                ErrorPresentationContext.VideoRendering);
+            StatusMessage = _videoRenderErrorPresentation.UserMessage;
             return;
         }
 
@@ -1874,8 +1961,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             else if (operationId == _imageOperationId)
             {
                 _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
-                _videoRenderTechnicalDetail = result.TechnicalDetail;
-                StatusMessage = result.UserMessage;
+                _videoRenderErrorPresentation = _errorPresentationService.From(result)
+                    ?? ErrorPresentation.Create(
+                        ApplicationErrorCode.VideoRenderFailed,
+                        ErrorPresentationContext.VideoRendering);
+                StatusMessage = _videoRenderErrorPresentation.UserMessage;
             }
         }
         catch (OperationCanceledException)
@@ -1891,11 +1981,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 StatusMessage = "Video rendering was cancelled. Any previous artifact file is retained.";
             }
         }
-        catch (Exception exception) when (exception is IOException
-            or UnauthorizedAccessException
-            or ArgumentException
-            or InvalidOperationException
-            or NotSupportedException)
+        catch (Exception exception) when (_errorPresentationService.IsRecoverable(
+            ErrorPresentationContext.ManagedArtifact,
+            exception))
         {
             if (candidate is not null)
             {
@@ -1905,8 +1993,12 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             if (operationId == _imageOperationId)
             {
                 _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
-                _videoRenderTechnicalDetail = exception.ToString();
-                StatusMessage = "GlyphFrame could not render the complete video.";
+                _videoRenderErrorPresentation = _errorPresentationService.FromException(
+                    ErrorPresentationContext.ManagedArtifact,
+                    exception) ?? ErrorPresentation.Create(
+                        ApplicationErrorCode.VideoRenderFailed,
+                        ErrorPresentationContext.VideoRendering);
+                StatusMessage = _videoRenderErrorPresentation.UserMessage;
             }
         }
         finally
@@ -1961,8 +2053,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             if (!opened.Success && previous is not null)
             {
                 _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
-                _videoRenderTechnicalDetail = opened.TechnicalDetail;
-                StatusMessage = "The replacement video could not be opened. The previous review is retained.";
+                _videoRenderErrorPresentation = _errorPresentationService.PlaybackFailure(
+                    ErrorPresentationContext.SymbolizedPlayback,
+                    opened.UserMessage,
+                    opened.TechnicalDetail);
+                StatusMessage = _videoRenderErrorPresentation.UserMessage;
                 return false;
             }
 
@@ -2012,13 +2107,15 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
             if (!_renderedVideoPlayer.IsOpen || _renderedVideoPlayer.SourcePath != intended.FilePath)
             {
-                SetReviewUnavailable(_videoReviewTechnicalDetail ?? opened.TechnicalDetail ?? _renderedVideoPlayer.TechnicalDetail);
+                SetReviewUnavailable(_videoReviewErrorPresentation?.TechnicalDetail
+                    ?? opened.TechnicalDetail
+                    ?? _renderedVideoPlayer.TechnicalDetail);
                 StatusMessage = "GlyphFrame could not open the managed video for review.";
                 return false;
             }
 
             ClearReviewFailure();
-            _videoRenderTechnicalDetail = null;
+            _videoRenderErrorPresentation = null;
             if (!valid || _renderWorkflowState.IsVideoArtifactStale)
             {
                 // Settings changed during an asynchronous commit/reopen, not the view lifetime.
@@ -2072,11 +2169,23 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         string? inputPath = imageRender ? ImageMetadata?.FilePath : VideoMetadata?.FilePath;
+        ErrorPresentationContext errorContext = imageRender
+            ? ErrorPresentationContext.ImageRendering
+            : ErrorPresentationContext.FrameSymbolization;
         if (string.IsNullOrWhiteSpace(inputPath) || !File.Exists(inputPath))
         {
-            StatusMessage = imageRender
-                ? "The selected image no longer exists. Choose the image again to continue."
-                : "The selected video no longer exists. Choose the video again to continue.";
+            ErrorPresentation missing = ErrorPresentation.Create(
+                ApplicationErrorCode.InputNotFound,
+                errorContext);
+            if (imageRender)
+            {
+                _imageRenderErrorPresentation = missing;
+            }
+            else
+            {
+                ApplyVideoFrameFailure(missing);
+            }
+            StatusMessage = missing.UserMessage;
             return;
         }
 
@@ -2091,6 +2200,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             operation,
             imageRender ? "Rendering image..." : "Previewing frame...",
             "Measuring glyphs and rendering symbol art");
+        if (imageRender)
+        {
+            _imageRenderErrorPresentation = null;
+        }
+        else
+        {
+            _videoFrameErrorPresentation = null;
+        }
 
         Stopwatch stopwatch = Stopwatch.StartNew();
         ImagePipelineResult? result = null;
@@ -2110,6 +2227,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
             GlyphMetrics glyphMetrics = result.GlyphMetrics;
             ApplyRenderedResult(result, identity, operation);
+            if (imageRender)
+            {
+                _imageRenderErrorPresentation = null;
+            }
+            else
+            {
+                _videoFrameErrorPresentation = null;
+            }
             result = null;
             PreviewMode = PreviewMode.Symbolized;
             ExportProgress = 100;
@@ -2129,27 +2254,64 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             }
         }
         catch (ImageProcessingException exception)
+            when (exception.Category == ImageProcessingErrorCategory.Cancelled)
+        {
+            result?.RenderedImage.Dispose();
+            if (operationId == _imageOperationId)
+            {
+                _renderWorkflowState = _renderWorkflowState.CancelActiveOperation();
+                StatusMessage = imageRender
+                    ? "Image rendering was cancelled. Any previous rendered result remains available."
+                    : "Frame preview was cancelled. The original frame remains available.";
+            }
+        }
+        catch (ImageProcessingException exception)
         {
             result?.RenderedImage.Dispose();
             if (operationId == _imageOperationId)
             {
                 _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
-                StatusMessage = exception.UserMessage;
+                ErrorPresentation presentation = _errorPresentationService.From(
+                    exception,
+                    errorContext)
+                    ?? ErrorPresentation.Create(
+                        imageRender ? ApplicationErrorCode.ImageRenderFailed : ApplicationErrorCode.FrameRenderFailed,
+                        errorContext);
+                if (imageRender)
+                {
+                    _imageRenderErrorPresentation = presentation;
+                }
+                else
+                {
+                    ApplyVideoFrameFailure(presentation);
+                }
+                StatusMessage = presentation.UserMessage;
                 if (!HasSymbolizedPreview)
                 {
                     PreviewMode = PreviewMode.Original;
                 }
             }
         }
-        catch (Exception)
+        catch (Exception exception) when (_errorPresentationService.IsRecoverable(errorContext, exception))
         {
             result?.RenderedImage.Dispose();
             if (operationId == _imageOperationId)
             {
                 _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
-                StatusMessage = imageRender
-                    ? "GlyphFrame could not render this image."
-                    : "GlyphFrame could not generate the symbolized frame.";
+                ErrorPresentation presentation = _errorPresentationService.FromException(
+                    errorContext,
+                    exception) ?? ErrorPresentation.Create(
+                        imageRender ? ApplicationErrorCode.ImageRenderFailed : ApplicationErrorCode.FrameRenderFailed,
+                        errorContext);
+                if (imageRender)
+                {
+                    _imageRenderErrorPresentation = presentation;
+                }
+                else
+                {
+                    ApplyVideoFrameFailure(presentation);
+                }
+                StatusMessage = presentation.UserMessage;
                 if (!HasSymbolizedPreview)
                 {
                     PreviewMode = PreviewMode.Original;
@@ -2173,7 +2335,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
         if (!File.Exists(ImageMetadata.FilePath))
         {
-            StatusMessage = "The selected image no longer exists. Choose the image again to continue.";
+            _imageExportErrorPresentation = ErrorPresentation.Create(
+                ApplicationErrorCode.InputNotFound,
+                ErrorPresentationContext.ImageExport);
+            StatusMessage = _imageExportErrorPresentation.UserMessage;
             return;
         }
 
@@ -2191,13 +2356,19 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             File.Exists(outputPath));
         if (destinationRequirement == ImageExportDestinationRequirement.RejectSourcePath)
         {
-            StatusMessage = "Choose a different output file so the source image is not overwritten.";
+            _imageExportErrorPresentation = ErrorPresentation.Create(
+                ApplicationErrorCode.DestinationConflict,
+                ErrorPresentationContext.ImageExport);
+            StatusMessage = _imageExportErrorPresentation.UserMessage;
             return;
         }
 
         if (destinationRequirement == ImageExportDestinationRequirement.InvalidPath)
         {
-            StatusMessage = "The selected output path is not valid.";
+            _imageExportErrorPresentation = ErrorPresentation.Create(
+                ApplicationErrorCode.DestinationUnavailable,
+                ErrorPresentationContext.ImageExport);
+            StatusMessage = _imageExportErrorPresentation.UserMessage;
             return;
         }
 
@@ -2216,6 +2387,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             RenderWorkflowOperation.ExportImage,
             "Exporting image...",
             $"Encoding {AppSettingsCatalog.GetDisplayName(format)} from the current rendered image");
+        _imageExportErrorPresentation = null;
 
         try
         {
@@ -2232,6 +2404,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             }
 
             _lastImageExportPath = outputPath;
+            _imageExportErrorPresentation = null;
             _renderWorkflowState = _renderWorkflowState.CompleteExport(operationId);
             ExportProgress = 100;
             StatusMessage = $"Symbolized image exported to {Path.GetFileName(outputPath)}.";
@@ -2245,19 +2418,40 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             }
         }
         catch (ImageProcessingException exception)
+            when (exception.Category == ImageProcessingErrorCategory.Cancelled)
         {
             if (operationId == _imageOperationId)
             {
-                _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
-                StatusMessage = exception.UserMessage;
+                _renderWorkflowState = _renderWorkflowState.CancelActiveOperation();
+                StatusMessage = "Image export was cancelled. No partial output was kept.";
             }
         }
-        catch (Exception)
+        catch (ImageProcessingException exception)
         {
             if (operationId == _imageOperationId)
             {
                 _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
-                StatusMessage = "GlyphFrame could not export the image.";
+                _imageExportErrorPresentation = _errorPresentationService.From(
+                    exception,
+                    ErrorPresentationContext.ImageExport) ?? ErrorPresentation.Create(
+                        ApplicationErrorCode.ImageExportFailed,
+                        ErrorPresentationContext.ImageExport);
+                StatusMessage = _imageExportErrorPresentation.UserMessage;
+            }
+        }
+        catch (Exception exception) when (_errorPresentationService.IsRecoverable(
+            ErrorPresentationContext.ImageExport,
+            exception))
+        {
+            if (operationId == _imageOperationId)
+            {
+                _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
+                _imageExportErrorPresentation = _errorPresentationService.FromException(
+                    ErrorPresentationContext.ImageExport,
+                    exception) ?? ErrorPresentation.Create(
+                        ApplicationErrorCode.ImageExportFailed,
+                        ErrorPresentationContext.ImageExport);
+                StatusMessage = _imageExportErrorPresentation.UserMessage;
             }
         }
         finally
@@ -2285,6 +2479,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         // Destination selection is modal; capture and revalidate before beginning async work.
         (long operationId, CancellationToken token) = BeginImageOperation(
             RenderWorkflowOperation.ExportVideo, "Exporting reviewed video...", "Preparing a byte-identical MP4 copy");
+        _videoPublicationErrorPresentation = null;
         bool completed = false;
         try
         {
@@ -2322,13 +2517,13 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            _videoRenderTechnicalDetail = result.TechnicalDetail;
             if (result.Success)
             {
                 // Atomic publication is the commit boundary. A later cancellation cannot undo success.
                 _renderWorkflowState = _renderWorkflowState.CompleteExport(operationId);
                 _lastVideoExportPath = destination.FilePath;
                 _lastVideoExportArtifactId = artifact.ArtifactId;
+                _videoPublicationErrorPresentation = null;
                 ExportStage = VideoExportStage.Completed;
                 ExportProgress = 100;
                 IsExportProgressIndeterminate = false;
@@ -2346,9 +2541,19 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 _renderWorkflowState = result.Status == VideoExportStatus.Cancelled
                     ? _renderWorkflowState.CancelActiveOperation()
                     : _renderWorkflowState.FailActiveOperation(operationId);
-                StatusMessage = result.Status == VideoExportStatus.Cancelled
-                    ? "Video export cancelled. The reviewed video is retained."
-                    : result.UserMessage;
+                if (result.Status == VideoExportStatus.Cancelled)
+                {
+                    StatusMessage = "Video export cancelled. The reviewed video is retained.";
+                }
+                else
+                {
+                    _videoPublicationErrorPresentation = _errorPresentationService.From(
+                        result,
+                        ErrorPresentationContext.VideoPublication) ?? ErrorPresentation.Create(
+                            ApplicationErrorCode.AtomicPublicationFailed,
+                            ErrorPresentationContext.VideoPublication);
+                    StatusMessage = _videoPublicationErrorPresentation.UserMessage;
+                }
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -2359,14 +2564,19 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 StatusMessage = "Video export cancelled. The reviewed video is retained.";
             }
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
-            or ArgumentException or NotSupportedException or InvalidOperationException)
+        catch (Exception exception) when (_errorPresentationService.IsRecoverable(
+            ErrorPresentationContext.VideoPublication,
+            exception))
         {
             if (!_disposed && operationId == _imageOperationId)
             {
-                _videoRenderTechnicalDetail = exception.ToString();
                 _renderWorkflowState = _renderWorkflowState.FailActiveOperation(operationId);
-                StatusMessage = "Could not export the reviewed video. Choose an accessible MP4 destination outside the source and cache.";
+                _videoPublicationErrorPresentation = _errorPresentationService.FromException(
+                    ErrorPresentationContext.VideoPublication,
+                    exception) ?? ErrorPresentation.Create(
+                        ApplicationErrorCode.AtomicPublicationFailed,
+                        ErrorPresentationContext.VideoPublication);
+                StatusMessage = _videoPublicationErrorPresentation.UserMessage;
             }
         }
         finally
@@ -2413,7 +2623,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         long operationId = Interlocked.Increment(ref _imageOperationId);
         _renderWorkflowState = _renderWorkflowState.BeginVideoRender(operationId, identity);
         CancelReviewRecovery();
-        _videoRenderTechnicalDetail = null;
+        _videoRenderErrorPresentation = null;
         BeginOperationPresentation(
             "Rendering video...",
             identity.AudioMode == AudioExportMode.KeepAudio
@@ -2875,13 +3085,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 await _managedVideoArtifactSession.RejectAsync(candidate, CancellationToken.None);
             }
         }
-        catch (Exception exception) when (exception is IOException
-            or UnauthorizedAccessException
-            or ArgumentException
-            or InvalidOperationException
-            or NotSupportedException)
+        catch (Exception exception) when (_errorPresentationService.IsRecoverable(
+            ErrorPresentationContext.ManagedArtifact,
+            exception))
         {
-            _videoRenderTechnicalDetail = exception.ToString();
+            _videoRenderErrorPresentation = ErrorPresentation.Create(
+                ApplicationErrorCode.ArtifactCleanupFailed,
+                ErrorPresentationContext.ManagedArtifact,
+                exception.ToString());
         }
     }
 
@@ -3175,7 +3386,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 && !string.IsNullOrWhiteSpace(_renderedVideoPlayer.FailureMessage))
             {
                 SetReviewUnavailable(_renderedVideoPlayer.TechnicalDetail);
-                StatusMessage = _renderedVideoPlayer.FailureMessage;
+                StatusMessage = _videoReviewErrorPresentation?.UserMessage
+                    ?? "GlyphFrame could not open the rendered video for review. The review file is retained.";
             }
 
             _suppressRenderedVideoSeek = true;
@@ -3228,7 +3440,15 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 && !string.IsNullOrWhiteSpace(_originalVideoPlayer.FailureMessage)
                 && !IsExportActive)
             {
-                StatusMessage = _originalVideoPlayer.FailureMessage;
+                _originalPlaybackErrorPresentation = _errorPresentationService.PlaybackFailure(
+                    ErrorPresentationContext.OriginalPlayback,
+                    _originalVideoPlayer.FailureMessage,
+                    _originalVideoPlayer.TechnicalDetail);
+                StatusMessage = _originalPlaybackErrorPresentation.UserMessage;
+            }
+            else if (_originalVideoPlayer.IsPlaybackReady)
+            {
+                _originalPlaybackErrorPresentation = null;
             }
 
             _suppressOriginalVideoSeek = true;
@@ -3364,8 +3584,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         long requestId = Interlocked.Increment(ref _mediaRequestId);
         MediaInputState loading = _mediaInputState.BeginLoading(requestId, null);
         _pendingFilePath = null;
+        _mediaInputErrorPresentation = _errorPresentationService.From(failure);
         ApplyMediaInputState(loading.Complete(requestId, failure));
-        StatusMessage = failure.UserMessage;
+        StatusMessage = _mediaInputErrorPresentation?.UserMessage
+            ?? "GlyphFrame could not read this media. Choose another file and try again.";
     }
 
     private void ApplyMediaInputState(MediaInputState state)
@@ -3402,9 +3624,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         [
             nameof(CurrentMedia), nameof(ImageMetadata), nameof(VideoMetadata),
             nameof(IsNoMediaSelected), nameof(IsMediaSelected), nameof(IsImageSelected), nameof(IsVideoSelected),
-            nameof(IsLoadingMedia), nameof(HasMediaInputError), nameof(ShowEmptyPreview), nameof(ShowLoadingPreview),
+            nameof(IsLoadingMedia), nameof(HasMediaInputError), nameof(MediaInputErrorPresentation),
+            nameof(ShowEmptyPreview), nameof(ShowLoadingPreview),
             nameof(HasVideoFrame), nameof(IsVideoFrameLoading), nameof(HasVideoFrameError),
-            nameof(VideoFrameStatusMessage), nameof(VideoFrameTechnicalDetail), nameof(ShowVideoFrameLoading),
+            nameof(VideoFrameStatusMessage), nameof(VideoFrameTechnicalDetail), nameof(VideoFrameErrorPresentation),
+            nameof(ShowVideoFrameLoading),
             nameof(ShowVideoFrameError), nameof(ShowMediaPlaceholder), nameof(ShowImagePreview),
             nameof(ShowErrorPreview), nameof(IsBrowseMediaAvailable), nameof(IsVideoSeekEnabled),
             nameof(AreSettingsEnabled), nameof(InputLabel), nameof(PreviewFrameActionLabel),
@@ -3423,7 +3647,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(IsOriginalVideoPlaybackOpening), nameof(IsOriginalVideoPlaybackReady),
             nameof(IsOriginalVideoPlaybackFallback), nameof(ShowOriginalVideoPlayer),
             nameof(ShowOriginalPlaybackOpening), nameof(ShowOriginalPlaybackFallback),
-            nameof(OriginalVideoPlaybackLimitationMessage), nameof(OriginalVideoPlaybackTechnicalDetail)
+            nameof(OriginalVideoPlaybackLimitationMessage), nameof(OriginalVideoPlaybackTechnicalDetail),
+            nameof(OriginalPlaybackErrorPresentation)
         ];
 
         foreach (string propertyName in propertyNames)
@@ -3465,6 +3690,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ImageExportActionLabel));
         OnPropertyChanged(nameof(ImageResultTitle));
         OnPropertyChanged(nameof(ImageResultSummary));
+        OnPropertyChanged(nameof(ImageRenderErrorPresentation));
+        OnPropertyChanged(nameof(ImageExportErrorPresentation));
         OnPropertyChanged(nameof(PreviewStaleMessage));
         NotifyCommandStates();
     }
@@ -3477,6 +3704,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(WorkflowStatus), nameof(ShowVideoResultPanel), nameof(IsVideoResultSuccess),
             nameof(IsVideoResultWarning), nameof(IsVideoResultFailure), nameof(VideoRenderActionLabel),
             nameof(VideoResultTitle), nameof(VideoResultSummary), nameof(VideoRenderTechnicalDetail),
+            nameof(VideoRenderErrorPresentation), nameof(VideoPublicationErrorPresentation),
+            nameof(VideoReviewErrorPresentation),
             nameof(ShowVideoRenderMetrics), nameof(VideoRenderedFrameCountText), nameof(VideoOutputDimensionsText),
             nameof(VideoAudioOutcomeText), nameof(VideoAudioOutcomeDescription),
             nameof(HasVideoExportDestination), nameof(VideoExportDestinationText), nameof(VideoExportActionLabel), nameof(CanOpenExportFolder),
@@ -3528,7 +3757,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(IsOriginalVideoPlaybackFallback), nameof(ShowOriginalVideoPlayer),
             nameof(ShowOriginalPlaybackOpening), nameof(ShowOriginalPlaybackFallback),
             nameof(OriginalVideoPlaybackSource), nameof(OriginalVideoPlaybackLimitationMessage),
-            nameof(OriginalVideoPlaybackTechnicalDetail), nameof(OriginalVideoPlaybackActionLabel),
+            nameof(OriginalVideoPlaybackTechnicalDetail), nameof(OriginalPlaybackErrorPresentation),
+            nameof(OriginalVideoPlaybackActionLabel),
             nameof(OriginalVideoMuteActionLabel), nameof(IsOriginalVideoPlaying),
             nameof(IsOriginalVideoMuted), nameof(ShowOriginalVideoReplay),
             nameof(OriginalVideoPixelWidth), nameof(OriginalVideoPixelHeight),
@@ -3556,7 +3786,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         string[] propertyNames =
         [
             nameof(HasVideoFrame), nameof(IsVideoFrameLoading), nameof(HasVideoFrameError),
-            nameof(VideoFrameStatusMessage), nameof(VideoFrameTechnicalDetail),
+            nameof(VideoFrameStatusMessage), nameof(VideoFrameTechnicalDetail), nameof(VideoFrameErrorPresentation),
             nameof(ShowVideoFrameLoading), nameof(ShowVideoFrameError), nameof(ShowMediaPlaceholder),
             nameof(ShowImagePreview), nameof(IsVideoSeekEnabled), nameof(AreSettingsEnabled),
             nameof(InputStatusMessage), nameof(TimelineText), nameof(VideoFramePositionText),
@@ -3667,6 +3897,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _resolvedVideoFrameIdentity = null;
         _videoFrameError = null;
         _videoFrameTechnicalDetail = null;
+        _videoFrameErrorPresentation = null;
         SetTimelinePositionSilently(0d);
         NotifyVideoFrameProperties();
     }

@@ -90,6 +90,7 @@ public sealed class ManagedVideoRenderServiceTests
             CreateJob(data, AudioExportMode.RemoveAudio));
 
         Assert.Equal(ManagedVideoArtifactStatus.Failed, failed.Status);
+        Assert.Equal(VideoExportErrorCategory.EncoderFailed, failed.PipelineErrorCategory);
         Assert.Empty(Directory.EnumerateFiles(store.SessionDirectory, "*.mp4"));
 
         exporter.Handler = async (job, _, _) =>
@@ -101,11 +102,13 @@ public sealed class ManagedVideoRenderServiceTests
             CreateJob(data, AudioExportMode.RemoveAudio));
 
         Assert.Equal(ManagedVideoArtifactStatus.Cancelled, cancelled.Status);
+        Assert.Null(cancelled.PipelineErrorCategory);
         Assert.Empty(Directory.EnumerateFiles(store.SessionDirectory, "*.mp4"));
     }
 
     [Theory]
     [InlineData(VideoExportErrorCategory.DecodeFailed)]
+    [InlineData(VideoExportErrorCategory.RenderingFailed)]
     [InlineData(VideoExportErrorCategory.EncoderFailed)]
     [InlineData(VideoExportErrorCategory.AudioProbeFailed)]
     [InlineData(VideoExportErrorCategory.AudioMuxFailed)]
@@ -128,6 +131,7 @@ public sealed class ManagedVideoRenderServiceTests
 
         Assert.Equal(ManagedVideoArtifactStatus.Failed, result.Status);
         Assert.Equal(ManagedVideoArtifactErrorCategory.RenderFailed, result.ErrorCategory);
+        Assert.Equal(exportCategory, result.PipelineErrorCategory);
         Assert.Empty(Directory.EnumerateFiles(store.SessionDirectory, "*.mp4"));
     }
 

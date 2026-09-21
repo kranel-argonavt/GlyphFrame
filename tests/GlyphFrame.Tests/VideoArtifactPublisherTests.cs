@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using GlyphFrame.Core.Enums;
 using GlyphFrame.Core.Models;
@@ -58,8 +59,60 @@ public sealed class VideoArtifactPublisherTests
         fixture.Publisher.BeforeCommit = _ => File.WriteAllBytesAsync(output, [9, 9]);
         VideoExportResult result = await fixture.Publish(output, overwrite: true);
         Assert.False(result.Success);
+        Assert.Equal(VideoExportErrorCategory.DestinationConflict, result.ErrorCategory);
         Assert.Equal(new byte[] { 9, 9 }, await File.ReadAllBytesAsync(output));
         fixture.AssertNoPartials();
+    }
+
+    [Theory]
+    [InlineData("access", VideoExportErrorCategory.DestinationAccessDenied)]
+    [InlineData("win32-access", VideoExportErrorCategory.DestinationAccessDenied)]
+    [InlineData("disk", VideoExportErrorCategory.InsufficientDiskSpace)]
+    [InlineData("atomic", VideoExportErrorCategory.OutputFinalizationFailed)]
+    public async Task PublicationFailures_PreserveFilesystemIdentityAndHideRawText(
+        string failure,
+        VideoExportErrorCategory expectedCategory)
+    {
+        using Fixture fixture = new();
+        string output = fixture.Output($"{failure}.mp4");
+        const string raw = "controlled publication diagnostic";
+        fixture.Publisher.BeforeCommit = _ => Task.FromException(failure switch
+        {
+            "access" => new UnauthorizedAccessException(raw),
+            "win32-access" => new Win32Exception(5, raw),
+            "disk" => new ControlledIOException(raw, unchecked((int)0x80070070)),
+            _ => new InvalidOperationException(raw)
+        });
+
+        VideoExportResult result = await fixture.Publish(output);
+
+        Assert.Equal(expectedCategory, result.ErrorCategory);
+        Assert.Contains(raw, result.TechnicalDetail, StringComparison.Ordinal);
+        Assert.DoesNotContain(raw, result.UserMessage, StringComparison.Ordinal);
+        Assert.False(File.Exists(output));
+        Assert.True(File.Exists(fixture.Artifact.FilePath));
+        fixture.AssertNoPartials();
+    }
+
+    [Fact]
+    public async Task ClassifiedFailure_RemainsAccurateWhenOwnedPartialCleanupAlsoFails()
+    {
+        using Fixture fixture = new();
+        string output = fixture.Output("access-with-cleanup-debt.mp4");
+        fixture.Publisher.BeforeCommit = _ => Task.FromException(
+            new UnauthorizedAccessException("controlled access failure"));
+        fixture.Publisher.FailCleanup = true;
+
+        VideoExportResult result = await fixture.Publish(output);
+
+        Assert.Equal(VideoExportErrorCategory.DestinationAccessDenied, result.ErrorCategory);
+        string incomplete = Assert.IsType<string>(result.IncompleteOutputPath);
+        Assert.Contains("controlled access failure", result.TechnicalDetail, StringComparison.Ordinal);
+        Assert.Contains("Owned incomplete file:", result.TechnicalDetail, StringComparison.Ordinal);
+        Assert.True(File.Exists(incomplete));
+        Assert.True(File.Exists(fixture.Artifact.FilePath));
+        Assert.False(File.Exists(output));
+        File.Delete(incomplete); // explicitly test-owned, recorded cleanup debt
     }
 
     [Theory]
@@ -201,6 +254,15 @@ public sealed class VideoArtifactPublisherTests
     private sealed class Observer(Action<VideoExportProgress> callback) : IProgress<VideoExportProgress>
     {
         public void Report(VideoExportProgress value) => callback(value);
+    }
+
+    private sealed class ControlledIOException : IOException
+    {
+        public ControlledIOException(string message, int hResult)
+            : base(message)
+        {
+            HResult = hResult;
+        }
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]

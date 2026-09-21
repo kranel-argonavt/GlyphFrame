@@ -124,6 +124,7 @@ public partial class App : Application
         services.AddSingleton<IImageSaveDialogService, ImageSaveDialogService>();
         services.AddSingleton<IImageSourceFactory, WpfImageSourceFactory>();
         services.AddSingleton<IExportStatusPresentationService, ExportStatusPresentationService>();
+        services.AddSingleton<IErrorPresentationService, ErrorPresentationService>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
     }

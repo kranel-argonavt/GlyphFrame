@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -14,6 +15,9 @@ namespace GlyphFrame.Infrastructure.Media;
 public class VideoArtifactPublisher(IManagedVideoArtifactStore store) : IVideoArtifactPublisher
 {
     private const int BufferSize = 128 * 1024;
+    private const int ErrorDiskFull = 0x70;
+    private const int ErrorHandleDiskFull = 0x27;
+    private const int ErrorAccessDenied = 0x05;
 
     public Task<VideoPublicationDestination> PrepareAsync(string outputPath, string originalInputPath,
         CancellationToken cancellationToken = default) => Task.Run(async () =>
@@ -88,9 +92,9 @@ public class VideoArtifactPublisher(IManagedVideoArtifactStore store) : IVideoAr
             result = VideoExportResult.Cancelled();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
-            or ArgumentException or NotSupportedException or InvalidOperationException)
+            or ArgumentException or NotSupportedException or InvalidOperationException or Win32Exception)
         {
-            result = VideoExportResult.Failure(VideoExportErrorCategory.OutputFinalizationFailed,
+            result = VideoExportResult.Failure(ClassifyPublicationFailure(exception),
                 "Could not export the reviewed video. Check available space, file access, and choose the destination again.",
                 exception.ToString());
         }
@@ -103,7 +107,10 @@ public class VideoArtifactPublisher(IManagedVideoArtifactStore store) : IVideoAr
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
-                result = VideoExportResult.Failure(VideoExportErrorCategory.OutputFinalizationFailed,
+                VideoExportErrorCategory category = result.Status == VideoExportStatus.Cancelled
+                    ? VideoExportErrorCategory.OutputFinalizationFailed
+                    : result.ErrorCategory;
+                result = VideoExportResult.Failure(category,
                     "Export did not complete and its temporary file could not be removed. Close applications using the destination and try again.",
                     $"{result.TechnicalDetail}\nOwned incomplete file: {partial}\n{exception}") with
                 {
@@ -150,9 +157,27 @@ public class VideoArtifactPublisher(IManagedVideoArtifactStore store) : IVideoAr
         string? version = await ReadVersionAsync(path, token).ConfigureAwait(false);
         if (version != job.Destination.ExistingVersion || (version is not null && !job.Overwrite))
         {
-            throw new IOException("The destination changed or overwrite was not confirmed. Select it again.");
+            throw new DestinationConflictException(
+                "The destination changed or overwrite was not confirmed. Select it again.");
         }
     }
+
+    private static VideoExportErrorCategory ClassifyPublicationFailure(Exception exception) => exception switch
+    {
+        DestinationConflictException => VideoExportErrorCategory.DestinationConflict,
+        UnauthorizedAccessException => VideoExportErrorCategory.DestinationAccessDenied,
+        Win32Exception win32Exception when win32Exception.NativeErrorCode == ErrorAccessDenied
+            => VideoExportErrorCategory.DestinationAccessDenied,
+        IOException ioException when IsDiskFull(ioException.HResult)
+            => VideoExportErrorCategory.InsufficientDiskSpace,
+        Win32Exception win32Exception when IsDiskFull(win32Exception.NativeErrorCode)
+            => VideoExportErrorCategory.InsufficientDiskSpace,
+        _ => VideoExportErrorCategory.OutputFinalizationFailed
+    };
+
+    private static bool IsDiskFull(int errorCode) => (errorCode & 0xFFFF) is ErrorDiskFull or ErrorHandleDiskFull;
+
+    private sealed class DestinationConflictException(string message) : IOException(message);
 
     private string ValidateDestination(string output, string original)
     {
