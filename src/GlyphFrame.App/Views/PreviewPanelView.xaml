@@ -97,12 +97,18 @@
                         BorderThickness="1"
                         CornerRadius="6"
                         Visibility="{Binding ShowOriginalPlaybackFallback, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <TextBlock
-                            MaxWidth="560"
-                            Foreground="{StaticResource SecondaryTextBrush}"
-                            Text="{Binding OriginalVideoPlaybackLimitationMessage}"
-                            TextAlignment="Center"
-                            TextWrapping="Wrap" />
+                        <StackPanel MaxWidth="560">
+                            <TextBlock Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="{Binding OriginalVideoPlaybackLimitationMessage}"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap" />
+                            <Button Margin="0,5,0,0"
+                                    HorizontalAlignment="Center"
+                                    Command="{Binding ShowOriginalPlaybackErrorDetailsCommand}"
+                                    Content="Show Details"
+                                    Style="{StaticResource TextButtonStyle}"
+                                    Visibility="{Binding ShowOriginalPlaybackErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </StackPanel>
                     </Border>
 
                     <Border Margin="18"
@@ -189,6 +195,12 @@
                                        Foreground="{StaticResource ErrorBrush}"
                                        Text="{Binding InputStatusMessage}"
                                        TextWrapping="Wrap" />
+                            <Button Margin="0,8,0,0"
+                                    HorizontalAlignment="Center"
+                                    Command="{Binding ShowMediaInputErrorDetailsCommand}"
+                                    Content="Show Details"
+                                    Style="{StaticResource TextButtonStyle}"
+                                    Visibility="{Binding ShowMediaInputErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             <Button Width="154"
                                     Height="40"
                                     Margin="0,20,0,0"
@@ -250,6 +262,12 @@
                                        Style="{StaticResource MutedTextStyle}"
                                        Text="Move the position slider to retry, or choose another video."
                                        TextWrapping="Wrap" />
+                            <Button Margin="0,8,0,0"
+                                    HorizontalAlignment="Center"
+                                    Command="{Binding ShowVideoFrameErrorDetailsCommand}"
+                                    Content="Show Details"
+                                    Style="{StaticResource TextButtonStyle}"
+                                    Visibility="{Binding ShowVideoFrameErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
                     </Border>
 
@@ -269,6 +287,12 @@
                                        Style="{StaticResource MutedTextStyle}"
                                        Text="The managed artifact is retained. Use Render Again to retry."
                                        TextWrapping="Wrap" />
+                            <Button Margin="0,8,0,0"
+                                    HorizontalAlignment="Center"
+                                    Command="{Binding ShowVideoReviewErrorDetailsCommand}"
+                                    Content="Show Details"
+                                    Style="{StaticResource TextButtonStyle}"
+                                    Visibility="{Binding ShowVideoReviewErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
                     </Border>
 

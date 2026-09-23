@@ -244,6 +244,12 @@
                                                Foreground="{StaticResource SecondaryTextBrush}"
                                                Text="{Binding FfprobeVersion}" />
                                 </Grid>
+                                <Button Margin="0,8,0,0"
+                                        HorizontalAlignment="Left"
+                                        Command="{Binding ShowFfmpegErrorDetailsCommand}"
+                                        Content="Show Details"
+                                        Style="{StaticResource TextButtonStyle}"
+                                        Visibility="{Binding ShowFfmpegErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             </StackPanel>
                         </Border>
 
@@ -254,18 +260,6 @@
                                        TextTrimming="CharacterEllipsis"
                                        ToolTip="{Binding BundledToolsDirectory}" />
                         </Border>
-
-                        <Expander Margin="0,0,0,14"
-                                  Header="Technical details"
-                                  Foreground="{StaticResource SecondaryTextBrush}">
-                            <Border Margin="0,6,0,0" Style="{StaticResource ReadOnlySurfaceStyle}">
-                                <TextBlock FontFamily="Cascadia Mono, Consolas"
-                                           FontSize="11"
-                                           Foreground="{StaticResource MutedTextBrush}"
-                                           Text="{Binding FfmpegTechnicalDetails}"
-                                           TextWrapping="Wrap" />
-                            </Border>
-                        </Expander>
 
                         <Grid>
                             <Grid.ColumnDefinitions>

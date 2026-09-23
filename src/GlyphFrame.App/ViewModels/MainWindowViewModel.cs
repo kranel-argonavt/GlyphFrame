@@ -37,6 +37,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly ICharacterPresetProvider _presetProvider;
     private readonly IExportStatusPresentationService _exportStatusPresentationService;
     private readonly IErrorPresentationService _errorPresentationService;
+    private readonly IErrorDetailsDialogService _errorDetailsDialogService;
     private readonly SynchronizationContext? _synchronizationContext;
     private readonly DispatcherTimer _exportElapsedTimer;
     private readonly Stopwatch _exportStopwatch = new();
@@ -59,6 +60,12 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly RelayCommand _restartOriginalVideoCommand;
     private readonly RelayCommand _toggleOriginalVideoMuteCommand;
     private readonly RelayCommand _originalFullscreenCommand;
+    private readonly RelayCommand _showMediaInputErrorDetailsCommand;
+    private readonly RelayCommand _showVideoFrameErrorDetailsCommand;
+    private readonly RelayCommand _showOriginalPlaybackErrorDetailsCommand;
+    private readonly RelayCommand _showVideoReviewErrorDetailsCommand;
+    private readonly RelayCommand _showImageResultErrorDetailsCommand;
+    private readonly RelayCommand _showVideoResultErrorDetailsCommand;
     private UiPresentationState _presentationState = UiPresentationState.Empty;
     private MediaInputState _mediaInputState = MediaInputState.Empty;
     private RenderWorkflowState _renderWorkflowState = RenderWorkflowState.Empty;
@@ -166,7 +173,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         IFolderLauncher folderLauncher,
         ICharacterPresetProvider presetProvider,
         IExportStatusPresentationService exportStatusPresentationService,
-        IErrorPresentationService errorPresentationService)
+        IErrorPresentationService errorPresentationService,
+        IErrorDetailsDialogService errorDetailsDialogService)
     {
         ArgumentNullException.ThrowIfNull(applicationInfo);
         _settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
@@ -195,6 +203,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             ?? throw new ArgumentNullException(nameof(exportStatusPresentationService));
         _errorPresentationService = errorPresentationService
             ?? throw new ArgumentNullException(nameof(errorPresentationService));
+        _errorDetailsDialogService = errorDetailsDialogService
+            ?? throw new ArgumentNullException(nameof(errorDetailsDialogService));
         _synchronizationContext = SynchronizationContext.Current;
         _exportElapsedTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -263,6 +273,12 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _originalFullscreenCommand = new RelayCommand(
             () => _originalVideoPlayer.ShowFullscreen(SelectedFitMode),
             CanControlOriginalVideo);
+        _showMediaInputErrorDetailsCommand = CreateErrorDetailsCommand(() => _mediaInputErrorPresentation);
+        _showVideoFrameErrorDetailsCommand = CreateErrorDetailsCommand(() => _videoFrameErrorPresentation);
+        _showOriginalPlaybackErrorDetailsCommand = CreateErrorDetailsCommand(() => _originalPlaybackErrorPresentation);
+        _showVideoReviewErrorDetailsCommand = CreateErrorDetailsCommand(() => _videoReviewErrorPresentation);
+        _showImageResultErrorDetailsCommand = CreateErrorDetailsCommand(() => VisibleImageResultErrorPresentation);
+        _showVideoResultErrorDetailsCommand = CreateErrorDetailsCommand(() => VisibleVideoResultErrorPresentation);
 
         AboutCommand = new RelayCommand(
             () => StatusMessage = "GlyphFrame v1.0.0 - local media processing with no telemetry.");
@@ -329,6 +345,18 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public IRelayCommand OriginalFullscreenCommand => _originalFullscreenCommand;
 
+    public IRelayCommand ShowMediaInputErrorDetailsCommand => _showMediaInputErrorDetailsCommand;
+
+    public IRelayCommand ShowVideoFrameErrorDetailsCommand => _showVideoFrameErrorDetailsCommand;
+
+    public IRelayCommand ShowOriginalPlaybackErrorDetailsCommand => _showOriginalPlaybackErrorDetailsCommand;
+
+    public IRelayCommand ShowVideoReviewErrorDetailsCommand => _showVideoReviewErrorDetailsCommand;
+
+    public IRelayCommand ShowImageResultErrorDetailsCommand => _showImageResultErrorDetailsCommand;
+
+    public IRelayCommand ShowVideoResultErrorDetailsCommand => _showVideoResultErrorDetailsCommand;
+
     public IRelayCommand AboutCommand { get; }
 
     public IRelayCommand SettingsCommand { get; }
@@ -357,6 +385,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public ErrorPresentation? MediaInputErrorPresentation => _mediaInputErrorPresentation;
 
+    public bool ShowMediaInputErrorDetails => HasTechnicalDetails(_mediaInputErrorPresentation);
+
     public bool ShowEmptyPreview => IsNoMediaSelected && !IsLoadingMedia && !HasMediaInputError;
 
     public bool ShowLoadingPreview => IsLoadingMedia;
@@ -377,6 +407,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public string? VideoFrameTechnicalDetail => _videoFrameTechnicalDetail;
 
     public ErrorPresentation? VideoFrameErrorPresentation => _videoFrameErrorPresentation;
+
+    public bool ShowVideoFrameErrorDetails => HasTechnicalDetails(_videoFrameErrorPresentation);
 
     public bool ShowVideoFrameLoading => IsVideoSelected
         && IsVideoFrameLoading
@@ -515,6 +547,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         ?? _originalVideoPlayer.TechnicalDetail;
 
     public ErrorPresentation? OriginalPlaybackErrorPresentation => _originalPlaybackErrorPresentation;
+
+    public bool ShowOriginalPlaybackErrorDetails => HasTechnicalDetails(_originalPlaybackErrorPresentation);
 
     public bool ShowRenderedVideoReviewError => IsVideoSelected
         && IsSymbolizedPreviewSelected
@@ -672,6 +706,30 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public ErrorPresentation? VideoPublicationErrorPresentation => _videoPublicationErrorPresentation;
 
     public ErrorPresentation? VideoReviewErrorPresentation => _videoReviewErrorPresentation;
+
+    public bool ShowVideoReviewErrorDetails => HasTechnicalDetails(_videoReviewErrorPresentation);
+
+    private ErrorPresentation? VisibleImageResultErrorPresentation =>
+        _renderWorkflowState.Status == RenderWorkflowStatus.Failed
+            ? _renderWorkflowState.OutcomeOperation == RenderWorkflowOperation.ExportImage
+                ? _imageExportErrorPresentation
+                : _imageRenderErrorPresentation
+            : null;
+
+    private ErrorPresentation? VisibleVideoResultErrorPresentation => _videoReviewUnavailable
+        ? _videoReviewErrorPresentation
+        : _renderWorkflowState.Status == RenderWorkflowStatus.Failed
+            ? _renderWorkflowState.OutcomeOperation switch
+            {
+                RenderWorkflowOperation.ExportVideo => _videoPublicationErrorPresentation,
+                RenderWorkflowOperation.PreviewVideoFrame => _videoFrameErrorPresentation,
+                _ => _videoRenderErrorPresentation
+            }
+            : null;
+
+    public bool ShowImageResultErrorDetails => HasTechnicalDetails(VisibleImageResultErrorPresentation);
+
+    public bool ShowVideoResultErrorDetails => HasTechnicalDetails(VisibleVideoResultErrorPresentation);
 
     private ErrorPresentation? CurrentVideoOperationError =>
         _renderWorkflowState.OutcomeOperation == RenderWorkflowOperation.ExportVideo
@@ -3625,9 +3683,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(CurrentMedia), nameof(ImageMetadata), nameof(VideoMetadata),
             nameof(IsNoMediaSelected), nameof(IsMediaSelected), nameof(IsImageSelected), nameof(IsVideoSelected),
             nameof(IsLoadingMedia), nameof(HasMediaInputError), nameof(MediaInputErrorPresentation),
+            nameof(ShowMediaInputErrorDetails),
             nameof(ShowEmptyPreview), nameof(ShowLoadingPreview),
             nameof(HasVideoFrame), nameof(IsVideoFrameLoading), nameof(HasVideoFrameError),
             nameof(VideoFrameStatusMessage), nameof(VideoFrameTechnicalDetail), nameof(VideoFrameErrorPresentation),
+            nameof(ShowVideoFrameErrorDetails),
             nameof(ShowVideoFrameLoading),
             nameof(ShowVideoFrameError), nameof(ShowMediaPlaceholder), nameof(ShowImagePreview),
             nameof(ShowErrorPreview), nameof(IsBrowseMediaAvailable), nameof(IsVideoSeekEnabled),
@@ -3648,7 +3708,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(IsOriginalVideoPlaybackFallback), nameof(ShowOriginalVideoPlayer),
             nameof(ShowOriginalPlaybackOpening), nameof(ShowOriginalPlaybackFallback),
             nameof(OriginalVideoPlaybackLimitationMessage), nameof(OriginalVideoPlaybackTechnicalDetail),
-            nameof(OriginalPlaybackErrorPresentation)
+            nameof(OriginalPlaybackErrorPresentation), nameof(ShowOriginalPlaybackErrorDetails)
         ];
 
         foreach (string propertyName in propertyNames)
@@ -3692,6 +3752,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ImageResultSummary));
         OnPropertyChanged(nameof(ImageRenderErrorPresentation));
         OnPropertyChanged(nameof(ImageExportErrorPresentation));
+        OnPropertyChanged(nameof(ShowImageResultErrorDetails));
         OnPropertyChanged(nameof(PreviewStaleMessage));
         NotifyCommandStates();
     }
@@ -3705,7 +3766,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(IsVideoResultWarning), nameof(IsVideoResultFailure), nameof(VideoRenderActionLabel),
             nameof(VideoResultTitle), nameof(VideoResultSummary), nameof(VideoRenderTechnicalDetail),
             nameof(VideoRenderErrorPresentation), nameof(VideoPublicationErrorPresentation),
-            nameof(VideoReviewErrorPresentation),
+            nameof(VideoReviewErrorPresentation), nameof(ShowVideoReviewErrorDetails),
+            nameof(ShowVideoResultErrorDetails),
             nameof(ShowVideoRenderMetrics), nameof(VideoRenderedFrameCountText), nameof(VideoOutputDimensionsText),
             nameof(VideoAudioOutcomeText), nameof(VideoAudioOutcomeDescription),
             nameof(HasVideoExportDestination), nameof(VideoExportDestinationText), nameof(VideoExportActionLabel), nameof(CanOpenExportFolder),
@@ -3735,7 +3797,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(IsRenderedVideoPlaying), nameof(IsRenderedVideoMuted), nameof(ShowRenderedVideoReplay),
             nameof(RenderedVideoPixelWidth), nameof(RenderedVideoPixelHeight),
             nameof(RenderedVideoCurrentTimeText), nameof(RenderedVideoTotalTimeText),
-            nameof(ShowMediaPlaceholder)
+            nameof(ShowMediaPlaceholder), nameof(ShowVideoReviewErrorDetails),
+            nameof(ShowVideoResultErrorDetails)
         ];
 
         foreach (string propertyName in propertyNames)
@@ -3758,6 +3821,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(ShowOriginalPlaybackOpening), nameof(ShowOriginalPlaybackFallback),
             nameof(OriginalVideoPlaybackSource), nameof(OriginalVideoPlaybackLimitationMessage),
             nameof(OriginalVideoPlaybackTechnicalDetail), nameof(OriginalPlaybackErrorPresentation),
+            nameof(ShowOriginalPlaybackErrorDetails),
             nameof(OriginalVideoPlaybackActionLabel),
             nameof(OriginalVideoMuteActionLabel), nameof(IsOriginalVideoPlaying),
             nameof(IsOriginalVideoMuted), nameof(ShowOriginalVideoReplay),
@@ -3787,6 +3851,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         [
             nameof(HasVideoFrame), nameof(IsVideoFrameLoading), nameof(HasVideoFrameError),
             nameof(VideoFrameStatusMessage), nameof(VideoFrameTechnicalDetail), nameof(VideoFrameErrorPresentation),
+            nameof(ShowVideoFrameErrorDetails), nameof(ShowVideoResultErrorDetails),
             nameof(ShowVideoFrameLoading), nameof(ShowVideoFrameError), nameof(ShowMediaPlaceholder),
             nameof(ShowImagePreview), nameof(IsVideoSeekEnabled), nameof(AreSettingsEnabled),
             nameof(InputStatusMessage), nameof(TimelineText), nameof(VideoFramePositionText),
@@ -3820,8 +3885,28 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _restartOriginalVideoCommand.NotifyCanExecuteChanged();
         _toggleOriginalVideoMuteCommand.NotifyCanExecuteChanged();
         _originalFullscreenCommand.NotifyCanExecuteChanged();
+        _showMediaInputErrorDetailsCommand.NotifyCanExecuteChanged();
+        _showVideoFrameErrorDetailsCommand.NotifyCanExecuteChanged();
+        _showOriginalPlaybackErrorDetailsCommand.NotifyCanExecuteChanged();
+        _showVideoReviewErrorDetailsCommand.NotifyCanExecuteChanged();
+        _showImageResultErrorDetailsCommand.NotifyCanExecuteChanged();
+        _showVideoResultErrorDetailsCommand.NotifyCanExecuteChanged();
         SettingsCommand.NotifyCanExecuteChanged();
     }
+
+    private RelayCommand CreateErrorDetailsCommand(Func<ErrorPresentation?> currentPresentation) => new(
+        () =>
+        {
+            ErrorPresentation? presentation = currentPresentation();
+            if (HasTechnicalDetails(presentation))
+            {
+                _errorDetailsDialogService.Show(presentation!);
+            }
+        },
+        () => HasTechnicalDetails(currentPresentation()));
+
+    private static bool HasTechnicalDetails(ErrorPresentation? presentation) =>
+        !string.IsNullOrWhiteSpace(presentation?.TechnicalDetail);
 
     private void OnSettingsChanged(object? sender, AppSettings settings)
     {

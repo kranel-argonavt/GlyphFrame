@@ -131,6 +131,12 @@
                                    Style="{StaticResource SecondaryTextStyle}"
                                    Text="{Binding ImageResultSummary}"
                                    TextWrapping="Wrap" />
+                        <Button Margin="0,5,0,0"
+                                HorizontalAlignment="Left"
+                                Command="{Binding ShowImageResultErrorDetailsCommand}"
+                                Content="Show Details"
+                                Style="{StaticResource TextButtonStyle}"
+                                Visibility="{Binding ShowImageResultErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="1"
@@ -256,6 +262,12 @@
                                TextTrimming="CharacterEllipsis"
                                ToolTip="{Binding VideoExportDestinationText}"
                                Visibility="{Binding HasVideoExportDestination, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Button Margin="0,5,0,0"
+                            HorizontalAlignment="Left"
+                            Command="{Binding ShowVideoResultErrorDetailsCommand}"
+                            Content="Show Details"
+                            Style="{StaticResource TextButtonStyle}"
+                            Visibility="{Binding ShowVideoResultErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </StackPanel>
 
                 <StackPanel x:Name="VideoResultActions"

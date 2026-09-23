@@ -19,6 +19,7 @@ public sealed class SettingsViewModel : ObservableObject
     private readonly IUserDialogService _dialogService;
     private readonly IFfmpegValidationService _ffmpegValidationService;
     private readonly IErrorPresentationService _errorPresentationService;
+    private readonly IErrorDetailsDialogService _errorDetailsDialogService;
     private AccentPreset _selectedAccentPreset;
     private CharacterPresetOption _selectedCharacterPreset = CharacterPresetOption.Default;
     private string _selectedFontFamily = AppSettingsCatalog.Defaults.DefaultFontFamily;
@@ -46,7 +47,8 @@ public sealed class SettingsViewModel : ObservableObject
         IFolderLauncher folderLauncher,
         IUserDialogService dialogService,
         IFfmpegValidationService ffmpegValidationService,
-        IErrorPresentationService errorPresentationService)
+        IErrorPresentationService errorPresentationService,
+        IErrorDetailsDialogService errorDetailsDialogService)
     {
         _settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
@@ -56,6 +58,8 @@ public sealed class SettingsViewModel : ObservableObject
         _ffmpegValidationService = ffmpegValidationService ?? throw new ArgumentNullException(nameof(ffmpegValidationService));
         _errorPresentationService = errorPresentationService
             ?? throw new ArgumentNullException(nameof(errorPresentationService));
+        _errorDetailsDialogService = errorDetailsDialogService
+            ?? throw new ArgumentNullException(nameof(errorDetailsDialogService));
 
         SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsBusy);
         CancelCommand = new RelayCommand(Cancel, () => !IsBusy);
@@ -64,6 +68,9 @@ public sealed class SettingsViewModel : ObservableObject
         RefreshFfmpegCommand = new AsyncRelayCommand(
             () => RefreshFfmpegStatusAsync(forceRefresh: true),
             () => !IsFfmpegChecking);
+        ShowFfmpegErrorDetailsCommand = new RelayCommand(
+            OpenFfmpegErrorDetails,
+            () => ShowFfmpegErrorDetails);
     }
 
     public event EventHandler? RequestClose;
@@ -127,8 +134,17 @@ public sealed class SettingsViewModel : ObservableObject
     public ErrorPresentation? FfmpegErrorPresentation
     {
         get => _ffmpegErrorPresentation;
-        private set => SetProperty(ref _ffmpegErrorPresentation, value);
+        private set
+        {
+            if (SetProperty(ref _ffmpegErrorPresentation, value))
+            {
+                OnPropertyChanged(nameof(ShowFfmpegErrorDetails));
+                ShowFfmpegErrorDetailsCommand.NotifyCanExecuteChanged();
+            }
+        }
     }
+
+    public bool ShowFfmpegErrorDetails => !string.IsNullOrWhiteSpace(FfmpegErrorPresentation?.TechnicalDetail);
 
     public bool IsFfmpegChecking
     {
@@ -151,6 +167,8 @@ public sealed class SettingsViewModel : ObservableObject
     public IAsyncRelayCommand OpenLogsFolderCommand { get; }
 
     public IAsyncRelayCommand RefreshFfmpegCommand { get; }
+
+    public IRelayCommand ShowFfmpegErrorDetailsCommand { get; }
 
     public AccentPreset SelectedAccentPreset
     {
@@ -363,6 +381,16 @@ public sealed class SettingsViewModel : ObservableObject
         CancelCommand.NotifyCanExecuteChanged();
         ResetCommand.NotifyCanExecuteChanged();
         OpenLogsFolderCommand.NotifyCanExecuteChanged();
+        ShowFfmpegErrorDetailsCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OpenFfmpegErrorDetails()
+    {
+        ErrorPresentation? presentation = FfmpegErrorPresentation;
+        if (!string.IsNullOrWhiteSpace(presentation?.TechnicalDetail))
+        {
+            _errorDetailsDialogService.Show(presentation);
+        }
     }
 
     private async Task RefreshFfmpegStatusAsync(bool forceRefresh)

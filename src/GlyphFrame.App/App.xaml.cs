@@ -125,6 +125,8 @@ public partial class App : Application
         services.AddSingleton<IImageSourceFactory, WpfImageSourceFactory>();
         services.AddSingleton<IExportStatusPresentationService, ExportStatusPresentationService>();
         services.AddSingleton<IErrorPresentationService, ErrorPresentationService>();
+        services.AddSingleton<IClipboardService, WpfClipboardService>();
+        services.AddSingleton<IErrorDetailsDialogService, ErrorDetailsDialogService>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
     }

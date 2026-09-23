@@ -21,7 +21,8 @@ public sealed class SettingsViewModelFfmpegTests
             new FakeFolderLauncher(),
             new FakeUserDialogService(),
             null!,
-            new ErrorPresentationService()));
+            new ErrorPresentationService(),
+            new FakeErrorDetailsDialogService()));
     }
 
     [Fact]
@@ -74,6 +75,7 @@ public sealed class SettingsViewModelFfmpegTests
         Assert.Contains("ffmpeg technical", viewModel.FfmpegTechnicalDetails, StringComparison.Ordinal);
         Assert.Contains("ffprobe technical", viewModel.FfmpegTechnicalDetails, StringComparison.Ordinal);
         Assert.True(viewModel.RefreshFfmpegCommand.CanExecute(null));
+        Assert.False(viewModel.ShowFfmpegErrorDetailsCommand.CanExecute(null));
     }
 
     [Theory]
@@ -82,7 +84,8 @@ public sealed class SettingsViewModelFfmpegTests
     public async Task InvalidTools_ProduceUnavailableStablePresentation(FfmpegToolValidationStatus status)
     {
         ControlledValidationService validation = new((_, _) => Task.FromResult(UnavailableResult(status)));
-        SettingsViewModel viewModel = CreateViewModel(validation);
+        FakeErrorDetailsDialogService dialogs = new();
+        SettingsViewModel viewModel = CreateViewModel(validation, dialogs);
         Task completed = WaitForPropertyAsync(viewModel, nameof(viewModel.IsFfmpegChecking), () => !viewModel.IsFfmpegChecking);
 
         viewModel.BeginEdit();
@@ -100,6 +103,11 @@ public sealed class SettingsViewModelFfmpegTests
         Assert.Equal(presentation.UserMessage, viewModel.FfmpegStatusMessage);
         Assert.DoesNotContain("System.", viewModel.FfmpegStatusMessage, StringComparison.Ordinal);
         Assert.Contains("current failure technical", presentation.TechnicalDetail);
+        Assert.True(viewModel.ShowFfmpegErrorDetailsCommand.CanExecute(null));
+
+        viewModel.ShowFfmpegErrorDetailsCommand.Execute(null);
+
+        Assert.Same(presentation, dialogs.LastPresentation);
     }
 
     [Fact]
@@ -143,6 +151,7 @@ public sealed class SettingsViewModelFfmpegTests
         Assert.Contains("cancelled", viewModel.FfmpegStatusMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("cancelled", viewModel.FfmpegTechnicalDetails, StringComparison.OrdinalIgnoreCase);
         Assert.Null(viewModel.FfmpegErrorPresentation);
+        Assert.False(viewModel.ShowFfmpegErrorDetailsCommand.CanExecute(null));
     }
 
     [Fact]
@@ -189,6 +198,24 @@ public sealed class SettingsViewModelFfmpegTests
     }
 
     [Fact]
+    public async Task FailedThenSuccessfulRefresh_ClearsToolDetailsAction()
+    {
+        int call = 0;
+        ControlledValidationService validation = new((_, _) => ++call == 1
+            ? Task.FromResult(UnavailableResult(FfmpegToolValidationStatus.Missing))
+            : Task.FromResult(AvailableResult()));
+        SettingsViewModel viewModel = CreateViewModel(validation);
+        viewModel.BeginEdit();
+        Assert.True(viewModel.ShowFfmpegErrorDetailsCommand.CanExecute(null));
+
+        await viewModel.RefreshFfmpegCommand.ExecuteAsync(null);
+
+        Assert.Equal("Available", viewModel.FfmpegAvailability);
+        Assert.Null(viewModel.FfmpegErrorPresentation);
+        Assert.False(viewModel.ShowFfmpegErrorDetailsCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task RepeatedBeginEdit_DoesNotStartDuplicateValidationWhileOneIsRunning()
     {
         TaskCompletionSource<FfmpegValidationResult> pending = NewPendingValidation();
@@ -205,14 +232,17 @@ public sealed class SettingsViewModelFfmpegTests
         await completed;
     }
 
-    private static SettingsViewModel CreateViewModel(IFfmpegValidationService validationService) => new(
+    private static SettingsViewModel CreateViewModel(
+        IFfmpegValidationService validationService,
+        FakeErrorDetailsDialogService? dialogs = null) => new(
         new FakeSettingsManager(),
         new FakeApplicationPaths(),
         new FakeAccentThemeService(),
         new FakeFolderLauncher(),
         new FakeUserDialogService(),
         validationService,
-        new ErrorPresentationService());
+        new ErrorPresentationService(),
+        dialogs ?? new FakeErrorDetailsDialogService());
 
     private static TaskCompletionSource<FfmpegValidationResult> NewPendingValidation() =>
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -363,5 +393,12 @@ public sealed class SettingsViewModelFfmpegTests
     private sealed class FakeUserDialogService : IUserDialogService
     {
         public bool Confirm(string title, string message, string confirmButtonText = "Confirm", string cancelButtonText = "Cancel") => false;
+    }
+
+    private sealed class FakeErrorDetailsDialogService : IErrorDetailsDialogService
+    {
+        public ErrorPresentation? LastPresentation { get; private set; }
+
+        public void Show(ErrorPresentation presentation) => LastPresentation = presentation;
     }
 }

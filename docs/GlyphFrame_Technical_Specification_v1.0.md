@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 12A — Error Presentation Foundation; Phase 12B Show Details and Phase 12C local logging specified
+Status: Updated through Phase 12B — Show Details; Phase 12C local logging specified
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -1387,7 +1387,11 @@ Error presentations remain independent by workflow context. In particular, media
 
 Cancellation, request supersession, view unload, and shutdown are expected workflow outcomes, not application errors. They retain their existing state-specific messages and do not create an error presentation. Unexpected exceptions at established recoverable operation boundaries receive safe catalog guidance while their complete exception diagnostics remain available separately. Process-corrupting exceptions such as `OutOfMemoryException`, `StackOverflowException`, and `AccessViolationException` must not be normalized or broadly swallowed.
 
-Phase 12A continues to show only concise friendly text in the existing UI locations. Technical `Show Details` is Phase 12B. Local diagnostic file writing, retention, and rotation are Phase 12C. Phase 12A adds neither logging nor telemetry.
+Phase 12B keeps concise friendly text as the normal presentation and adds one reusable modal `Error Details` dialog. A context-local `Show Details` action is visible and executable only when the failure currently displayed at that location retains non-empty technical detail. It opens the same immutable `ErrorPresentation` that owns the friendly message; successful retry, replacement, cancellation, supersession, or context reset cannot expose an obsolete presentation, and an unrelated workflow error is never merged into it.
+
+The dialog uses the application theme and active-window ownership, shows the stable application error code, a user-readable operation, friendly message, and scrollable monospaced technical detail, and supports Escape, Close, and explicit `Copy Details`. The copied plain-text report has deterministic code, context, message, and retained-detail fields. Copying is never automatic; expected clipboard contention leaves the dialog open with concise retry guidance and is never reported as success. Bundled-tool validation uses the same dialog through `FfmpegErrorPresentation`; successful tool/path/version information remains in Settings while failed-tool raw diagnostics are no longer exposed through a separate expander.
+
+Phase 12B adds no local diagnostic file writing, telemetry, upload, crash reporting, or automatic clipboard operation. Local logging, retention, and rotation remain Phase 12C.
 
 ## 18. Performance Requirements
 
@@ -1718,7 +1722,7 @@ If Original is still opening, the requested comparison timestamp is retained onl
 ### Phase 12 - Error Handling
 
 - **Phase 12A — Error Presentation Foundation (implemented):** immutable error identity/context plus catalog-owned friendly messages and separate hidden technical diagnostics; centralized normalization for input, processing, playback, tool, managed-artifact, and publication failures; independent workflow error contexts; cancellation remains a non-error outcome.
-- **Phase 12B — Show Details (planned):** expose retained technical diagnostics through an explicit details UI and copying workflow without replacing the friendly primary presentation.
+- **Phase 12B — Show Details (implemented):** one themed, owner-modal details dialog exposes the current context's immutable code, operation, friendly message, and retained technical detail only after explicit user action; deterministic clipboard copying is also explicit, tested through an abstraction, and failure-safe. Error lifetimes and independent workflow contexts remain unchanged.
 - **Phase 12C — Local Logging (planned):** write privacy-safe local diagnostics with bounded retention and rotation. Do not log media content, decoded frames, or fabricated events.
 - Existing overwrite confirmation remains part of safe publication rather than an error state. Destination conflicts, permission failures, insufficient space, encoder failures, and missing tools use the Phase 12A presentation policy.
 
