@@ -17,6 +17,101 @@ namespace GlyphFrame.App.Tests;
 public sealed class MainWindowVideoPreviewTests
 {
     [Fact]
+    public async Task DiagnosticLogging_RecordsOneAcceptedFailurePerAttemptButNotDetailsOrCancellation()
+    {
+        using TestMediaFiles files = new();
+        string path = files.Create("private-source.png");
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (_, _) => Task.FromResult(MediaInputResult.Failure(
+            MediaInputErrorCategory.InvalidImage, "untrusted message", "private diagnostic"));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([path]);
+        Assert.Equal([(ApplicationErrorCode.InvalidImage, ErrorPresentationContext.MediaInput)],
+            harness.Diagnostics.Events);
+        viewModel.ShowMediaInputErrorDetailsCommand.Execute(null);
+        Assert.Single(harness.Diagnostics.Events);
+
+        await viewModel.DropMediaCommand.ExecuteAsync([path]);
+        Assert.Equal(2, harness.Diagnostics.Events.Count);
+
+        harness.MediaInput.Handler = (_, _) => Task.FromResult(MediaInputResult.Failure(
+            MediaInputErrorCategory.Cancelled, "cancelled"));
+        await viewModel.DropMediaCommand.ExecuteAsync([path]);
+        Assert.Equal(2, harness.Diagnostics.Events.Count);
+    }
+
+    [Fact]
+    public async Task DiagnosticLogging_RejectsObsoleteMediaFailure()
+    {
+        using TestMediaFiles files = new();
+        string older = files.Create("older.png");
+        string current = files.Create("current.png");
+        TestHarness harness = new();
+        TaskCompletionSource<MediaInputResult> late = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.MediaInput.Handler = (path, _) => path == older
+            ? late.Task
+            : Task.FromResult(MediaInputResult.Failure(
+                MediaInputErrorCategory.FileNotFound, "current", "current detail"));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        Task obsolete = viewModel.DropMediaCommand.ExecuteAsync([older]);
+        await viewModel.DropMediaCommand.ExecuteAsync([current]);
+        late.SetResult(MediaInputResult.Failure(
+            MediaInputErrorCategory.InvalidImage, "obsolete", "obsolete detail"));
+        await obsolete;
+
+        Assert.Equal([(ApplicationErrorCode.InputNotFound, ErrorPresentationContext.MediaInput)],
+            harness.Diagnostics.Events);
+    }
+
+    [Fact]
+    public async Task DiagnosticLogging_ObsoleteCancellationDoesNotRecordAnotherEvent()
+    {
+        using TestMediaFiles files = new();
+        string older = files.Create("older.png");
+        string current = files.Create("current.png");
+        TestHarness harness = new();
+        TaskCompletionSource<MediaInputResult> late = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.MediaInput.Handler = (path, _) => path == older
+            ? late.Task
+            : Task.FromResult(MediaInputResult.Failure(
+                MediaInputErrorCategory.FileNotFound, "current", "current detail"));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        Task obsolete = viewModel.DropMediaCommand.ExecuteAsync([older]);
+        await viewModel.DropMediaCommand.ExecuteAsync([current]);
+        late.SetResult(MediaInputResult.Failure(MediaInputErrorCategory.Cancelled, "cancelled"));
+        await obsolete;
+
+        Assert.Equal([(ApplicationErrorCode.InputNotFound, ErrorPresentationContext.MediaInput)],
+            harness.Diagnostics.Events);
+    }
+
+    [Fact]
+    public async Task DiagnosticLogging_TwoFailedImageRenderRetriesWithSameContextProduceTwoEvents()
+    {
+        using TestMediaFiles files = new();
+        string path = files.Create("render-source.png");
+        TestHarness harness = ReadyImageHarness();
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([path]);
+        File.Delete(path);
+
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+        Assert.Contains("no longer available", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        viewModel.ShowImageResultErrorDetailsCommand.Execute(null);
+        viewModel.StatusMessage = viewModel.StatusMessage;
+        Assert.Single(harness.Diagnostics.Events);
+
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+        Assert.Equal(2, harness.Diagnostics.Events.Count);
+        Assert.All(harness.Diagnostics.Events, entry => Assert.Equal(
+            (ApplicationErrorCode.InputNotFound, ErrorPresentationContext.ImageRendering), entry));
+        Assert.Equal(0, harness.ImagePipeline.RenderCalls);
+    }
+
+    [Fact]
     public void Constructor_RejectsNullVideoFrameReader()
     {
         TestHarness harness = new();
@@ -1926,6 +2021,34 @@ public sealed class MainWindowVideoPreviewTests
         Assert.Equal(1, harness.ManagedArtifacts.RejectCalls);
         Assert.False(viewModel.HasVideoArtifact);
         Assert.NotEqual(PreviewMode.Symbolized, viewModel.PreviewMode);
+        Assert.DoesNotContain(harness.Diagnostics.Events, entry => entry.Item2 is
+            ErrorPresentationContext.VideoRendering or ErrorPresentationContext.ManagedArtifact);
+    }
+
+    [Fact]
+    public async Task ObsoleteCandidateCleanupFailureCannotPublishOrLogAnOldError()
+    {
+        using TestMediaFiles files = new();
+        string path = files.Create("obsolete-cleanup.mp4");
+        TestHarness harness = ReadyVideoHarness();
+        TaskCompletionSource<ManagedVideoRenderResult> pending = NewCompletion<ManagedVideoRenderResult>();
+        harness.ManagedVideoRenders.Handler = (_, _, _) => pending.Task;
+        harness.ManagedArtifacts.RejectHandler = (_, _) => throw new IOException("private obsolete cleanup");
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([path]);
+
+        Task render = viewModel.RenderVideoCommand.ExecuteAsync(null);
+        await WaitUntilAsync(viewModel, () => harness.ManagedVideoRenders.LastJob is not null);
+        ManagedVideoRenderJob job = harness.ManagedVideoRenders.LastJob!;
+        viewModel.SelectedFontSize = 12;
+        pending.SetResult(ManagedVideoRenderResult.Completed(Artifact(
+            files.PathFor("obsolete-artifact.mp4"), job.Identity)));
+        await render;
+
+        Assert.DoesNotContain(harness.Diagnostics.Events, entry => entry.Item2 is
+            ErrorPresentationContext.VideoRendering or ErrorPresentationContext.ManagedArtifact);
+        Assert.Null(viewModel.VideoRenderErrorPresentation);
+        Assert.False(viewModel.HasVideoArtifact);
     }
 
     [Fact]
@@ -1977,6 +2100,9 @@ public sealed class MainWindowVideoPreviewTests
                 "The replacement render failed."));
 
         await viewModel.RenderVideoCommand.ExecuteAsync(null);
+
+        Assert.Equal(cancelled ? 0 : 1, harness.Diagnostics.Events.Count(entry =>
+            entry.Item2 == ErrorPresentationContext.VideoRendering));
 
         Assert.Same(first, harness.ManagedArtifacts.Current);
         Assert.Equal(firstPath, harness.RenderedVideoPlayer.SourcePath);
@@ -4266,6 +4392,8 @@ public sealed class MainWindowVideoPreviewTests
 
         public FakeErrorDetailsDialogService ErrorDetailsDialogs { get; } = new();
 
+        public FakeDiagnosticLogger Diagnostics { get; } = new();
+
         public MainWindowViewModel CreateViewModel(
             IVideoFrameReader? videoFrameReader = null,
             bool allowNull = false,
@@ -4302,7 +4430,16 @@ public sealed class MainWindowVideoPreviewTests
                 ? exportStatusPresentationService!
                 : exportStatusPresentationService ?? ExportStatusPresentation,
             new ErrorPresentationService(),
-            ErrorDetailsDialogs);
+            ErrorDetailsDialogs,
+            Diagnostics);
+    }
+
+    private sealed class FakeDiagnosticLogger : IApplicationDiagnosticLogger
+    {
+        public List<(ApplicationErrorCode, ErrorPresentationContext)> Events { get; } = [];
+
+        public void Record(ApplicationErrorCode code, ErrorPresentationContext context) =>
+            Events.Add((code, context));
     }
 
     private sealed class FakeErrorDetailsDialogService : IErrorDetailsDialogService

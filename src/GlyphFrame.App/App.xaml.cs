@@ -84,7 +84,11 @@ public partial class App : Application
         services.AddSingleton<IBundledFfmpegLocator, BundledFfmpegLocator>();
         services.AddSingleton<IProcessRunner, ProcessRunner>();
         services.AddSingleton<IBinaryProcessRunner, BinaryProcessRunner>();
-        services.AddSingleton<IFfmpegValidationService, FfmpegValidationService>();
+        services.AddSingleton<FfmpegValidationService>();
+        services.AddSingleton<IFfmpegValidationService>(provider => new LoggedFfmpegValidationService(
+            provider.GetRequiredService<FfmpegValidationService>(),
+            provider.GetRequiredService<IErrorPresentationService>(),
+            provider.GetRequiredService<IApplicationDiagnosticLogger>()));
         services.AddSingleton<MetadataExtractorVideoMetadataReader>();
         services.AddSingleton<IVideoMetadataReader, FfprobeVideoMetadataReader>();
         services.AddSingleton<IVideoFrameReader, FfmpegVideoFrameReader>();
@@ -125,6 +129,7 @@ public partial class App : Application
         services.AddSingleton<IImageSourceFactory, WpfImageSourceFactory>();
         services.AddSingleton<IExportStatusPresentationService, ExportStatusPresentationService>();
         services.AddSingleton<IErrorPresentationService, ErrorPresentationService>();
+        services.AddSingleton<IApplicationDiagnosticLogger, LocalDiagnosticLogger>();
         services.AddSingleton<IClipboardService, WpfClipboardService>();
         services.AddSingleton<IErrorDetailsDialogService, ErrorDetailsDialogService>();
         services.AddSingleton<MainWindowViewModel>();

@@ -12,6 +12,110 @@ namespace GlyphFrame.App.Tests;
 public sealed class SettingsViewModelFfmpegTests
 {
     [Fact]
+    public async Task ToolValidation_LogsAcceptedFailureOnceAndShowDetailsAddsNoEvent()
+    {
+        FfmpegValidationResult cached = UnavailableResult(FfmpegToolValidationStatus.Missing);
+        ControlledValidationService validation = new((refresh, _) => Task.FromResult(
+            refresh ? UnavailableResult(FfmpegToolValidationStatus.Missing) : cached));
+        RecordingDiagnosticLogger logger = new();
+        SettingsViewModel viewModel = CreateViewModel(validation, logger: logger);
+        Task completed = WaitForPropertyAsync(viewModel, nameof(viewModel.IsFfmpegChecking),
+            () => !viewModel.IsFfmpegChecking);
+
+        viewModel.BeginEdit();
+        await completed;
+        Assert.Equal([(ApplicationErrorCode.ToolMissing, ErrorPresentationContext.ToolValidation)],
+            logger.Events);
+        viewModel.ShowFfmpegErrorDetailsCommand.Execute(null);
+        Assert.Single(logger.Events);
+
+        completed = WaitForPropertyAsync(viewModel, nameof(viewModel.IsFfmpegChecking),
+            () => !viewModel.IsFfmpegChecking);
+        viewModel.BeginEdit();
+        await completed;
+        Assert.Single(logger.Events);
+
+        completed = WaitForPropertyAsync(viewModel, nameof(viewModel.IsFfmpegChecking),
+            () => !viewModel.IsFfmpegChecking);
+        await viewModel.RefreshFfmpegCommand.ExecuteAsync(null);
+        await completed;
+        Assert.Equal(2, logger.Events.Count);
+    }
+
+    [Fact]
+    public async Task ToolValidation_StartupAndSettingsConcurrentObserversRecordCachedFailureOnce()
+    {
+        TaskCompletionSource<FfmpegValidationResult> pending = NewPendingValidation();
+        ControlledValidationService backend = new((_, _) => pending.Task);
+        RecordingDiagnosticLogger logger = new();
+        LoggedFfmpegValidationService shared = new(backend, new ErrorPresentationService(), logger);
+        SettingsViewModel viewModel = CreateViewModel(shared);
+
+        Task<FfmpegValidationResult> startup = shared.ValidateAsync();
+        Task completed = WaitForPropertyAsync(viewModel, nameof(viewModel.IsFfmpegChecking),
+            () => !viewModel.IsFfmpegChecking);
+        viewModel.BeginEdit();
+        FfmpegValidationResult cached = UnavailableResult(FfmpegToolValidationStatus.Missing);
+        pending.SetResult(cached);
+        await Task.WhenAll(startup, completed);
+
+        Assert.Single(logger.Events);
+        Assert.Same(cached, await shared.ValidateAsync());
+        Assert.Single(logger.Events);
+    }
+
+    [Fact]
+    public async Task ToolValidation_StartupFailureThenRepeatedSettingsOpeningsRecordOneEvent()
+    {
+        FfmpegValidationResult cached = UnavailableResult(FfmpegToolValidationStatus.Missing);
+        ControlledValidationService backend = new((_, _) => Task.FromResult(cached));
+        RecordingDiagnosticLogger logger = new();
+        LoggedFfmpegValidationService shared = new(backend, new ErrorPresentationService(), logger);
+        await shared.ValidateAsync(); // Startup warm-up observes the failed result first.
+        SettingsViewModel viewModel = CreateViewModel(shared);
+
+        for (int opening = 0; opening < 2; opening++)
+        {
+            Task completed = WaitForPropertyAsync(viewModel, nameof(viewModel.IsFfmpegChecking),
+                () => !viewModel.IsFfmpegChecking);
+            viewModel.BeginEdit();
+            await completed;
+        }
+
+        Assert.Equal(3, backend.CallCount);
+        Assert.Equal([(ApplicationErrorCode.ToolMissing, ErrorPresentationContext.ToolValidation)],
+            logger.Events);
+    }
+
+    [Fact]
+    public async Task ToolValidation_RecoverableExceptionAndRetryAreSeparateAttempts()
+    {
+        ControlledValidationService backend = new((_, _) =>
+            Task.FromException<FfmpegValidationResult>(new IOException("sensitive validation path")));
+        RecordingDiagnosticLogger logger = new();
+        LoggedFfmpegValidationService shared = new(backend, new ErrorPresentationService(), logger);
+
+        await Assert.ThrowsAsync<IOException>(() => shared.ValidateAsync());
+        await Assert.ThrowsAsync<IOException>(() => shared.ValidateAsync(forceRefresh: true));
+
+        Assert.Equal(2, backend.CallCount);
+        Assert.Equal(2, logger.Events.Count);
+        Assert.All(logger.Events, entry => Assert.Equal(ErrorPresentationContext.ToolValidation, entry.Item2));
+    }
+
+    [Fact]
+    public async Task ToolValidation_CancelledAttemptIsNotLogged()
+    {
+        ControlledValidationService backend = new((_, _) =>
+            Task.FromCanceled<FfmpegValidationResult>(new CancellationToken(canceled: true)));
+        RecordingDiagnosticLogger logger = new();
+        LoggedFfmpegValidationService shared = new(backend, new ErrorPresentationService(), logger);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => shared.ValidateAsync());
+        Assert.Empty(logger.Events);
+    }
+
+    [Fact]
     public void Constructor_NullFfmpegValidationServiceThrows()
     {
         Assert.Throws<ArgumentNullException>(() => new SettingsViewModel(
@@ -234,15 +338,26 @@ public sealed class SettingsViewModelFfmpegTests
 
     private static SettingsViewModel CreateViewModel(
         IFfmpegValidationService validationService,
-        FakeErrorDetailsDialogService? dialogs = null) => new(
+        FakeErrorDetailsDialogService? dialogs = null,
+        IApplicationDiagnosticLogger? logger = null) => new(
         new FakeSettingsManager(),
         new FakeApplicationPaths(),
         new FakeAccentThemeService(),
         new FakeFolderLauncher(),
         new FakeUserDialogService(),
-        validationService,
+        logger is null
+            ? validationService
+            : new LoggedFfmpegValidationService(validationService, new ErrorPresentationService(), logger),
         new ErrorPresentationService(),
         dialogs ?? new FakeErrorDetailsDialogService());
+
+    private sealed class RecordingDiagnosticLogger : IApplicationDiagnosticLogger
+    {
+        public List<(ApplicationErrorCode, ErrorPresentationContext)> Events { get; } = [];
+
+        public void Record(ApplicationErrorCode code, ErrorPresentationContext context) =>
+            Events.Add((code, context));
+    }
 
     private static TaskCompletionSource<FfmpegValidationResult> NewPendingValidation() =>
         new(TaskCreationOptions.RunContinuationsAsynchronously);

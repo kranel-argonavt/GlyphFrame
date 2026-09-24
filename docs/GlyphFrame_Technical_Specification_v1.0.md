@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 12B — Show Details; Phase 12C local logging specified
+Status: Updated through Phase 12C — Privacy-Safe Local Diagnostic Logging
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -1355,7 +1355,7 @@ GlyphFrame must follow these privacy rules:
 - No file upload.
 - No telemetry.
 - No analytics.
-- When Phase 12C logging is implemented, logs are stored locally.
+- Phase 12C logs stable error identities and operation contexts locally after accepted recoverable failures.
 - Logs must not contain image pixels, video frames, or media content.
 - Temporary files are removed after success, failure, or cancel.
 - Settings are stored locally.
@@ -1391,7 +1391,11 @@ Phase 12B keeps concise friendly text as the normal presentation and adds one re
 
 The dialog uses the application theme and active-window ownership, shows the stable application error code, a user-readable operation, friendly message, and scrollable monospaced technical detail, and supports Escape, Close, and explicit `Copy Details`. The copied plain-text report has deterministic code, context, message, and retained-detail fields. Copying is never automatic; expected clipboard contention leaves the dialog open with concise retry guidance and is never reported as success. Bundled-tool validation uses the same dialog through `FfmpegErrorPresentation`; successful tool/path/version information remains in Settings while failed-tool raw diagnostics are no longer exposed through a separate expander.
 
-Phase 12B adds no local diagnostic file writing, telemetry, upload, crash reporting, or automatic clipboard operation. Local logging, retention, and rotation remain Phase 12C.
+Phase 12B does not copy automatically, and Phase 12C adds no telemetry, upload, or crash reporting. Full technical details remain in memory for explicit Show Details use and are never persisted by the local logger.
+
+For Phase 12C, local logs live only under `IApplicationPaths.LogsDirectory` (`%LocalAppData%\GlyphFrame\logs`). An individual log file must not exceed 1 MiB (1,048,576 bytes); rotate before an append that would cross that limit. A serialized UTF-8 record, including its line terminator, must not exceed 1 KiB (1,024 bytes); do not write a truncated or malformed record. Retain at most 10 completed files and 10 MiB (10,485,760 bytes) of completed logs, removing the oldest completed files first. Remove completed files whose last write was more than 14 days ago, measured in UTC, even when the count and size limits have not been reached. Apply these limits only to GlyphFrame-owned completed log files. Never delete or modify a file while any GlyphFrame instance is actively writing to it; concurrent active files may temporarily increase total storage beyond the completed-log limits and become eligible for cleanup after they close. Logging and cleanup failures must not change the originating workflow result.
+
+The implemented record is one newline-terminated UTF-8 JSON object with exactly `TimestampUtc` (ISO-8601 UTC), `Code` (`ApplicationErrorCode`), and `Context` (`ErrorPresentationContext`). The application queues these three allowlisted values at explicit current-failure acceptance boundaries, not from status-message or property notifications; a new failed retry records a new event even when its code and context match the previous failure. Repeated notification of one failure, Show Details, cancellation, supersession, success, unload, and shutdown do not create failure entries. Startup and Settings use the same application-level FFmpeg validation observer: the validator's cached result identity is recorded at most once across consumers, while a fresh failed Refresh result or recoverable failed validation attempt records another event. Media-input, frame, image, full-video render, publication, managed-artifact, Original/Symbolized playback, and bundled-tool validation use these boundaries. No `TechnicalDetail`, arbitrary message, path, filename, exception, stack, FFmpeg output, settings value, clipboard content, or media content is serialized. Each process writes a unique `.active` file and renames it to an owned `.log` when complete. Recovery ignores locked live files and removes abandoned active files only when exclusive write access proves no writer remains. File work runs off the UI thread; missing or unwritable storage drops the logging attempt without affecting the original result or recursively logging the failure. Settings retains Open Logs Folder.
 
 ## 18. Performance Requirements
 
@@ -1723,7 +1727,7 @@ If Original is still opening, the requested comparison timestamp is retained onl
 
 - **Phase 12A — Error Presentation Foundation (implemented):** immutable error identity/context plus catalog-owned friendly messages and separate hidden technical diagnostics; centralized normalization for input, processing, playback, tool, managed-artifact, and publication failures; independent workflow error contexts; cancellation remains a non-error outcome.
 - **Phase 12B — Show Details (implemented):** one themed, owner-modal details dialog exposes the current context's immutable code, operation, friendly message, and retained technical detail only after explicit user action; deterministic clipboard copying is also explicit, tested through an abstraction, and failure-safe. Error lifetimes and independent workflow contexts remain unchanged.
-- **Phase 12C — Local Logging (planned):** write privacy-safe local diagnostics with bounded retention and rotation. Do not log media content, decoded frames, or fabricated events.
+- **Phase 12C — Local Logging (implemented):** accepted recoverable failures enqueue only UTC timestamp, stable error code, and operation context for best-effort local logging under the specified 1 MiB per-file, 10 completed files/10 MiB total, 14-day retention, and 1 KiB per-record limits. Concurrent active writers remain protected; no media content, decoded frames, technical details, or fabricated events are logged.
 - Existing overwrite confirmation remains part of safe publication rather than an error state. Destination conflicts, permission failures, insufficient space, encoder failures, and missing tools use the Phase 12A presentation policy.
 
 ### Phase 13 - UI Polish
