@@ -572,6 +572,134 @@ public sealed class ReviewSurfaceTests
         });
     }
 
+    [Theory]
+    [InlineData(590, "ready", true)]
+    [InlineData(750, "ready", false)]
+    [InlineData(590, "stale", true)]
+    [InlineData(750, "stale", false)]
+    [InlineData(590, "exported", true)]
+    [InlineData(750, "exported", false)]
+    [InlineData(590, "failed", true)]
+    [InlineData(590, "cancelled", true)]
+    [InlineData(590, "export-failure", true)]
+    [InlineData(590, "export-cancellation", true)]
+    [InlineData(590, "fallback", true)]
+    [InlineData(750, "fallback", false)]
+    [InlineData(590, "initial-failure", false)]
+    [InlineData(590, "initial-cancellation", false)]
+    public void ImageResultPanel_MeasuresAndArrangesAllStatesWithinTheCard(
+        double availableWidth,
+        string state,
+        bool expectedCompact)
+    {
+        RunSta(() =>
+        {
+            UserControl view = LoadExportStatusViewForLayout();
+            ImageResultLayoutModel model = new(state);
+            view.DataContext = model;
+            view.Measure(new Size(availableWidth, double.PositiveInfinity));
+            view.Arrange(new Rect(0, 0, availableWidth, view.DesiredSize.Height));
+            view.UpdateLayout();
+
+            Border card = Assert.IsType<Border>(view.FindName("ImageResultCard"));
+            AdaptiveResultPanel layout = Assert.IsType<AdaptiveResultPanel>(view.FindName("ImageResultLayout"));
+            StackPanel text = Assert.IsType<StackPanel>(view.FindName("ImageResultText"));
+            StackPanel metrics = Assert.IsType<StackPanel>(view.FindName("ImageResultMetrics"));
+            StackPanel actions = Assert.IsType<StackPanel>(view.FindName("ImageResultActions"));
+            TextBlock title = Assert.IsType<TextBlock>(view.FindName("ImageResultTitleText"));
+            TextBlock summary = Assert.IsType<TextBlock>(view.FindName("ImageResultSummaryText"));
+            TextBlock warning = Assert.IsType<TextBlock>(view.FindName("ImageRenderWarningTextBlock"));
+            Button details = Assert.IsType<Button>(view.FindName("ImageResultDetailsButton"));
+            ComboBox format = Assert.IsType<ComboBox>(view.FindName("ImageFormatSelector"));
+            Button export = Assert.IsType<Button>(view.FindName("ImageExportButton"));
+            Button folder = Assert.IsType<Button>(view.FindName("OpenImageExportFolderButton"));
+            Border[] metricCards =
+            [
+                Assert.IsType<Border>(view.FindName("ImageGridMetricCard")),
+                Assert.IsType<Border>(view.FindName("ImageOutputMetricCard"))
+            ];
+
+            Assert.Equal(expectedCompact, layout.IsCompact);
+            Assert.Equal(Visibility.Visible, card.Visibility);
+            Assert.True(text.ActualWidth >= 180, $"Image text width at {availableWidth} in {state}: {text.ActualWidth}");
+            Assert.True(title.ActualWidth >= 180);
+            Assert.True(summary.ActualWidth > 0 && summary.ActualWidth <= text.ActualWidth);
+            Assert.Equal(TextWrapping.Wrap, title.TextWrapping);
+            double titleLeft = BoundsWithin(title, text).Left;
+            Assert.True(Math.Abs(BoundsWithin(summary, text).Left - titleLeft) <= 0.1,
+                $"Image summary does not align with title at {availableWidth} in {state}.");
+            if (model.ShowImageRenderWarning)
+            {
+                Assert.True(Math.Abs(BoundsWithin(warning, text).Left - titleLeft) <= 0.1,
+                    $"Image warning does not align with title at {availableWidth} in {state}.");
+            }
+            Assert.Equal(model.ShowImageRenderWarning ? Visibility.Visible : Visibility.Collapsed, warning.Visibility);
+            Assert.Equal(model.ShowImageResultErrorDetails ? Visibility.Visible : Visibility.Collapsed, details.Visibility);
+            Assert.Equal(model.ShowImageRenderMetrics ? Visibility.Visible : Visibility.Collapsed, metrics.Visibility);
+            Assert.Equal(model.ShowImageExportControls ? Visibility.Visible : Visibility.Collapsed, actions.Visibility);
+            Assert.Equal(model.CanOpenExportFolder ? Visibility.Visible : Visibility.Collapsed, folder.Visibility);
+
+            FrameworkElement[] visibleElements =
+            [
+                title, summary,
+                .. model.ShowImageRenderWarning ? [warning] : Array.Empty<FrameworkElement>(),
+                .. model.ShowImageResultErrorDetails ? [details] : Array.Empty<FrameworkElement>(),
+                .. model.ShowImageRenderMetrics ? metricCards : Array.Empty<FrameworkElement>(),
+                .. model.ShowImageExportControls ? [format, export] : Array.Empty<FrameworkElement>(),
+                .. model.CanOpenExportFolder ? [folder] : Array.Empty<FrameworkElement>()
+            ];
+            foreach (FrameworkElement element in visibleElements)
+            {
+                Rect bounds = BoundsWithin(element, card);
+                Assert.True(bounds.Left >= -0.1 && bounds.Top >= -0.1,
+                    $"{element.Name} starts outside the image card: {bounds}");
+                Assert.True(bounds.Right <= card.ActualWidth + 0.1 && bounds.Bottom <= card.ActualHeight + 0.1,
+                    $"{element.Name} extends outside the image card: {bounds}; card={card.RenderSize}");
+            }
+
+            if (model.ShowImageRenderMetrics)
+            {
+                Assert.False(Overlaps(BoundsWithin(metricCards[0], card), BoundsWithin(metricCards[1], card)));
+            }
+
+            if (model.ShowImageExportControls)
+            {
+                Assert.True(format.ActualWidth >= 150);
+                Assert.True(export.ActualWidth >= 150);
+                Assert.Equal(state != "stale", export.IsEnabled);
+                Rect textBounds = BoundsWithin(text, layout);
+                Rect metricsBounds = BoundsWithin(metrics, layout);
+                Rect actionBounds = BoundsWithin(actions, layout);
+                Assert.False(Overlaps(textBounds, actionBounds));
+                Assert.False(Overlaps(metricsBounds, actionBounds));
+                if (expectedCompact)
+                {
+                    Assert.True(textBounds.Bottom <= metricsBounds.Top + 0.1);
+                }
+                else
+                {
+                    Assert.True(textBounds.Right <= metricsBounds.Left + 0.1);
+                    Assert.True(metricsBounds.Right <= actionBounds.Left + 0.1);
+                }
+            }
+
+            Assert.DoesNotContain(VisualDescendants(view).OfType<ScrollViewer>(), scroll =>
+                scroll.ComputedHorizontalScrollBarVisibility == Visibility.Visible);
+        });
+    }
+
+    [Fact]
+    public void ImageResultPanel_WideReadyStateRemainsCompact()
+    {
+        RunSta(() =>
+        {
+            Border compact = ArrangeImageResultCard(590, "ready");
+            Border wide = ArrangeImageResultCard(750, "ready");
+            Assert.True(compact.ActualHeight - wide.ActualHeight >= 20,
+                $"Compact={compact.ActualHeight}; wide={wide.ActualHeight}");
+        });
+    }
+
     [Fact]
     public void SharedViewContract_HasOnePrimaryPlayControl_OverlayOnlyReplay_AndAccessibleActions()
     {
@@ -686,6 +814,16 @@ public sealed class ReviewSurfaceTests
         return Assert.IsType<Border>(view.FindName("VideoResultCard"));
     }
 
+    private static Border ArrangeImageResultCard(double availableWidth, string state)
+    {
+        UserControl view = LoadExportStatusViewForLayout();
+        view.DataContext = new ImageResultLayoutModel(state);
+        view.Measure(new Size(availableWidth, double.PositiveInfinity));
+        view.Arrange(new Rect(0, 0, availableWidth, view.DesiredSize.Height));
+        view.UpdateLayout();
+        return Assert.IsType<Border>(view.FindName("ImageResultCard"));
+    }
+
     private static double CenterY(Rect bounds) => bounds.Top + (bounds.Height / 2);
 
     private static bool Overlaps(Rect first, Rect second) =>
@@ -748,6 +886,63 @@ public sealed class ReviewSurfaceTests
         public string VideoExportActionLabel => exported ? "Export Again" : "Export Video";
         public ICommand ExportVideoCommand => Command;
         public ICommand OpenExportFolderCommand => Command;
+    }
+
+    private sealed class ImageResultLayoutModel(string state)
+    {
+        private static readonly ICommand Enabled = new EnabledCommand();
+        private static readonly ICommand Disabled = new DisabledCommand();
+
+        public bool IsProcessingResultPanelVisible => true;
+        public bool IsExportStatusVisible => false;
+        public bool ShowImageResultPanel => true;
+        public bool ShowVideoResultPanel => false;
+        public bool IsImageResultSuccess => state is "ready" or "exported" or "fallback";
+        public bool IsImageResultWarning => state is "stale" or "cancelled" or "initial-cancellation" or "export-cancellation";
+        public bool IsImageResultFailure => state is "failed" or "initial-failure" or "export-failure";
+        public bool ShowImageRenderMetrics => state is not ("initial-failure" or "initial-cancellation");
+        public bool ShowImageExportControls => ShowImageRenderMetrics;
+        public bool CanOpenExportFolder => state == "exported";
+        public bool ShowImageRenderWarning => state == "fallback";
+        public bool ShowImageResultErrorDetails => state is "failed" or "initial-failure" or "export-failure";
+        public string ImageResultTitle => state switch
+        {
+            "stale" => "Render Stale",
+            "exported" => "Image Exported",
+            "failed" or "initial-failure" => "Image Render Failed",
+            "cancelled" or "initial-cancellation" => "Image Rendering Cancelled",
+            "export-failure" => "Image Export Failed",
+            "export-cancellation" => "Image Export Cancelled",
+            _ => "Image Ready"
+        };
+        public string ImageResultSummary => state switch
+        {
+            "stale" => "Render settings changed. Review the previous result or render again before exporting.",
+            "exported" => "Saved a symbolized image. The rendered image remains ready for another export.",
+            "failed" => "GlyphFrame could not render the image. Your previous rendered image is still available.",
+            "initial-failure" => "GlyphFrame could not render this image. You can try again.",
+            "cancelled" => "Image rendering was cancelled. Your previous rendered image is still available.",
+            "initial-cancellation" => "Rendering was cancelled. The original image remains available.",
+            "export-failure" => "GlyphFrame could not export the image. The rendered image remains ready to try again.",
+            "export-cancellation" => "Image export was cancelled. The rendered image remains ready for another export.",
+            _ => "Ready for review and export."
+        };
+        public string ImageRenderWarningText => "The selected font was unavailable; a fallback was used for this retained result.";
+        public string ImageGridDimensionsText => "181 × 67";
+        public string ImageOutputDimensionsText => "1448 × 1086";
+        public string[] ImageOutputFormats => ["PNG", "JPEG"];
+        public string SelectedImageOutputFormat { get; set; } = "PNG";
+        public string ImageExportActionLabel => state == "exported" ? "Export Again" : "Export Image";
+        public ICommand ShowImageResultErrorDetailsCommand => Enabled;
+        public ICommand ExportImageCommand => state == "stale" ? Disabled : Enabled;
+        public ICommand OpenExportFolderCommand => Enabled;
+    }
+
+    private sealed class DisabledCommand : ICommand
+    {
+        public event EventHandler? CanExecuteChanged { add { } remove { } }
+        public bool CanExecute(object? parameter) => false;
+        public void Execute(object? parameter) { }
     }
 
     private sealed class EnabledCommand : ICommand

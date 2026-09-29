@@ -305,7 +305,7 @@
                                                        AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
                                                        IsActive="{Binding IsExportActive}"
                                                        IsCompleted="False"
-                                                       PercentageText="{Binding ExportPercentageText}" />
+                                                       ShowPercentageText="False" />
                     </Border>
                 </Grid>
 

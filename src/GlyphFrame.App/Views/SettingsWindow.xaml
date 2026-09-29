@@ -59,7 +59,9 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Style="{StaticResource LabelTextStyle}" Text="Accent preset" />
-                            <ComboBox Grid.Column="1"
+                            <ComboBox x:Name="AccentPresetComboBox"
+                                      Grid.Column="1"
+                                      AutomationProperties.Name="Accent preset"
                                       DisplayMemberPath="DisplayName"
                                       ItemsSource="{Binding AccentPresets}"
                                       SelectedValue="{Binding SelectedAccentPreset}"
@@ -233,7 +235,9 @@
                                     <TextBlock Style="{StaticResource MutedTextStyle}" Text="FFmpeg" />
                                     <TextBlock Grid.Column="1"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="{Binding FfmpegVersion}" />
+                                               Text="{Binding FfmpegVersion}"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding FfmpegVersion}" />
                                     <TextBlock Grid.Row="1"
                                                Margin="0,4,0,0"
                                                Style="{StaticResource MutedTextStyle}"
@@ -242,7 +246,9 @@
                                                Grid.Column="1"
                                                Margin="0,4,0,0"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="{Binding FfprobeVersion}" />
+                                               Text="{Binding FfprobeVersion}"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding FfprobeVersion}" />
                                 </Grid>
                                 <Button Margin="0,8,0,0"
                                         HorizontalAlignment="Left"

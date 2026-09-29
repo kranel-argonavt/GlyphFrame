@@ -13,7 +13,21 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         DataContext = _viewModel;
         _viewModel.RequestClose += OnRequestClose;
+        SourceInitialized += OnSourceInitialized;
+        Loaded += OnLoaded;
         Closed += OnClosed;
+    }
+
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        WindowsCaptionTheme.Apply(this);
+        WindowWorkAreaPlacement.FitInitialBounds(this);
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnLoaded;
+        AccentPresetComboBox.Focus();
     }
 
     private void OnRequestClose(object? sender, EventArgs e) => Close();
@@ -21,6 +35,8 @@ public partial class SettingsWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         _viewModel.RequestClose -= OnRequestClose;
+        SourceInitialized -= OnSourceInitialized;
+        Loaded -= OnLoaded;
         Closed -= OnClosed;
     }
 }

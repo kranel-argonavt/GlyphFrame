@@ -129,6 +129,9 @@ public sealed class Phase11B1ViewContractTests
             element.Attribute("Visibility")?.Value.Contains("ShowImageResultPanel", StringComparison.Ordinal) == true);
         Assert.Single(imagePanel.Descendants(), element => element.Attribute("Text")?.Value == "{Binding ImageGridDimensionsText}");
         Assert.Single(imagePanel.Descendants(), element => element.Attribute("Text")?.Value == "{Binding ImageOutputDimensionsText}");
+        System.Xml.Linq.XElement fontWarning = Assert.Single(imagePanel.Descendants(), element =>
+            element.Attribute("Text")?.Value == "{Binding ImageRenderWarningText}");
+        Assert.Contains("ShowImageRenderWarning", fontWarning.Attribute("Visibility")?.Value, StringComparison.Ordinal);
         Assert.DoesNotContain(imagePanel.Descendants().SelectMany(element => element.Attributes()), attribute =>
             attribute.Value.Contains("VideoAudioOutcome", StringComparison.Ordinal));
     }
@@ -143,7 +146,8 @@ public sealed class Phase11B1ViewContractTests
             && element.Attribute("Visibility")?.Value == "{Binding IsExportActive, Converter={StaticResource BooleanToVisibilityConverter}}");
         System.Xml.Linq.XElement indicator = Assert.Single(overlay.Descendants(), element =>
             element.Name.LocalName == "ExportActivityIndicator");
-        Assert.Equal("{Binding ExportPercentageText}", indicator.Attribute("PercentageText")?.Value);
+        Assert.Equal("False", indicator.Attribute("ShowPercentageText")?.Value);
+        Assert.Null(indicator.Attribute("PercentageText"));
         Assert.Equal("False", indicator.Attribute("IsCompleted")?.Value);
         Assert.DoesNotContain(overlay.Descendants(), element => element.Name.LocalName is "TextBlock" or "ProgressBar" or "Button");
         Assert.DoesNotContain(preview.Descendants().SelectMany(element => element.Attributes()), attribute =>
@@ -158,6 +162,10 @@ public sealed class Phase11B1ViewContractTests
         System.Xml.Linq.XElement progressPanel = Assert.Single(result.Descendants(), element =>
             element.Name.LocalName == "Border"
             && element.Attribute("Visibility")?.Value == "{Binding IsExportStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}");
+        System.Xml.Linq.XElement detailedIndicator = Assert.Single(progressPanel.Descendants(), element =>
+            element.Name.LocalName == "ExportActivityIndicator");
+        Assert.Equal("True", detailedIndicator.Attribute("ShowPercentageText")?.Value);
+        Assert.Equal("{Binding ExportPercentageText}", detailedIndicator.Attribute("PercentageText")?.Value);
         foreach (string binding in new[]
         {
             "ExportOperationTitle", "ExportProgressText", "ExportProgress", "ExportFrameText", "ElapsedText", "RemainingText"

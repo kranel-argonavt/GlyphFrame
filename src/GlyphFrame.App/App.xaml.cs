@@ -124,6 +124,7 @@ public partial class App : Application
         services.AddSingleton<IUserDialogService, UserDialogService>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<ISettingsDialogService, SettingsDialogService>();
+        services.AddSingleton<IAboutDialogService, AboutDialogService>();
         services.AddSingleton<IMediaFileDialogService, MediaFileDialogService>();
         services.AddSingleton<IImageSaveDialogService, ImageSaveDialogService>();
         services.AddSingleton<IImageSourceFactory, WpfImageSourceFactory>();

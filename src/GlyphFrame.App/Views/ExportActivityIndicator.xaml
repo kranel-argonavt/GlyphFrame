@@ -7,17 +7,20 @@
         <Ellipse Fill="{DynamicResource PanelBackgroundBrush}"
                  Stroke="{DynamicResource BorderBrush}"
                  StrokeThickness="7" />
-        <Ellipse x:Name="RingSegments"
-                 Margin="5"
-                 Opacity="0.9"
-                 RenderTransformOrigin="0.5,0.5"
-                 Stroke="{DynamicResource AccentBrush}"
-                 StrokeDashArray="5,2"
-                 StrokeThickness="5">
-            <Ellipse.RenderTransform>
+        <Path x:Name="RingSegments"
+              Margin="5"
+              Opacity="0.9"
+              RenderTransformOrigin="0.5,0.5"
+              SizeChanged="OnRingSegmentsSizeChanged"
+              Stretch="None"
+              Stroke="{DynamicResource AccentBrush}"
+              StrokeStartLineCap="Round"
+              StrokeEndLineCap="Round"
+              StrokeThickness="5">
+            <Path.RenderTransform>
                 <RotateTransform x:Name="RingRotation" />
-            </Ellipse.RenderTransform>
-        </Ellipse>
+            </Path.RenderTransform>
+        </Path>
         <TextBlock x:Name="PercentagePresenter"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"

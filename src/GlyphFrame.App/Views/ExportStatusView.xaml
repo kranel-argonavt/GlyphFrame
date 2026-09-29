@@ -23,6 +23,7 @@
                                                AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
                                                IsActive="{Binding IsExportActive}"
                                                IsCompleted="{Binding IsExportCompletionVisible}"
+                                               ShowPercentageText="True"
                                                PercentageText="{Binding ExportPercentageText}" />
 
                 <Grid Grid.Column="1" Margin="0,0,18,0">
@@ -70,16 +71,15 @@
             </Grid>
         </Border>
 
-        <Border Style="{StaticResource CardStyle}"
+        <Border x:Name="ImageResultCard"
+                Style="{StaticResource CardStyle}"
                 Visibility="{Binding ShowImageResultPanel, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="64" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <Grid Width="46" Height="46" HorizontalAlignment="Left" VerticalAlignment="Center">
+            <views:AdaptiveResultPanel x:Name="ImageResultLayout">
+                <Grid Width="46"
+                      Height="46"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Center"
+                      views:AdaptiveResultPanel.Role="Status">
                     <Ellipse Fill="{DynamicResource AccentSubtleBrush}"
                              Stroke="{DynamicResource AccentBrush}"
                              StrokeThickness="1" />
@@ -115,85 +115,97 @@
                           Visibility="{Binding IsImageResultFailure, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </Grid>
 
-                <Grid Grid.Column="1" Margin="0,0,24,0" VerticalAlignment="Center">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock HorizontalAlignment="Left"
-                                   Style="{StaticResource SectionHeaderTextStyle}"
-                                   Text="{Binding ImageResultTitle}" />
-                        <TextBlock Margin="0,5,0,0"
-                                   HorizontalAlignment="Left"
-                                   MaxWidth="360"
-                                   Style="{StaticResource SecondaryTextStyle}"
-                                   Text="{Binding ImageResultSummary}"
-                                   TextWrapping="Wrap" />
-                        <Button Margin="0,5,0,0"
-                                HorizontalAlignment="Left"
-                                Command="{Binding ShowImageResultErrorDetailsCommand}"
-                                Content="Show Details"
-                                Style="{StaticResource TextButtonStyle}"
-                                Visibility="{Binding ShowImageResultErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1"
-                                Margin="24,0,0,0"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Orientation="Horizontal"
-                                Visibility="{Binding ShowImageRenderMetrics, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <Border MinWidth="112"
-                                Padding="12,8"
-                                Background="{DynamicResource ElevatedBackgroundBrush}"
-                                BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource MutedTextStyle}" Text="SYMBOL GRID" />
-                                <TextBlock Margin="0,3,0,0"
-                                           Style="{StaticResource MonospaceTextStyle}"
-                                           Text="{Binding ImageGridDimensionsText}" />
-                            </StackPanel>
-                        </Border>
-                        <Border MinWidth="132"
-                                Margin="10,0,0,0"
-                                Padding="12,8"
-                                Background="{DynamicResource ElevatedBackgroundBrush}"
-                                BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource MutedTextStyle}" Text="OUTPUT" />
-                                <TextBlock Margin="0,3,0,0"
-                                           Style="{StaticResource MonospaceTextStyle}"
-                                           Text="{Binding ImageOutputDimensionsText}" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </Grid>
-
-                <StackPanel Grid.Column="2"
+                <StackPanel x:Name="ImageResultText"
+                            MinWidth="0"
                             VerticalAlignment="Center"
-                            Visibility="{Binding ShowImageExportControls, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <ComboBox MinWidth="150"
+                            views:AdaptiveResultPanel.Role="Text">
+                    <TextBlock x:Name="ImageResultTitleText"
+                               Style="{StaticResource SectionHeaderTextStyle}"
+                               Text="{Binding ImageResultTitle}"
+                               TextWrapping="Wrap" />
+                    <TextBlock x:Name="ImageResultSummaryText"
+                               Margin="0,5,0,0"
+                               HorizontalAlignment="Left"
+                               MaxWidth="360"
+                               Style="{StaticResource SecondaryTextStyle}"
+                               Text="{Binding ImageResultSummary}"
+                               TextWrapping="Wrap" />
+                    <TextBlock x:Name="ImageRenderWarningTextBlock"
+                               Margin="0,5,0,0"
+                               HorizontalAlignment="Left"
+                               MaxWidth="360"
+                               Foreground="{StaticResource WarningBrush}"
+                               Text="{Binding ImageRenderWarningText}"
+                               TextWrapping="Wrap"
+                               Visibility="{Binding ShowImageRenderWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Button x:Name="ImageResultDetailsButton"
+                            Margin="0,5,0,0"
+                            HorizontalAlignment="Left"
+                            Command="{Binding ShowImageResultErrorDetailsCommand}"
+                            Content="Show Details"
+                            Style="{StaticResource TextButtonStyle}"
+                            Visibility="{Binding ShowImageResultErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                </StackPanel>
+
+                <StackPanel x:Name="ImageResultMetrics"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Visibility="{Binding ShowImageRenderMetrics, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            views:AdaptiveResultPanel.Role="Metrics">
+                    <Border x:Name="ImageGridMetricCard"
+                            MinWidth="112"
+                            Padding="12,8"
+                            Background="{DynamicResource ElevatedBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource MutedTextStyle}" Text="SYMBOL GRID" />
+                            <TextBlock Margin="0,3,0,0"
+                                       Style="{StaticResource MonospaceTextStyle}"
+                                       Text="{Binding ImageGridDimensionsText}" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="ImageOutputMetricCard"
+                            MinWidth="132"
+                            Margin="10,0,0,0"
+                            Padding="12,8"
+                            Background="{DynamicResource ElevatedBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource MutedTextStyle}" Text="OUTPUT" />
+                            <TextBlock Margin="0,3,0,0"
+                                       Style="{StaticResource MonospaceTextStyle}"
+                                       Text="{Binding ImageOutputDimensionsText}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel x:Name="ImageResultActions"
+                            VerticalAlignment="Center"
+                            Visibility="{Binding ShowImageExportControls, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            views:AdaptiveResultPanel.Role="Actions">
+                    <ComboBox x:Name="ImageFormatSelector"
+                              MinWidth="150"
                               ItemsSource="{Binding ImageOutputFormats}"
                               SelectedItem="{Binding SelectedImageOutputFormat}"
                               ToolTip="Choose the image format used by Export Image" />
-                    <StackPanel Margin="0,10,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
-                        <Button Margin="0,0,8,0"
-                                Command="{Binding OpenExportFolderCommand}"
-                                Content="Open Folder"
-                                Visibility="{Binding CanOpenExportFolder, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <Button MinWidth="112"
-                                Command="{Binding ExportImageCommand}"
-                                Content="{Binding ImageExportActionLabel}"
-                                Style="{StaticResource PrimaryButtonStyle}" />
-                    </StackPanel>
+                    <Button x:Name="ImageExportButton"
+                            MinWidth="150"
+                            Margin="0,10,0,0"
+                            Command="{Binding ExportImageCommand}"
+                            Content="{Binding ImageExportActionLabel}"
+                            Style="{StaticResource PrimaryButtonStyle}" />
+                    <Button x:Name="OpenImageExportFolderButton"
+                            Margin="0,8,0,0"
+                            Command="{Binding OpenExportFolderCommand}"
+                            Content="Open Folder"
+                            Visibility="{Binding CanOpenExportFolder, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </StackPanel>
-            </Grid>
+            </views:AdaptiveResultPanel>
         </Border>
 
         <Border x:Name="VideoResultCard"

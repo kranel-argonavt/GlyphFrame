@@ -66,6 +66,12 @@
                                    Style="{StaticResource MutedTextStyle}"
                                    Text="{Binding InputStatusMessage}"
                                    TextWrapping="Wrap" />
+                        <Button Margin="0,5,0,0"
+                                HorizontalAlignment="Left"
+                                Command="{Binding ShowMediaInputErrorDetailsCommand}"
+                                Content="Show Details"
+                                Style="{StaticResource TextButtonStyle}"
+                                Visibility="{Binding ShowRetainedMediaInputErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <TextBlock Margin="0,5,0,0"
                                    Foreground="{StaticResource SecondaryTextBrush}"
                                    Text="{Binding InputMetadataSummary}"

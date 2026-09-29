@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using GlyphFrame.App.Presentation;
 
@@ -7,6 +8,9 @@ namespace GlyphFrame.App.Views;
 
 public partial class ExportActivityIndicator : UserControl
 {
+    private const int RingSegmentCount = 4;
+    private const double RingSegmentSweepDegrees = 70d;
+
     public static readonly DependencyProperty PercentageTextProperty = DependencyProperty.Register(
         nameof(PercentageText),
         typeof(string),
@@ -27,6 +31,12 @@ public partial class ExportActivityIndicator : UserControl
 
     public static readonly DependencyProperty AnimationsEnabledProperty = DependencyProperty.Register(
         nameof(AnimationsEnabled),
+        typeof(bool),
+        typeof(ExportActivityIndicator),
+        new PropertyMetadata(true, OnPresentationChanged));
+
+    public static readonly DependencyProperty ShowPercentageTextProperty = DependencyProperty.Register(
+        nameof(ShowPercentageText),
         typeof(bool),
         typeof(ExportActivityIndicator),
         new PropertyMetadata(true, OnPresentationChanged));
@@ -65,11 +75,20 @@ public partial class ExportActivityIndicator : UserControl
         set => SetValue(AnimationsEnabledProperty, value);
     }
 
+    public bool ShowPercentageText
+    {
+        get => (bool)GetValue(ShowPercentageTextProperty);
+        set => SetValue(ShowPercentageTextProperty, value);
+    }
+
     private static void OnPresentationChanged(DependencyObject element, DependencyPropertyChangedEventArgs args) =>
         ((ExportActivityIndicator)element).UpdatePresentation();
 
-    private static void OnPercentageTextChanged(DependencyObject element, DependencyPropertyChangedEventArgs args) =>
-        ((ExportActivityIndicator)element).PercentagePresenter.Text = (string)args.NewValue;
+    private static void OnPercentageTextChanged(DependencyObject element, DependencyPropertyChangedEventArgs args)
+    {
+        ExportActivityIndicator indicator = (ExportActivityIndicator)element;
+        indicator.PercentagePresenter.Text = indicator.ShowPercentageText ? (string)args.NewValue : string.Empty;
+    }
 
     private void OnLoaded(object sender, RoutedEventArgs args) => UpdatePresentation();
 
@@ -87,10 +106,49 @@ public partial class ExportActivityIndicator : UserControl
         }
     }
 
+    private void OnRingSegmentsSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        Size ringSize = args.NewSize;
+        double radius = (Math.Min(ringSize.Width, ringSize.Height) - RingSegments.StrokeThickness) / 2d;
+        if (radius <= 0d)
+        {
+            RingSegments.Data = Geometry.Empty;
+            return;
+        }
+
+        Point center = new(ringSize.Width / 2d, ringSize.Height / 2d);
+        PathGeometry geometry = new();
+        double segmentStepDegrees = 360d / RingSegmentCount;
+        for (int index = 0; index < RingSegmentCount; index++)
+        {
+            double middleDegrees = -90d + index * segmentStepDegrees;
+            Point start = PointOnRing(center, radius, middleDegrees - RingSegmentSweepDegrees / 2d);
+            Point end = PointOnRing(center, radius, middleDegrees + RingSegmentSweepDegrees / 2d);
+            PathFigure figure = new() { StartPoint = start, IsFilled = false };
+            figure.Segments.Add(new ArcSegment(
+                end,
+                new Size(radius, radius),
+                0d,
+                false,
+                SweepDirection.Clockwise,
+                true));
+            geometry.Figures.Add(figure);
+        }
+
+        geometry.Freeze();
+        RingSegments.Data = geometry;
+    }
+
+    private static Point PointOnRing(Point center, double radius, double degrees)
+    {
+        double radians = degrees * Math.PI / 180d;
+        return new Point(center.X + radius * Math.Cos(radians), center.Y + radius * Math.Sin(radians));
+    }
+
     private void UpdatePresentation()
     {
-        PercentagePresenter.Text = PercentageText;
-        PercentagePresenter.Visibility = IsCompleted ? Visibility.Collapsed : Visibility.Visible;
+        PercentagePresenter.Text = ShowPercentageText ? PercentageText : string.Empty;
+        PercentagePresenter.Visibility = !IsCompleted && ShowPercentageText ? Visibility.Visible : Visibility.Collapsed;
         CompletionPresenter.Visibility = IsCompleted ? Visibility.Visible : Visibility.Collapsed;
         RingSegments.Visibility = IsCompleted ? Visibility.Collapsed : Visibility.Visible;
 

@@ -28,14 +28,20 @@
                 <ColumnDefinition Width="3*" />
             </Grid.ColumnDefinitions>
 
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <views:PreviewPanelView Grid.Row="0" />
-                <views:ExportStatusView Grid.Row="1" />
-            </Grid>
+            <ScrollViewer x:Name="LeftPaneScrollViewer"
+                          Grid.Column="0"
+                          HorizontalScrollBarVisibility="Disabled"
+                          PanningMode="VerticalOnly"
+                          VerticalScrollBarVisibility="Auto">
+                <Grid MinHeight="{Binding ViewportHeight, ElementName=LeftPaneScrollViewer}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <views:PreviewPanelView Grid.Row="0" />
+                    <views:ExportStatusView Grid.Row="1" />
+                </Grid>
+            </ScrollViewer>
 
             <ScrollViewer Grid.Column="2"
                           HorizontalScrollBarVisibility="Disabled"

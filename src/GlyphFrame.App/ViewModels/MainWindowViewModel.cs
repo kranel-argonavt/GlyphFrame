@@ -39,6 +39,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly IErrorPresentationService _errorPresentationService;
     private readonly IApplicationDiagnosticLogger? _diagnosticLogger;
     private readonly IErrorDetailsDialogService _errorDetailsDialogService;
+    private readonly IAboutDialogService _aboutDialogService;
     private readonly SynchronizationContext? _synchronizationContext;
     private readonly DispatcherTimer _exportElapsedTimer;
     private readonly Stopwatch _exportStopwatch = new();
@@ -106,6 +107,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private string _lastGridSummary = string.Empty;
     private string _lastGridDimensions = string.Empty;
     private string _lastOutputDimensions = string.Empty;
+    private string? _imageRenderWarning;
     private double _timelinePosition;
     private double _resolvedVideoPosition;
     private TimeSpan? _resolvedVideoTimestamp;
@@ -176,7 +178,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         IExportStatusPresentationService exportStatusPresentationService,
         IErrorPresentationService errorPresentationService,
         IErrorDetailsDialogService errorDetailsDialogService,
-        IApplicationDiagnosticLogger? diagnosticLogger = null)
+        IApplicationDiagnosticLogger? diagnosticLogger = null,
+        IAboutDialogService? aboutDialogService = null)
     {
         ArgumentNullException.ThrowIfNull(applicationInfo);
         _settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
@@ -208,6 +211,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _errorDetailsDialogService = errorDetailsDialogService
             ?? throw new ArgumentNullException(nameof(errorDetailsDialogService));
         _diagnosticLogger = diagnosticLogger;
+        _aboutDialogService = aboutDialogService ?? throw new ArgumentNullException(nameof(aboutDialogService));
         _synchronizationContext = SynchronizationContext.Current;
         _exportElapsedTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -283,14 +287,15 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _showImageResultErrorDetailsCommand = CreateErrorDetailsCommand(() => VisibleImageResultErrorPresentation);
         _showVideoResultErrorDetailsCommand = CreateErrorDetailsCommand(() => VisibleVideoResultErrorPresentation);
 
-        AboutCommand = new RelayCommand(
-            () => StatusMessage = "GlyphFrame v1.0.0 - local media processing with no telemetry.");
+        AboutCommand = new RelayCommand(() => _aboutDialogService.Show(ApplicationInfo));
         SettingsCommand = new RelayCommand(
             () => _settingsDialogService.Show(),
             () => AreSettingsEnabled);
     }
 
     public ApplicationInfo ApplicationInfo { get; }
+
+    public string ApplicationVersion => _aboutDialogService.VersionText;
 
     public IReadOnlyList<CharacterPresetOption> Presets => _presetProvider.GetPresets();
 
@@ -389,6 +394,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public ErrorPresentation? MediaInputErrorPresentation => _mediaInputErrorPresentation;
 
     public bool ShowMediaInputErrorDetails => HasTechnicalDetails(_mediaInputErrorPresentation);
+    public bool ShowRetainedMediaInputErrorDetails => IsMediaSelected && HasMediaInputError && ShowMediaInputErrorDetails;
 
     public bool ShowEmptyPreview => IsNoMediaSelected && !IsLoadingMedia && !HasMediaInputError;
 
@@ -753,6 +759,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public string ImageGridDimensionsText => _lastGridDimensions;
 
     public string ImageOutputDimensionsText => _lastOutputDimensions;
+
+    public string ImageRenderWarningText => _imageRenderWarning ?? string.Empty;
+
+    public bool ShowImageRenderWarning => HasImageRender && !string.IsNullOrWhiteSpace(_imageRenderWarning);
 
     public bool IsImageResultSuccess => _renderWorkflowState.Status is
         RenderWorkflowStatus.RenderReady or RenderWorkflowStatus.Exported;
@@ -2298,7 +2308,6 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            GlyphMetrics glyphMetrics = result.GlyphMetrics;
             ApplyRenderedResult(result, identity, operation);
             if (imageRender)
             {
@@ -2312,7 +2321,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             PreviewMode = PreviewMode.Symbolized;
             ExportProgress = 100;
             StatusMessage = imageRender
-                ? BuildImageRenderSuccessMessage(stopwatch.Elapsed, _lastGridSummary, glyphMetrics)
+                ? "Image ready for review and export."
                 : $"Symbolized frame generated in {stopwatch.Elapsed.TotalSeconds:0.##} seconds.";
         }
         catch (OperationCanceledException)
@@ -3063,6 +3072,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         if (operation == RenderWorkflowOperation.RenderImage)
         {
             _lastImageExportPath = null;
+            _imageRenderWarning = result.GlyphMetrics is { UsedFallback: true, DiagnosticMessage.Length: > 0 }
+                ? result.GlyphMetrics.DiagnosticMessage
+                : null;
         }
 
         NotifyImageProperties();
@@ -3078,6 +3090,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _lastGridSummary = string.Empty;
         _lastGridDimensions = string.Empty;
         _lastOutputDimensions = string.Empty;
+        _imageRenderWarning = null;
         _lastImageExportPath = null;
         PreviewMode = PreviewMode.Original;
         NotifyImageProperties();
@@ -3679,19 +3692,6 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
-    private static string BuildImageRenderSuccessMessage(
-        TimeSpan elapsed,
-        string summary,
-        GlyphMetrics glyphMetrics)
-    {
-        string message = string.IsNullOrWhiteSpace(summary)
-            ? $"Image rendered in {elapsed.TotalSeconds:0.##} seconds."
-            : $"Image rendered in {elapsed.TotalSeconds:0.##} seconds. {summary}.";
-        return glyphMetrics is { UsedFallback: true, DiagnosticMessage.Length: > 0 }
-            ? $"{message} {glyphMetrics.DiagnosticMessage}"
-            : message;
-    }
-
     private void ApplyImmediateFailure(MediaInputResult failure)
     {
         CancellationTokenSource? previous = Interlocked.Exchange(ref _mediaLoadCancellation, null);
@@ -3745,7 +3745,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(CurrentMedia), nameof(ImageMetadata), nameof(VideoMetadata),
             nameof(IsNoMediaSelected), nameof(IsMediaSelected), nameof(IsImageSelected), nameof(IsVideoSelected),
             nameof(IsLoadingMedia), nameof(HasMediaInputError), nameof(MediaInputErrorPresentation),
-            nameof(ShowMediaInputErrorDetails),
+            nameof(ShowMediaInputErrorDetails), nameof(ShowRetainedMediaInputErrorDetails),
             nameof(ShowEmptyPreview), nameof(ShowLoadingPreview),
             nameof(HasVideoFrame), nameof(IsVideoFrameLoading), nameof(HasVideoFrameError),
             nameof(VideoFrameStatusMessage), nameof(VideoFrameTechnicalDetail), nameof(VideoFrameErrorPresentation),
@@ -3799,6 +3799,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowImageRenderMetrics));
         OnPropertyChanged(nameof(ImageGridDimensionsText));
         OnPropertyChanged(nameof(ImageOutputDimensionsText));
+        OnPropertyChanged(nameof(ImageRenderWarningText));
+        OnPropertyChanged(nameof(ShowImageRenderWarning));
         OnPropertyChanged(nameof(IsProcessingResultPanelVisible));
         OnPropertyChanged(nameof(IsImageResultSuccess));
         OnPropertyChanged(nameof(IsImageResultWarning));

@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 12C — Privacy-Safe Local Diagnostic Logging
+Status: Updated through Phase 13 — UI Polish (single-monitor DPI and media-state retests passed; multi-monitor behavior not tested)
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -783,13 +783,17 @@ During full rendering the processing/result panel shows:
 - Estimated remaining time when available.
 - Cancel button.
 
-The preview busy overlay is limited to the media viewport and exists only while an operation is active. It contains one compact segmented activity ring with the current percentage when determinate or a neutral indeterminate indication. It does not contain the operation title, stage description, linear bar, frame/timing details, or Cancel. The overlay disappears immediately when processing and cleanup finish; the brief completion animation occurs only in this lower panel and does not cover the completed preview.
+The preview busy overlay is limited to the media viewport and exists only while an operation is active. It contains one compact segmented activity ring without a numeric percentage; the ring serves as a neutral activity indication for determinate and indeterminate work alike. The lower processing/result panel alone presents percentage, operation title, stage description, linear bar, frame/timing details, and Cancel. The overlay disappears immediately when processing and cleanup finish; the brief completion animation occurs only in this lower panel and does not cover the completed preview.
 
 After a render succeeds, the panel remains visible and settles into `Image Ready` or `Video Ready`. It shows the green completion mark and a result summary. Image Ready exposes PNG/JPEG selection plus `Export Image`. Video Ready uses matching gray metric cards for accepted `FRAMES`, `OUTPUT`, and `AUDIO` values; `AUDIO` is mapped from the retained artifact's actual mux outcome (`Original`, `AAC`, `Removed`, or `No source`) rather than the mutable audio selector. Candidate or missing metadata is never shown as an accepted metric. The ordinary ready subtitle is the concise `Ready for review and export.` and the exported subtitle is `Ready for review and another export.`; state-specific stale, failure, cancellation, suspension, opening, and playback-unavailable explanations remain detailed. The panel exposes artifact-based `Export Video` without a format selector. Playback controls remain with the Symbolized preview. The permanent Output card and transitional direct-export action are removed in Phase 11B.4. The media action row above the preview is the single location for `Render Image` / `Render Again` and `Render Video` / `Render Again`. After export the panel keeps video metrics visible, shows the trimmed chosen destination with a full-path tooltip, and exposes `Export Again` and `Open Folder`. A stale result remains reviewable with metrics visible, export disabled, and a Render Again explanation. When measured space is sufficient, the title/summary, all three metric cards, and actions share one compact horizontal row aligned with Image Ready. At constrained widths, the same controls and bindings automatically form a two-row layout with text above metrics and actions. The breakpoint is derived from child measurements plus a practical text allowance and a hysteresis band, so it is DPI-independent, stable during resizing, and safe at the supported minimum window width without horizontal scrolling.
 
+Image results use the same measured responsive layout: the title, summary, accepted symbol-grid/output cards, and format/export actions share a compact row when space permits, then reflow into text above metrics and actions at constrained widths. A retained font-fallback warning and Show Details action remain with the readable text column. The same controls and bindings are reused in both layouts; no result guidance or action is hidden solely to fit the supported minimum window width.
+
 Before an image render exists, the result panel may remain visible to report a failed or cancelled render, but it hides the output-format selector and all export-related action containers. A stale retained render keeps the format selector visible and Export disabled while the preview-panel `Render Again` action remains primary. Failed and cancelled states identify whether rendering or exporting was affected; export failure or cancellation preserves a current retained render for retry without rerendering.
 
-The segmented accent ring rotates around stationary percentage text and uses a restrained opacity pulse while rendering or cancellation cleanup is active. Determinate bar values ease monotonically toward the latest truthful percentage, and meaningful stage changes crossfade without animating frame or timing updates. Successful review-artifact publication replaces the percentage with a green vector completion mark before the panel settles into its persistent ready state; failure and cancellation never show success. These effects are presentation-only and are disabled when Windows client-area animations are disabled.
+Successful image rendering gives the footer the concise `Image ready for review and export.` state message. Symbol-grid and output dimensions remain in the result-panel metric cards; a font-fallback diagnostic, when present for the accepted retained render, appears as a warning beside that result rather than extending the footer. The warning persists with a stale or otherwise retained render and refreshes on successful replacement.
+
+In the lower processing panel, the segmented accent ring rotates around stationary percentage text and uses a restrained opacity pulse while rendering or cancellation cleanup is active. Its four equal-angle arcs have even gaps at both the compact preview and detailed panel sizes; the preview overlay uses the same ring motion without percentage text. Determinate bar values ease monotonically toward the latest truthful percentage, and meaningful stage changes crossfade without animating frame or timing updates. Successful review-artifact publication replaces the percentage with a green vector completion mark before the panel settles into its persistent ready state; failure and cancellation never show success. These effects are presentation-only and are disabled when Windows client-area animations are disabled.
 
 It must not include:
 
@@ -1732,16 +1736,11 @@ If Original is still opening, the requested comparison timestamp is retained onl
 
 ### Phase 13 - UI Polish
 
-- Hover states.
-- Focus states.
-- Disabled states.
-- Empty states.
-- Loading states.
-- Settings dialog.
-- About dialog.
-- DPI scaling.
-- Resizing.
-- Final comparison with the design reference.
+- Shared buttons, tabs, segmented controls, and player icon buttons have distinct enabled hover/pressed/keyboard-focus/disabled presentation under the selected accent. Disabled controls no longer take on active hover styling; muted copy has improved contrast against dark cards.
+- The existing empty-state media-selection guidance, compact viewport activity ring, detailed processing/result panel, reduced-motion behavior, and distinct ready/stale/cancelled/error states remain the canonical workflow presentation. The superseded permanent Output card is not restored.
+- Settings preserves its persistence and validation behavior while giving keyboard focus to the accent selector, keeping the form vertically scrollable at its minimum size, and trimming long tool-version lines with full-value tooltips.
+- The footer's About action opens a themed owner-modal dialog with the application assembly version, local-processing/no-telemetry information, accessible Close controls, and Escape support. Opening it does not replace the current processing status. Main and Settings native title bars request dark Windows caption styling where supported.
+- Main-window minimum size remains 1024×720 DIPs. Initial Main and owner-modal Settings bounds are centered within the selected monitor's DPI-aware work area, retaining their preferred sizes where they fit and keeping the supported minimum where the work area permits. At constrained height, the left preview/result pane scrolls vertically independently of the right settings pane; the media action row, result card, and footer remain reachable. A failed replacement selection retains the previous accepted result and presents Show Details beside the current Input error when technical detail exists, without duplicating the clean-start error action. Existing Fit/Fill/100% media scaling, including one media pixel per physical display pixel at 100%, is unchanged. Automated WPF main-window and dialog layout checks cover minimum/default sizes, with synthetic 100%/125%/150% DPI work-area bounds. A user-performed single-monitor smoke retest on 2026-09-29 passed at actual 100%/125%/150% scaling: initial window placement at 150%, Settings from a minimum-size owner, image/video Ready actions and export controls at minimum size, and Show Details for a failed replacement after image export. Multi-monitor behavior was not tested because only one display was available.
 
 ### Phase 14 - Testing
 

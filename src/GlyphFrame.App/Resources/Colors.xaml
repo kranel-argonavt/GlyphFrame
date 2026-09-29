@@ -9,7 +9,7 @@
     <Color x:Key="BorderColor">#2A2F3A</Color>
     <Color x:Key="PrimaryTextColor">#F3F4F6</Color>
     <Color x:Key="SecondaryTextColor">#9CA3AF</Color>
-    <Color x:Key="MutedTextColor">#6B7280</Color>
+    <Color x:Key="MutedTextColor">#858E9E</Color>
     <Color x:Key="AccentColor">#8B5CF6</Color>
     <Color x:Key="AccentHoverColor">#A78BFA</Color>
     <Color x:Key="AccentPressedColor">#7C3AED</Color>

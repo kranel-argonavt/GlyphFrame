@@ -16,6 +16,80 @@ namespace GlyphFrame.App.Tests;
 
 public sealed class MainWindowVideoPreviewTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedMediaReplacement_ShowsCurrentInputDetailsBesideRetainedResult(bool video)
+    {
+        using TestMediaFiles files = new();
+        string acceptedPath = files.Create(video ? "accepted.mp4" : "accepted.png");
+        string brokenPath = files.Create(video ? "broken.mkv" : "broken.png");
+        TestHarness harness = video ? ReadyVideoHarness() : ReadyImageHarness();
+        if (video)
+        {
+            harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+                ManagedVideoRenderResult.Completed(Artifact(files.PathFor("retained-review.mp4"), job.Identity)));
+        }
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(path == brokenPath
+            ? MediaInputResult.Failure(video ? MediaInputErrorCategory.InvalidVideo : MediaInputErrorCategory.InvalidImage,
+                "untrusted input message", "current replacement diagnostic")
+            : video ? VideoResult(path!) : ImageResult(path!));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([acceptedPath]);
+        if (video)
+        {
+            await viewModel.RenderVideoCommand.ExecuteAsync(null);
+        }
+        else
+        {
+            await viewModel.RenderImageCommand.ExecuteAsync(null);
+            harness.SaveDialogs.ImageOutputPaths.Enqueue(files.PathFor("accepted-export.png"));
+            await viewModel.ExportImageCommand.ExecuteAsync(null);
+            Assert.Equal(RenderWorkflowStatus.Exported, viewModel.WorkflowStatus);
+        }
+        MediaInputResult? previousMedia = viewModel.CurrentMedia;
+
+        await viewModel.DropMediaCommand.ExecuteAsync([brokenPath]);
+
+        Assert.True(viewModel.HasMediaInputError);
+        Assert.True(viewModel.IsMediaSelected);
+        Assert.False(viewModel.ShowErrorPreview);
+        Assert.True(viewModel.ShowRetainedMediaInputErrorDetails);
+        Assert.True(viewModel.ShowMediaInputErrorDetailsCommand.CanExecute(null));
+        Assert.DoesNotContain("current replacement diagnostic", viewModel.InputStatusMessage, StringComparison.Ordinal);
+        Assert.Equal(video, viewModel.HasVideoArtifact);
+        Assert.Equal(!video, viewModel.HasImageRender);
+        Assert.Same(previousMedia, viewModel.CurrentMedia);
+        ErrorPresentation current = Assert.IsType<ErrorPresentation>(viewModel.MediaInputErrorPresentation);
+        viewModel.ShowMediaInputErrorDetailsCommand.Execute(null);
+        Assert.Same(current, Assert.Single(harness.ErrorDetailsDialogs.Presentations));
+
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(video ? VideoResult(path!) : ImageResult(path!));
+        await viewModel.DropMediaCommand.ExecuteAsync([acceptedPath]);
+        Assert.False(viewModel.ShowRetainedMediaInputErrorDetails);
+        Assert.False(viewModel.ShowMediaInputErrorDetailsCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task CleanStartMediaFailure_ShowsDetailsOnlyInPreview()
+    {
+        using TestMediaFiles files = new();
+        string brokenPath = files.Create("broken.png");
+        TestHarness harness = new();
+        harness.MediaInput.Handler = (_, _) => Task.FromResult(MediaInputResult.Failure(
+            MediaInputErrorCategory.InvalidImage, "untrusted", "current diagnostic"));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+
+        await viewModel.DropMediaCommand.ExecuteAsync([brokenPath]);
+
+        Assert.True(viewModel.ShowErrorPreview);
+        Assert.True(viewModel.ShowMediaInputErrorDetails);
+        Assert.False(viewModel.ShowRetainedMediaInputErrorDetails);
+        viewModel.ShowMediaInputErrorDetailsCommand.Execute(null);
+        Assert.Same(viewModel.MediaInputErrorPresentation,
+            Assert.Single(harness.ErrorDetailsDialogs.Presentations));
+    }
+
     [Fact]
     public async Task DiagnosticLogging_RecordsOneAcceptedFailurePerAttemptButNotDetailsOrCancellation()
     {
@@ -39,6 +113,21 @@ public sealed class MainWindowVideoPreviewTests
             MediaInputErrorCategory.Cancelled, "cancelled"));
         await viewModel.DropMediaCommand.ExecuteAsync([path]);
         Assert.Equal(2, harness.Diagnostics.Events.Count);
+    }
+
+    [Fact]
+    public void About_OpensDialogWithoutChangingProcessingStatus()
+    {
+        TestHarness harness = new();
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        viewModel.StatusMessage = "Rendering the complete symbolized video...";
+
+        viewModel.AboutCommand.Execute(null);
+
+        Assert.Equal(1, harness.AboutDialogs.ShowCount);
+        Assert.Same(viewModel.ApplicationInfo, harness.AboutDialogs.LastApplicationInfo);
+        Assert.Equal("v1.0.0", viewModel.ApplicationVersion);
+        Assert.Equal("Rendering the complete symbolized video...", viewModel.StatusMessage);
     }
 
     [Fact]
@@ -1183,8 +1272,49 @@ public sealed class MainWindowVideoPreviewTests
         Assert.True(viewModel.ShowImageRenderMetrics);
         Assert.Equal("1 × 1", viewModel.ImageGridDimensionsText);
         Assert.Equal("2 × 1", viewModel.ImageOutputDimensionsText);
+        Assert.Equal("Image ready for review and export.", viewModel.StatusMessage);
+        Assert.Equal("Ready for review and export.", viewModel.ImageResultSummary);
+        Assert.False(viewModel.ShowImageRenderWarning);
         Assert.True(viewModel.ExportImageCommand.CanExecute(null));
         Assert.Equal("Render Again", viewModel.ImageRenderActionLabel);
+    }
+
+    [Fact]
+    public async Task ImageRender_FontFallbackWarningStaysWithRetainedResultNotFooter()
+    {
+        using TestMediaFiles files = new();
+        TestHarness harness = ReadyImageHarness();
+        int renderCall = 0;
+        harness.ImagePipeline.RenderHandler = (_, _, _, _) =>
+        {
+            ImagePipelineResult result = RenderResult();
+            GlyphMetrics fallback = result.GlyphMetrics with
+            {
+                UsedFallback = true,
+                DiagnosticMessage = "Requested font was unavailable; a fallback was used."
+            };
+            return Task.FromResult(Interlocked.Increment(ref renderCall) == 1
+                ? result with { GlyphMetrics = fallback }
+                : result);
+        };
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        await viewModel.DropMediaCommand.ExecuteAsync([files.Create("font-fallback.png")]);
+
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+
+        Assert.Equal("Image ready for review and export.", viewModel.StatusMessage);
+        Assert.True(viewModel.ShowImageRenderMetrics);
+        Assert.True(viewModel.ShowImageRenderWarning);
+        Assert.Contains("fallback was used", viewModel.ImageRenderWarningText, StringComparison.Ordinal);
+        viewModel.SelectedFontSize = 12;
+        Assert.Equal(RenderWorkflowStatus.RenderStale, viewModel.WorkflowStatus);
+        Assert.True(viewModel.ShowImageRenderWarning);
+
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+
+        Assert.Equal(RenderWorkflowStatus.RenderReady, viewModel.WorkflowStatus);
+        Assert.False(viewModel.ShowImageRenderWarning);
+        Assert.Equal(string.Empty, viewModel.ImageRenderWarningText);
     }
 
     [Fact]
@@ -4394,6 +4524,8 @@ public sealed class MainWindowVideoPreviewTests
 
         public FakeDiagnosticLogger Diagnostics { get; } = new();
 
+        public FakeAboutDialogService AboutDialogs { get; } = new();
+
         public MainWindowViewModel CreateViewModel(
             IVideoFrameReader? videoFrameReader = null,
             bool allowNull = false,
@@ -4431,7 +4563,23 @@ public sealed class MainWindowVideoPreviewTests
                 : exportStatusPresentationService ?? ExportStatusPresentation,
             new ErrorPresentationService(),
             ErrorDetailsDialogs,
-            Diagnostics);
+            Diagnostics,
+            AboutDialogs);
+    }
+
+    private sealed class FakeAboutDialogService : IAboutDialogService
+    {
+        public string VersionText => "v1.0.0";
+
+        public int ShowCount { get; private set; }
+
+        public ApplicationInfo? LastApplicationInfo { get; private set; }
+
+        public void Show(ApplicationInfo applicationInfo)
+        {
+            ShowCount++;
+            LastApplicationInfo = applicationInfo;
+        }
     }
 
     private sealed class FakeDiagnosticLogger : IApplicationDiagnosticLogger

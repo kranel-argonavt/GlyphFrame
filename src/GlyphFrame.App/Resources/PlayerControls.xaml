@@ -34,6 +34,12 @@
             Property="Background"
             Value="{DynamicResource PanelBackgroundBrush}" />
         <Setter
+            Property="Cursor"
+            Value="Hand" />
+        <Setter
+            Property="FocusVisualStyle"
+            Value="{StaticResource GlyphFrameFocusVisualStyle}" />
+        <Setter
             Property="Template">
             <Setter.Value>
                 <ControlTemplate
@@ -48,14 +54,16 @@
                         <ContentPresenter />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger
-                            Property="IsMouseOver"
-                            Value="True">
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsEnabled" Value="True" />
+                            </MultiTrigger.Conditions>
                             <Setter
                                 TargetName="Chrome"
                                 Property="Background"
                                 Value="{DynamicResource AccentSubtleBrush}" />
-                        </Trigger>
+                        </MultiTrigger>
                         <Trigger
                             Property="IsPressed"
                             Value="True">
@@ -78,6 +86,7 @@
                             <Setter
                                 Property="Opacity"
                                 Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

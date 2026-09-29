@@ -1,5 +1,6 @@
 using System.Windows;
 using GlyphFrame.App.ViewModels;
+using GlyphFrame.App.Views;
 
 namespace GlyphFrame.App;
 
@@ -9,5 +10,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
+        SourceInitialized += (_, _) =>
+        {
+            WindowsCaptionTheme.Apply(this);
+            WindowWorkAreaPlacement.FitInitialBounds(this);
+        };
     }
 }
