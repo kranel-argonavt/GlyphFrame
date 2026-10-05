@@ -736,6 +736,17 @@ public sealed class ReviewSurfaceTests
         Assert.Equal("{Binding CurrentPreviewPixelWidth}", media.Attribute("PixelWidth")?.Value);
     }
 
+    [Fact]
+    public void RenderedReviewError_BindsGuidanceAndDetailsToSameIndependentContext()
+    {
+        XDocument preview = ReadView("PreviewPanelView.xaml");
+        XElement review = Assert.Single(preview.Descendants(), e =>
+            e.Attribute("Visibility")?.Value.Contains("ShowRenderedVideoReviewError", StringComparison.Ordinal) == true);
+        Assert.Single(review.Descendants(), e => e.Attribute("Text")?.Value == "{Binding VideoReviewErrorPresentation.UserMessage}");
+        Assert.DoesNotContain(review.Descendants(), e => e.Attribute("Text")?.Value == "{Binding StatusMessage}");
+        Assert.Single(review.Descendants(), e => e.Attribute("Command")?.Value == "{Binding ShowVideoReviewErrorDetailsCommand}");
+    }
+
     private static XDocument ReadView(string name)
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

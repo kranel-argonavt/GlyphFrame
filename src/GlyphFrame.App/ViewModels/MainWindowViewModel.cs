@@ -2579,6 +2579,8 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         RenderWorkflowState beforeExportState = _renderWorkflowState;
+        string beforeExportStatus = StatusMessage;
+        ErrorPresentation? beforePublicationError = _videoPublicationErrorPresentation;
         // Destination selection is modal; capture and revalidate before beginning async work.
         (long operationId, CancellationToken token) = BeginImageOperation(
             RenderWorkflowOperation.ExportVideo, "Exporting reviewed video...", "Preparing a byte-identical MP4 copy");
@@ -2595,17 +2597,20 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             }
 
             bool overwrite = destination.ExistingVersion is not null;
-            if (overwrite && !_userDialogService.Confirm("Replace existing video?",
-                    $"Replace '{Path.GetFileName(destination.FilePath)}' with the reviewed video?", "Replace Video", "Cancel"))
+            bool confirmed = !overwrite || _userDialogService.Confirm("Replace existing video?",
+                $"Replace '{Path.GetFileName(destination.FilePath)}' with the reviewed video?", "Replace Video", "Cancel");
+            // The modal confirmation can pump replacement/disposal callbacks. Never restore an obsolete snapshot.
+            if (operationId != _imageOperationId || !IsCurrentPublication() || token.IsCancellationRequested)
+            {
+                token.ThrowIfCancellationRequested();
+                return;
+            }
+            if (!confirmed)
             {
                 // Declining consent is not a failed export; restore the pre-dialog outcome.
                 _renderWorkflowState = beforeExportState;
-                return;
-            }
-
-            if (!IsCurrentPublication() || token.IsCancellationRequested)
-            {
-                token.ThrowIfCancellationRequested();
+                _videoPublicationErrorPresentation = beforePublicationError;
+                StatusMessage = _videoReviewErrorPresentation?.UserMessage ?? beforeExportStatus;
                 return;
             }
 

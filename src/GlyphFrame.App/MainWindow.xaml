@@ -32,15 +32,11 @@
                           Grid.Column="0"
                           HorizontalScrollBarVisibility="Disabled"
                           PanningMode="VerticalOnly"
-                          VerticalScrollBarVisibility="Auto">
-                <Grid MinHeight="{Binding ViewportHeight, ElementName=LeftPaneScrollViewer}">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <views:PreviewPanelView Grid.Row="0" />
-                    <views:ExportStatusView Grid.Row="1" />
-                </Grid>
+                          VerticalScrollBarVisibility="Visible">
+                <views:ReviewPanePanel ViewportHeight="{Binding ActualHeight, ElementName=LeftPaneScrollViewer}">
+                    <views:PreviewPanelView />
+                    <views:ExportStatusView />
+                </views:ReviewPanePanel>
             </ScrollViewer>
 
             <ScrollViewer Grid.Column="2"

@@ -17,6 +17,91 @@ namespace GlyphFrame.App.Tests;
 public sealed class MainWindowVideoPreviewTests
 {
     [Theory]
+    [InlineData(1920, 1080, false)]
+    [InlineData(1080, 1920, false)]
+    [InlineData(1921, 1080, true)]
+    [InlineData(1920, 1081, true)]
+    [InlineData(1081, 1920, true)]
+    [InlineData(1080, 1921, true)]
+    public async Task ResolutionWarning_UsesDisplayOriented1080BoundaryAndSelectedOutput(
+        int displayWidth, int displayHeight, bool aboveBoundary)
+    {
+        using TestMediaFiles files = new();
+        string source = files.Create("resolution.png");
+        TestHarness harness = ReadyImageHarness();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(MediaInputResult.ForImage(
+            ImageResult(path!).ImageMetadata! with
+            {
+                // Encoded dimensions intentionally differ: policy must use display dimensions.
+                Width = 1920,
+                Height = 1080,
+                DisplayWidth = displayWidth,
+                DisplayHeight = displayHeight
+            }));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        List<string?> changes = [];
+        viewModel.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+        Assert.False(viewModel.ShowResolutionWarning);
+        await viewModel.DropMediaCommand.ExecuteAsync([source]);
+        Assert.Equal(aboveBoundary, viewModel.ShowResolutionWarning);
+        Assert.Contains(nameof(viewModel.ShowResolutionWarning), changes);
+
+        foreach (string output in new[] { "720p", "1080p", "Same as source" })
+        {
+            changes.Clear();
+            viewModel.SelectedOutputResolution = output;
+            Assert.Equal(aboveBoundary && output == "Same as source", viewModel.ShowResolutionWarning);
+            Assert.Contains(nameof(viewModel.ShowResolutionWarning), changes);
+            Assert.True(viewModel.RenderImageCommand.CanExecute(null));
+        }
+        await viewModel.RenderImageCommand.ExecuteAsync(null);
+        Assert.Equal(aboveBoundary, viewModel.ShowResolutionWarning);
+        Assert.True(viewModel.ExportImageCommand.CanExecute(null));
+        harness.SaveDialogs.ImageOutputPaths.Enqueue(files.PathFor("resolution-export.png"));
+        await viewModel.ExportImageCommand.ExecuteAsync(null);
+        Assert.Equal(RenderWorkflowStatus.Exported, viewModel.WorkflowStatus);
+        Assert.Equal(aboveBoundary, viewModel.ShowResolutionWarning);
+    }
+
+    [Fact]
+    public async Task ResolutionWarning_ReplacementAndMediaKindRefreshWithoutChangingImageOnlyScope()
+    {
+        using TestMediaFiles files = new();
+        string large = files.Create("large.png");
+        string small = files.Create("small.png");
+        string broken = files.Create("broken.png");
+        string video = files.Create("video.mp4");
+        TestHarness harness = ReadyImageHarness();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(path == video
+            ? VideoResult(path)
+            : path == broken
+                ? MediaInputResult.Failure(MediaInputErrorCategory.InvalidImage, "Invalid image", "fixture failure")
+                : MediaInputResult.ForImage(ImageResult(path!).ImageMetadata! with
+                {
+                    DisplayWidth = path == large ? 1921 : 1920,
+                    DisplayHeight = 1080
+                }));
+        harness.VideoFrames.Handler = (_, position, metadata, _) => Task.FromResult(
+            FrameResult(SolidFrame(10, 20, 30), position, metadata));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        List<string?> changes = [];
+        viewModel.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+        foreach ((string path, bool warning) in new[]
+        {
+            (large, true), (broken, true), (small, false), (large, true), (video, false), (large, true)
+        })
+        {
+            changes.Clear();
+            await viewModel.DropMediaCommand.ExecuteAsync([path]);
+            Assert.Equal(warning, viewModel.ShowResolutionWarning);
+            if (path != broken)
+            {
+                Assert.Contains(nameof(viewModel.ShowResolutionWarning), changes);
+            }
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task FailedMediaReplacement_ShowsCurrentInputDetailsBesideRetainedResult(bool video)
@@ -1005,11 +1090,162 @@ public sealed class MainWindowVideoPreviewTests
         await viewModel.DropMediaCommand.ExecuteAsync([videoPath]);
         await viewModel.RenderVideoCommand.ExecuteAsync(null);
 
+        string settledStatus = viewModel.StatusMessage;
         await viewModel.ExportVideoCommand.ExecuteAsync(null);
 
         Assert.Equal(0, harness.VideoPublications.Calls);
         Assert.Equal(original, await File.ReadAllBytesAsync(outputPath));
         Assert.Equal(RenderWorkflowStatus.RenderReady, viewModel.WorkflowStatus);
+        Assert.Equal(settledStatus, viewModel.StatusMessage);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task DeclinedOverwrite_RestoresSettledPresentationAndRetainedReview(bool unavailable, bool exported)
+    {
+        using TestMediaFiles files = new();
+        TestHarness harness = ReadyVideoHarness();
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("decline-review.mp4"), job.Identity)));
+        using MainWindowViewModel vm = harness.CreateViewModel();
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("source.mp4")]);
+        await vm.RenderVideoCommand.ExecuteAsync(null);
+        if (exported)
+        {
+            harness.SaveDialogs.VideoOutputPath = files.PathFor("first.mp4");
+            await vm.ExportVideoCommand.ExecuteAsync(null);
+        }
+        if (unavailable) harness.RenderedVideoPlayer.FailPlayback();
+        string settled = vm.StatusMessage;
+        string destination = vm.VideoExportDestinationText;
+        RenderWorkflowStatus outcome = vm.WorkflowStatus;
+        ErrorPresentation? review = vm.VideoReviewErrorPresentation;
+        ManagedVideoArtifact artifact = harness.ManagedArtifacts.Current!;
+        harness.SaveDialogs.VideoOutputPath = files.Create("existing.mp4");
+        harness.UserDialogs.ConfirmResult = false;
+
+        await vm.ExportVideoCommand.ExecuteAsync(null);
+
+        Assert.Equal(settled, vm.StatusMessage);
+        Assert.Equal(outcome, vm.WorkflowStatus);
+        Assert.Equal(destination, vm.VideoExportDestinationText);
+        Assert.Same(artifact, harness.ManagedArtifacts.Current);
+        Assert.Equal(review, vm.VideoReviewErrorPresentation);
+        Assert.Equal(unavailable, vm.ShowRenderedVideoReviewError);
+        Assert.Equal(unavailable, vm.ShowVideoReviewErrorDetailsCommand.CanExecute(null));
+        Assert.True(vm.ExportVideoCommand.CanExecute(null));
+        Assert.False(vm.IsExportActive);
+        Assert.Equal(exported ? 1 : 0, harness.VideoPublications.Calls);
+
+        // A subsequently cancelled destination chooser must leave that settled state untouched too.
+        harness.SaveDialogs.VideoOutputPath = null;
+        await vm.ExportVideoCommand.ExecuteAsync(null);
+        Assert.Equal(settled, vm.StatusMessage);
+        Assert.Equal(outcome, vm.WorkflowStatus);
+        Assert.Equal(review, vm.VideoReviewErrorPresentation);
+    }
+
+    [Fact]
+    public async Task DeclinedOverwrite_RestoresPreviousPublicationFailureWithoutLoggingAnotherFailure()
+    {
+        using TestMediaFiles files = new();
+        TestHarness harness = ReadyVideoHarness();
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("retained.mp4"), job.Identity)));
+        using MainWindowViewModel vm = harness.CreateViewModel();
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("source.mp4")]);
+        await vm.RenderVideoCommand.ExecuteAsync(null);
+        harness.SaveDialogs.VideoOutputPath = files.PathFor("first.mp4");
+        harness.VideoPublications.Handler = (_, _, _) => Task.FromResult(
+            VideoExportResult.Failure(VideoExportErrorCategory.OutputFinalizationFailed, "Failed.", "retained publication detail"));
+        await vm.ExportVideoCommand.ExecuteAsync(null);
+        ErrorPresentation? failure = vm.VideoPublicationErrorPresentation;
+        string settled = vm.StatusMessage;
+        harness.SaveDialogs.VideoOutputPath = files.Create("existing.mp4");
+        harness.UserDialogs.ConfirmResult = false;
+
+        await vm.ExportVideoCommand.ExecuteAsync(null);
+
+        Assert.Same(failure, vm.VideoPublicationErrorPresentation);
+        Assert.Equal(settled, vm.StatusMessage);
+        Assert.Equal("Video Export Failed", vm.VideoResultTitle);
+        Assert.Equal(1, harness.VideoPublications.Calls);
+        Assert.Single(harness.Diagnostics.Events, entry => entry.Item2 == ErrorPresentationContext.VideoPublication);
+    }
+
+    [Theory]
+    [InlineData("success")]
+    [InlineData("failure")]
+    [InlineData("cancelled")]
+    public async Task ReviewErrorGuidance_IsIndependentOfPublicationStatus(string outcome)
+    {
+        using TestMediaFiles files = new();
+        TestHarness harness = ReadyVideoHarness();
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("review.mp4"), job.Identity)));
+        using MainWindowViewModel vm = harness.CreateViewModel();
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("source.mp4")]);
+        await vm.RenderVideoCommand.ExecuteAsync(null);
+        harness.RenderedVideoPlayer.FailPlayback();
+        ErrorPresentation review = Assert.IsType<ErrorPresentation>(vm.VideoReviewErrorPresentation);
+        HashSet<string?> changes = [];
+        vm.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+        TaskCompletionSource entered = NewCompletion();
+        TaskCompletionSource<VideoExportResult> release = NewCompletion<VideoExportResult>();
+        harness.SaveDialogs.VideoOutputPath = files.PathFor("export.mp4");
+        harness.VideoPublications.Handler = (_, _, _) => { entered.SetResult(); return release.Task; };
+        Task export = vm.ExportVideoCommand.ExecuteAsync(null);
+        await entered.Task;
+        Assert.Equal("Publishing the reviewed video...", vm.StatusMessage);
+        Assert.Equal(review, vm.VideoReviewErrorPresentation);
+        release.SetResult(outcome switch
+        {
+            "failure" => VideoExportResult.Failure(VideoExportErrorCategory.OutputFinalizationFailed, "Failed.", "publication detail"),
+            "cancelled" => VideoExportResult.Cancelled(),
+            _ => VideoExportResult.Completed(files.PathFor("export.mp4"), 100, new(64, 48), 10)
+        });
+        await export;
+        Assert.NotEqual(review.UserMessage, vm.StatusMessage);
+        Assert.Equal(review, vm.VideoReviewErrorPresentation);
+        Assert.True(vm.ShowRenderedVideoReviewError);
+        vm.ShowVideoReviewErrorDetailsCommand.Execute(null);
+        Assert.Same(vm.VideoReviewErrorPresentation, Assert.Single(harness.ErrorDetailsDialogs.Presentations));
+        Assert.Contains(nameof(vm.VideoReviewErrorPresentation), changes);
+        vm.UnloadReviewView();
+        await vm.LoadReviewViewAsync(null);
+        Assert.Null(vm.VideoReviewErrorPresentation);
+        Assert.False(vm.ShowRenderedVideoReviewError);
+    }
+
+    [Fact]
+    public async Task ObsoleteOverwriteDecline_CannotRestoreFooterOverReplacementMedia()
+    {
+        using TestMediaFiles files = new();
+        TestHarness harness = ReadyVideoHarness();
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("review.mp4"), job.Identity)));
+        using MainWindowViewModel vm = harness.CreateViewModel();
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("source.mp4")]);
+        await vm.RenderVideoCommand.ExecuteAsync(null);
+        string oldStatus = vm.StatusMessage;
+        string nextSource = files.Create("new-source.mp4");
+        Task replacement = Task.CompletedTask;
+        harness.SaveDialogs.VideoOutputPath = files.Create("existing.mp4");
+        harness.UserDialogs.ConfirmResult = false;
+        harness.UserDialogs.OnConfirm = () => replacement = vm.DropMediaCommand.ExecuteAsync([nextSource]);
+
+        await vm.ExportVideoCommand.ExecuteAsync(null);
+        await replacement;
+
+        Assert.Equal(nextSource, vm.VideoMetadata?.FilePath);
+        Assert.NotEqual(oldStatus, vm.StatusMessage);
+        Assert.DoesNotContain("Publishing", vm.StatusMessage, StringComparison.Ordinal);
+        Assert.False(vm.HasVideoArtifact);
+        Assert.Null(vm.VideoReviewErrorPresentation);
+        Assert.Equal(0, harness.VideoPublications.Calls);
     }
 
     [Fact]
@@ -5243,11 +5479,17 @@ public sealed class MainWindowVideoPreviewTests
     {
         public bool ConfirmResult { get; set; } = true;
 
+        public Action? OnConfirm { get; set; }
+
         public bool Confirm(
             string title,
             string message,
             string confirmButtonText = "Confirm",
-            string cancelButtonText = "Cancel") => ConfirmResult;
+            string cancelButtonText = "Cancel")
+        {
+            OnConfirm?.Invoke();
+            return ConfirmResult;
+        }
     }
 
     private sealed class FakeFolderLauncher : IFolderLauncher

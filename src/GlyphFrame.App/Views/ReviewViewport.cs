@@ -40,6 +40,14 @@ public sealed class ReviewViewport : Grid
     public double RotationDegrees { get => (double)GetValue(RotationDegreesProperty); set => SetValue(RotationDegreesProperty, value); }
     public string ScaleMode { get => (string)GetValue(ScaleModeProperty); set => SetValue(ScaleModeProperty, value); }
 
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        // Canvas dimensions describe an internal scroll extent, never an intrinsic
+        // request for more space in the parent. The host supplies the viewport slot.
+        base.MeasureOverride(availableSize);
+        return new Size(0, 0);
+    }
+
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi) { base.OnDpiChanged(oldDpi, newDpi); Refresh(); }
     private static void Changed(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((ReviewViewport)d).Refresh();
     private void Refresh()

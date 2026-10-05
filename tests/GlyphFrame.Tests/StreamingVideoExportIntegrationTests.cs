@@ -17,11 +17,18 @@ namespace GlyphFrame.Tests;
 
 public sealed class StreamingVideoExportIntegrationTests
 {
-    [Fact]
-    public async Task ManagedRender_RealRotatedUnicodeVideoCreatesOwnedReviewArtifact()
+    [Theory]
+    [InlineData("video-preview.mp4", 64, 48)]
+    [InlineData("video-preview.mov", 64, 48)]
+    [InlineData("video-preview.mkv", 64, 48)]
+    [InlineData("video-preview.avi", 64, 48)]
+    [InlineData("video-preview-rotated.mov", 240, 320)]
+    public async Task ManagedRender_RealUnicodeContainerRendersAndPublishesAcceptedArtifact(
+        string fixture, int displayWidth, int displayHeight)
     {
         using TemporaryMediaDirectory media = new("керований кеш 日本語");
-        string input = media.CopyFixture("video-preview-rotated.mov", "джерело артефакту 日本語.MOV");
+        string input = media.CopyFixture(fixture, "джерело артефакту 日本語" + Path.GetExtension(fixture));
+        byte[] sourceBytes = await File.ReadAllBytesAsync(input);
         BundledFfmpegLocator locator = new(RepositoryRoot);
         ProcessRunner processRunner = new();
         using FfmpegValidationService validation = new(locator, processRunner);
@@ -30,10 +37,13 @@ public sealed class StreamingVideoExportIntegrationTests
             validation,
             processRunner);
         VideoMetadata metadata = await metadataReader.ReadAsync(input);
+        Assert.Equal(displayWidth, metadata.DisplayWidth);
+        Assert.Equal(displayHeight, metadata.DisplayHeight);
+        ImagePipelineService pipeline = CreatePipeline();
         StreamingVideoExportService exportService = new(
             new FfmpegSequentialVideoFrameReader(locator),
             new FfmpegVideoEncoder(locator),
-            CreatePipeline(),
+            pipeline,
             new OutputDimensionResolver(),
             new FfprobeAudioStreamProbe(validation, processRunner),
             new Mp4AudioCompatibilityPolicy(),
@@ -70,9 +80,10 @@ public sealed class StreamingVideoExportIntegrationTests
         Assert.True(result.Success, result.TechnicalDetail ?? result.UserMessage);
         ManagedVideoArtifact artifact = result.Artifact!;
         Assert.True(store.OwnsPath(artifact.FilePath));
-        Assert.Equal(new PixelDimensions(240, 320), artifact.OutputDimensions);
+        Assert.Equal(new PixelDimensions(displayWidth, displayHeight), artifact.OutputDimensions);
         Assert.Equal(12, artifact.RenderedFrameCount);
         Assert.Equal(10, artifact.FramesPerSecond);
+        Assert.Equal(TimeSpan.FromSeconds(1.2), artifact.Duration);
         Assert.Equal(AudioMuxOutcome.Removed, artifact.AudioOutcome);
         Assert.True(artifact.FileSizeBytes > 1_000);
         Assert.Empty(Directory.GetFiles(store.SessionDirectory, "*.partial"));
@@ -84,29 +95,65 @@ public sealed class StreamingVideoExportIntegrationTests
             .Single(stream => stream.GetProperty("codec_type").GetString() == "video");
         Assert.Equal("h264", video.GetProperty("codec_name").GetString());
         Assert.Equal("yuv420p", video.GetProperty("pix_fmt").GetString());
+        Assert.Equal(displayWidth, video.GetProperty("width").GetInt32());
+        Assert.Equal(displayHeight, video.GetProperty("height").GetInt32());
+        Assert.Equal("12", video.GetProperty("nb_frames").GetString());
+        Assert.Equal("10/1", video.GetProperty("avg_frame_rate").GetString());
+        Assert.Contains("mp4", probe.RootElement.GetProperty("format").GetProperty("format_name").GetString()!);
         Assert.DoesNotContain(
             streams.EnumerateArray(),
             stream => stream.GetProperty("codec_type").GetString() == "audio");
+        VideoMetadata renderedMetadata = await metadataReader.ReadAsync(artifact.FilePath);
+        FfmpegVideoFrameReader frames = new(locator, new BinaryProcessRunner(), metadataReader);
+        VideoFrameReadResult sourceFrame = await frames.ReadAsync(input, 0.5d, metadata);
+        VideoFrameReadResult renderedFrame = await frames.ReadAsync(artifact.FilePath, 0.5d, renderedMetadata);
+        Assert.True(sourceFrame.Success, sourceFrame.TechnicalDetail ?? sourceFrame.UserMessage);
+        Assert.True(renderedFrame.Success, renderedFrame.TechnicalDetail ?? renderedFrame.UserMessage);
+        ImagePipelineResult expected = await pipeline.RenderAsync(sourceFrame.Frame!, settings, preset);
+        double symbolError = RgbMeanAbsoluteError(renderedFrame.Frame!, expected.RenderedImage);
+        double sourceError = RgbMeanAbsoluteError(renderedFrame.Frame!, sourceFrame.Frame!);
+        Assert.True(symbolError < 18d, $"{fixture}: symbol-art RGB MAE was {symbolError:F3}.");
+        Assert.True(symbolError * 2d < sourceError, $"{fixture}: output did not match symbol art more closely than source pixels.");
+        (double coverage, double agreement) = BackgroundAgreement(
+            expected.RenderedImage, renderedFrame.Frame!, PixelColor.SymbolBackground, tolerance: 24);
+        Assert.True(coverage > 0.45d);
+        Assert.True(agreement > 0.80d);
         await using ManagedVideoArtifactSession session = new(store);
         await session.AcceptAsync(artifact);
+        Assert.Same(artifact, session.Current);
         VideoArtifactPublisher publisher = new(store);
+        DateTime artifactWriteTime = File.GetLastWriteTimeUtc(artifact.FilePath);
+        List<string> destinations = [];
         for (int copy = 0; copy < 2; copy++)
         {
             string destination = Path.Combine(media.RootPath, $"переглянутий 日本語 {copy}.mp4");
+            destinations.Add(destination);
             VideoPublicationDestination prepared = await publisher.PrepareAsync(destination, input);
             VideoExportResult published = await session.UseCurrentAsync(artifact,
                 token => publisher.PublishAsync(new(artifact, input, prepared, false), token));
             Assert.True(published.Success, published.TechnicalDetail);
+            Assert.Same(artifact, session.Current);
+            Assert.Equal(artifactWriteTime, File.GetLastWriteTimeUtc(artifact.FilePath));
             Assert.Equal(await File.ReadAllBytesAsync(artifact.FilePath), await File.ReadAllBytesAsync(destination));
             using JsonDocument exportedProbe = await ProbeAsync(destination, locator, processRunner);
             Assert.Equal(video.GetProperty("nb_frames").GetString(), exportedProbe.RootElement.GetProperty("streams")[0].GetProperty("nb_frames").GetString());
             using FileStream destinationExclusive = new(destination, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
         }
         Assert.Empty(Directory.GetFiles(media.RootPath, "*.partial", SearchOption.AllDirectories));
-        using FileStream sourceExclusive = new(input, FileMode.Open, FileAccess.Read, FileShare.None);
-        using FileStream artifactExclusive = new(artifact.FilePath, FileMode.Open, FileAccess.Read, FileShare.None);
-        Assert.True(sourceExclusive.CanRead);
-        Assert.True(artifactExclusive.CanRead);
+        Assert.Empty(Directory.GetFiles(media.RootPath, "*.pending.mp4", SearchOption.AllDirectories));
+        Assert.Empty(Directory.GetFiles(media.RootPath, "*.png", SearchOption.AllDirectories));
+        Assert.Equal(sourceBytes, await File.ReadAllBytesAsync(input));
+        using (FileStream sourceExclusive = new(input, FileMode.Open, FileAccess.Read, FileShare.None))
+        using (FileStream artifactExclusive = new(artifact.FilePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.True(sourceExclusive.CanRead);
+            Assert.True(artifactExclusive.CanRead);
+        }
+        await session.DisposeAsync();
+        Assert.Null(session.Current);
+        Assert.False(File.Exists(artifact.FilePath));
+        Assert.False(Directory.Exists(store.SessionDirectory));
+        Assert.All(destinations, destination => Assert.True(File.Exists(destination)));
     }
 
     [Fact]

@@ -239,11 +239,12 @@ public sealed class Phase13UiTests
             window.Show();
             window.UpdateLayout();
             ScrollViewer[] scrolls = Descendants(window).OfType<ScrollViewer>()
-                .Where(scroll => scroll.VerticalScrollBarVisibility == ScrollBarVisibility.Auto).ToArray();
+                .Where(scroll => scroll.VerticalScrollBarVisibility is ScrollBarVisibility.Auto or ScrollBarVisibility.Visible).ToArray();
             Assert.Equal(2, scrolls.Length);
             ScrollViewer left = Assert.Single(scrolls, scroll => Grid.GetColumn(scroll) == 0);
             ScrollViewer right = Assert.Single(scrolls, scroll => Grid.GetColumn(scroll) == 2);
             Assert.Equal(ScrollBarVisibility.Disabled, left.HorizontalScrollBarVisibility);
+            Assert.Equal(ScrollBarVisibility.Visible, left.VerticalScrollBarVisibility);
             Assert.Equal(ScrollBarVisibility.Disabled, right.HorizontalScrollBarVisibility);
 
             Button render = Assert.Single(Descendants(left).OfType<Button>(), button =>
@@ -308,7 +309,7 @@ public sealed class Phase13UiTests
         }
     }
 
-    private static Window LoadLooseMainWindow()
+    internal static Window LoadLooseMainWindow(bool realMediaComponents = false)
     {
         XDocument document = XDocument.Load(Path.Combine(RepositoryRoot(), "src", "GlyphFrame.App", "MainWindow.xaml"));
         XNamespace wpf = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
@@ -335,7 +336,7 @@ public sealed class Phase13UiTests
             {
                 handler.Remove();
             }
-            foreach (XElement nested in replacement.Descendants().Where(view =>
+            foreach (XElement nested in replacement.Descendants().Where(view => !realMediaComponents &&
                          view.Name.NamespaceName == "clr-namespace:GlyphFrame.App.Views"
                          && view.Name.LocalName is "ReviewViewport" or "VideoReviewSurface"
                              or "ExportActivityIndicator").ToArray())
@@ -490,7 +491,7 @@ public sealed class Phase13UiTests
         public string LogsDirectory => @"C:\Users\Example\AppData\Local\GlyphFrame\logs";
     }
 
-    private sealed class MainLayoutData(bool video, bool retainedInputError = false)
+    internal class MainLayoutData(bool video, bool retainedInputError = false)
     {
         public bool IsBrowseMediaAvailable => true;
         public bool ShowRetainedMediaInputErrorDetails => retainedInputError;

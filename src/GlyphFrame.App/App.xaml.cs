@@ -34,6 +34,11 @@ public partial class App : Application
 
         var services = new ServiceCollection();
         ConfigureServices(services);
+        string? verificationDataRoot = PackageVerificationDataRoot.Resolve(e.Args);
+        if (verificationDataRoot is not null)
+        {
+            services.AddSingleton<IApplicationPaths>(new ApplicationPaths(verificationDataRoot));
+        }
 
         _serviceProvider = services.BuildServiceProvider(new ServiceProviderOptions
         {

@@ -150,7 +150,7 @@ public sealed record ErrorPresentation
         ApplicationErrorCode.DestinationAccessDenied => "GlyphFrame cannot write to this location. Choose a destination you can modify.",
         ApplicationErrorCode.InsufficientDiskSpace => "There is not enough free disk space to complete this operation. Free space or choose another drive.",
         ApplicationErrorCode.DestinationConflict => "The destination changed or conflicts with a protected file. Choose another destination and try again.",
-        ApplicationErrorCode.AtomicPublicationFailed => "GlyphFrame could not safely publish the completed file. The existing destination was preserved.",
+        ApplicationErrorCode.AtomicPublicationFailed => "GlyphFrame could not safely save the completed file. Try again or choose another destination.",
         ApplicationErrorCode.ArtifactCacheUnavailable => "GlyphFrame could not use its local review cache. Check available storage and permissions, then try again.",
         ApplicationErrorCode.ArtifactValidationFailed => "The completed review video could not be validated. Render the video again.",
         ApplicationErrorCode.ArtifactAcceptanceFailed => "GlyphFrame could not retain the completed review video. Render the video again.",

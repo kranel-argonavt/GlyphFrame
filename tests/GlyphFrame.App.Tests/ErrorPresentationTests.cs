@@ -79,6 +79,43 @@ public sealed class ErrorPresentationTests
         Assert.Contains("native diagnostic detail", presentation.TechnicalDetail);
     }
 
+    [Fact]
+    public void AtomicPublicationFailed_UsesDestinationNeutralMessageAndRetainsDetails()
+    {
+        const string technicalDetail = "Managed artifact read failed: controlled diagnostic.";
+        ErrorPresentation presentation = ErrorPresentation.Create(
+            ApplicationErrorCode.AtomicPublicationFailed,
+            ErrorPresentationContext.VideoPublication,
+            technicalDetail);
+
+        Assert.Equal(ApplicationErrorCode.AtomicPublicationFailed, presentation.Code);
+        Assert.Equal(ErrorPresentationContext.VideoPublication, presentation.Context);
+        Assert.Equal(technicalDetail, presentation.TechnicalDetail);
+        Assert.Equal("GlyphFrame could not safely save the completed file. Try again or choose another destination.",
+            presentation.UserMessage);
+        Assert.DoesNotContain("existing destination", presentation.UserMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("preserved", presentation.UserMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(VideoExportErrorCategory.OutputFinalizationFailed)]
+    [InlineData(VideoExportErrorCategory.UnexpectedFailure)]
+    public void PublicationFailureService_UsesDestinationNeutralMessageAndRetainsDetails(VideoExportErrorCategory category)
+    {
+        const string technicalDetail = "Controlled publication failure diagnostic.";
+        VideoExportResult result = VideoExportResult.Failure(category, string.Empty, technicalDetail);
+
+        ErrorPresentation presentation = Assert.IsType<ErrorPresentation>(
+            _service.From(result, ErrorPresentationContext.VideoPublication));
+
+        Assert.Equal(ApplicationErrorCode.AtomicPublicationFailed, presentation.Code);
+        Assert.Equal(ErrorPresentationContext.VideoPublication, presentation.Context);
+        Assert.Equal(technicalDetail, presentation.TechnicalDetail);
+        Assert.Equal("GlyphFrame could not safely save the completed file. Try again or choose another destination.",
+            presentation.UserMessage);
+        Assert.DoesNotContain("existing destination", presentation.UserMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData(MediaInputErrorCategory.EmptyPath)]
     [InlineData(MediaInputErrorCategory.InvalidPath)]
