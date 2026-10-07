@@ -1,16 +1,17 @@
 # Provisional packaging evidence, intentionally separate from xUnit execution.
 [CmdletBinding()]
 param(
-    [ValidateRange(1, 30)][int]$StartupObservationSeconds = 3
+    [ValidateRange(1, 30)][int]$StartupObservationSeconds = 3,
+    [ValidatePattern('^[0-9a-f]{32}$')][string]$RunId = [Guid]::NewGuid().ToString('N')
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'This verifier requires PowerShell 7 on Windows.' }
 . (Join-Path $PSScriptRoot 'PackageVerification.Session.ps1')
+. (Join-Path $PSScriptRoot 'PortablePackage.Helpers.ps1')
 
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$runId = [Guid]::NewGuid().ToString('N')
 $runRoot = Join-Path $repositoryRoot "artifacts/package-verification/$runId"
 $publishRoot = Join-Path $runRoot 'publish'
 $dataRoot = $null
@@ -22,6 +23,11 @@ $application = $null
 $failure = $null
 $sessionObservation = $null
 $sessionCleanup = $null
+
+Assert-PortableDirectoryChain ([IO.Path]::GetDirectoryName($runRoot))
+if ([IO.Directory]::Exists($runRoot) -or [IO.File]::Exists($runRoot)) {
+    throw 'Verification output already exists; refuse to reuse or overwrite a previous run.'
+}
 
 function Require-File([string]$RelativePath) {
     $file = Join-Path $publishRoot $RelativePath
@@ -78,21 +84,11 @@ try {
 
     & dotnet publish (Join-Path $repositoryRoot 'src/GlyphFrame.App/GlyphFrame.App.csproj') `
         --configuration Release --runtime win-x64 --self-contained true `
-        -p:PublishSingleFile=false --output $publishRoot
+        -p:PublishSingleFile=false -p:PublishTrimmed=false --output $publishRoot
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE." }
     $checks.Add('Actual application project published as self-contained Windows x64 Release')
 
-    foreach ($file in @(
-        'GlyphFrame.App.exe', 'GlyphFrame.App.dll', 'GlyphFrame.App.deps.json', 'GlyphFrame.App.runtimeconfig.json',
-        'GlyphFrame.Core.dll', 'GlyphFrame.Infrastructure.dll', 'GlyphFrame.Rendering.dll',
-        'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'System.Private.CoreLib.dll',
-        'PresentationFramework.dll', 'PresentationCore.dll', 'WindowsBase.dll',
-        'PresentationNative_cor3.dll', 'wpfgfx_cor3.dll', 'vcruntime140_cor3.dll',
-        'D3DCompiler_47_cor3.dll', 'PenImc_cor3.dll',
-        'libSkiaSharp.dll', 'SkiaSharp.dll', 'THIRD_PARTY_NOTICES.md',
-        'Tools/ffmpeg/ffmpeg.exe', 'Tools/ffmpeg/ffprobe.exe', 'Tools/ffmpeg/SHA256SUMS.txt',
-        'Tools/ffmpeg/LICENSE.txt', 'Tools/ffmpeg/DISTRIBUTION_README.txt'
-    )) { Require-File $file | Out-Null }
+    Assert-PackageRequiredFiles $publishRoot
     $runtime = Get-Content -LiteralPath (Join-Path $publishRoot 'GlyphFrame.App.runtimeconfig.json') -Raw | ConvertFrom-Json
     if (-not $runtime.runtimeOptions.PSObject.Properties['includedFrameworks']) {
         throw 'Runtime configuration does not describe included self-contained frameworks.'

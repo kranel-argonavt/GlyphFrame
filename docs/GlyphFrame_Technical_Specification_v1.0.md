@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through the audited Phase 14 testing block (minimum-size/live-DPI checks passed; multi-monitor follow-up confirmed by the user; broader testing and Phase 15 clean-machine verification remain separate)
+Status: Updated through Phase 15A portable packaging (audited Phase 14 follow-ups preserved; broader testing, Phase 15B extracted-ZIP interaction and Phase 15C clean-machine execution remain separate)
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -121,7 +121,7 @@ The final application package must include:
 
 ```text
 GlyphFrame/
-├── GlyphFrame.exe
+├── GlyphFrame.App.exe
 └── Tools/
     └── ffmpeg/
         ├── ffmpeg.exe
@@ -1489,6 +1489,14 @@ Package must include:
 
 The app should be tested on a clean Windows machine before release.
 
+Phase 15A implements reproducible packaging steps with `pwsh -NoProfile -File scripts/Build-PortablePackage.ps1` (Windows, PowerShell 7, .NET 10 SDK, Git and configured NuGet/runtime-pack access). The contract is Release / win-x64 / self-contained / folder-based (`PublishSingleFile=false`) / untrimmed (`PublishTrimmed=false`). One fresh publish reuses the existing required runtime/native/tool/attribution, checksum, outside-repository startup, short marked isolated-data-root, active PID-bound lease and exact-session shutdown-cleanup checks. The verifier remains independently runnable.
+
+The package is `GlyphFrame-<version>-win-x64-portable.zip` with one `GlyphFrame-<version>-win-x64/` application directory and expected relative Tools layout, plus a SHA-256 checksum and machine-readable report in a unique ignored run directory. Version is read from the published application assembly using the same Major.Minor.Build convention as About, not a new hard-coded version. Reports record commit/dirty-tree provenance, SDK/tool versions, build options, excluded PDBs, staging file hashes and completed validation evidence. Archive entries are checked for required layout, safe relative paths, duplicate/case/file-directory conflicts, unwanted content and byte/hash agreement with validated staging. Generated data, tests/fixtures, repository/IDE files, logs/settings/cache, markers, media and smoke evidence are not distributed. Failure retains evidence and cannot report an incomplete package as successful. Reproducible commands/payload verification do not promise identical ZIP bytes across runs.
+
+Portable deployment is extraction and launch without an installer, **not** beside-EXE application data: ordinary settings, privacy-safe logs and managed cache retain `%LocalAppData%\GlyphFrame`. The marked verification-data-root opt-in remains verification-only. The included user README documents extraction, directory preservation, uninstall by removing the closed application's folder, and compatibility limitations. Existing third-party notices/license/distribution information are preserved; their presence does not prove legal distribution compliance or supply an invented application license. Public release requires release-owner licensing and corresponding-source review.
+
+Startup verification of the published folder is not interactive execution of the extracted ZIP. Phase 15B extracted-ZIP workflows and Phase 15C clean Windows without installed .NET/FFmpeg remain pending; no release/installer/signing or Phase 16 publication is performed. See `docs/Phase_15_Packaging.md` for reproduction and actual evidence.
+
 ## 21. Roadmap
 
 ### Phase 1 - Final Documentation
@@ -1758,12 +1766,9 @@ The package verifier's application data now resides under unique marked `%TEMP%\
 
 ### Phase 15 - Packaging
 
-- Self-contained Windows x64 publish.
-- Bundled native dependencies.
-- Bundled FFmpeg.
-- Portable ZIP.
-- Clean Windows machine test.
-- Licenses and notices.
+- **Phase 15A implemented:** reproducible self-contained Windows x64 folder publish, bundled runtime/native dependencies and FFmpeg, versioned portable ZIP/checksum, payload/archive verification and machine-readable provenance. Existing attribution preserved; public-distribution legal review remains separate.
+- **Phase 15B planned:** interactive testing of the actual extracted ZIP.
+- **Phase 15C planned:** clean Windows execution without separately installed .NET/FFmpeg.
 
 ### Phase 16 - Portfolio Release
 
