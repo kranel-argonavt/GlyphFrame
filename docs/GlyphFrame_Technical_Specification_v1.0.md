@@ -1,7 +1,8 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 15A portable packaging (audited Phase 14 follow-ups preserved; broader testing, Phase 15B extracted-ZIP interaction and Phase 15C clean-machine execution remain separate)
+Status: Updated through Phase 15B extracted-ZIP validation, 2026-10-07 (not signed off: observed transport defects and remaining checks; historical Phase 14 evidence preserved; Phase 15C clean-machine execution NOT TESTED)
+Follow-up: 2026-10-08 paused-position synchronization correction and dirty-tree candidate retest recorded; Phase 15B remains unsigned pending outstanding native/human checks and final committed-package verification.
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -1495,9 +1496,11 @@ The package is `GlyphFrame-<version>-win-x64-portable.zip` with one `GlyphFrame-
 
 Portable deployment is extraction and launch without an installer, **not** beside-EXE application data: ordinary settings, privacy-safe logs and managed cache retain `%LocalAppData%\GlyphFrame`. The marked verification-data-root opt-in remains verification-only. The included user README documents extraction, directory preservation, uninstall by removing the closed application's folder, and compatibility limitations. Existing third-party notices/license/distribution information are preserved; their presence does not prove legal distribution compliance or supply an invented application license. Public release requires release-owner licensing and corresponding-source review.
 
-Startup verification of the published folder is not interactive execution of the extracted ZIP. Phase 15B extracted-ZIP workflows and Phase 15C clean Windows without installed .NET/FFmpeg remain pending; no release/installer/signing or Phase 16 publication is performed. See `docs/Phase_15_Packaging.md` for reproduction and actual evidence.
+Startup verification of the published folder is not interactive execution of the extracted ZIP. Independent Phase 15B native validation on 2026-10-07 used a fresh ZIP from clean commit `cdb1f8eadaeda3d831c203faf62d89ed56cd8297`, verified all 416 extracted payload hashes, and launched only the extracted EXE with isolated data and an observed production lease. Image/video rendering/publication, full output decoding, active video-render cancellation/retry, and normal exact-session cleanup passed. Repeated fullscreen entry failed time/frame/thumb agreement; returning to Original once reset its position to zero. These are observed defects, not fixes or a complete Phase 15B sign-off. Human audibility and active artifact-publication cancellation remain NOT TESTED; transient image Rendering layout was inconclusive. Phase 15C clean Windows without installed .NET/FFmpeg remains NOT TESTED. See [the dated packaging validation report](Phase_15_Packaging.md#phase-15b--independent-extracted-zip-validation-2026-10-07) for identities, reproduction, per-scenario methods and evidence. No product fix, release/installer/signing or Phase 16 publication was performed.
 
 ## 21. Roadmap
+
+Phase 15B follow-up (2026-10-08): the shared playback controller owns a paused-position snapshot. Seek updates it immediately; playing timer ticks, a playing-to-paused transition and natural completion sample the native clock. Surface creation and idempotent pause do not replace a paused seek with delayed native zero/end readback; queued paused ticks are ignored. Replay remains the explicit restart operation. Separate transports, generation checks, media processing, publication and fullscreen ownership are unchanged. Seven delayed-readback/real-surface regression cases and 1,014 solution tests pass. An independently extracted dirty-tree candidate passed three full completion→midpoint→fullscreen-reopen cycles for each role and repeated paused timestamp comparisons. The historical single B2 observation's exact native cause is not retroactively proven. Precise playing-switch tolerance, rapid native switching, active publication cancellation, native SymbolizedPlayback-error/publication interaction, human audibility, sustained minimum-size image Rendering, broader DPI/multi-monitor checks and final clean committed-package retest are not signed off. See the October 8 follow-up in `Phase_15_Packaging.md`; Phase 15C remains separate.
 
 ### Phase 1 - Final Documentation
 
@@ -1767,7 +1770,7 @@ The package verifier's application data now resides under unique marked `%TEMP%\
 ### Phase 15 - Packaging
 
 - **Phase 15A implemented:** reproducible self-contained Windows x64 folder publish, bundled runtime/native dependencies and FFmpeg, versioned portable ZIP/checksum, payload/archive verification and machine-readable provenance. Existing attribution preserved; public-distribution legal review remains separate.
-- **Phase 15B planned:** interactive testing of the actual extracted ZIP.
+- **Phase 15B performed, not signed off (2026-10-07):** actual clean committed-source ZIP extracted and tested natively; structural/workflow/export/cancellation/cleanup passes, fullscreen and tab-position defects, and explicit remaining checks recorded in `docs/Phase_15_Packaging.md`. Requires fixes in a separately authorized implementation task, new committed-package retesting, audibility confirmation and observable publication-cancellation coverage.
 - **Phase 15C planned:** clean Windows execution without separately installed .NET/FFmpeg.
 
 ### Phase 16 - Portfolio Release

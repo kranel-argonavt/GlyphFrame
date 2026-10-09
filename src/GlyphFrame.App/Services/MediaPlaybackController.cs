@@ -44,6 +44,7 @@ internal sealed class MediaPlaybackController : IDisposable
     private string? _failureMessage;
     private string? _technicalDetail;
     private TimeSpan _duration;
+    private TimeSpan _position;
     private int _naturalVideoWidth;
     private int _naturalVideoHeight;
     private bool _disposed;
@@ -83,7 +84,10 @@ internal sealed class MediaPlaybackController : IDisposable
 
     public string? SourcePath => _sourcePath;
 
-    public TimeSpan Position => ClampPosition(_backend.Position);
+    // Native seek/readback is asynchronous (especially after natural completion).
+    // Paused presentation must retain the last commanded position, not reread a
+    // stale native clock whenever another surface binds or comparison captures it.
+    public TimeSpan Position => _position;
 
     public TimeSpan Duration => _duration;
 
@@ -226,7 +230,7 @@ internal sealed class MediaPlaybackController : IDisposable
 
         if (_hasEnded)
         {
-            _backend.Position = TimeSpan.Zero;
+            SetPosition(TimeSpan.Zero);
             _hasEnded = false;
         }
 
@@ -243,7 +247,15 @@ internal sealed class MediaPlaybackController : IDisposable
             return;
         }
 
-        _backend.Pause();
+        if (_isPlaying)
+        {
+            _backend.Pause();
+            _position = ClampPosition(_backend.Position);
+        }
+        else
+        {
+            _backend.Pause();
+        }
         _isPlaying = false;
         _positionTimer.Stop();
         OnStateChanged();
@@ -256,7 +268,7 @@ internal sealed class MediaPlaybackController : IDisposable
             return;
         }
 
-        _backend.Position = TimeSpan.Zero;
+        SetPosition(TimeSpan.Zero);
         _hasEnded = false;
         Play();
     }
@@ -268,7 +280,7 @@ internal sealed class MediaPlaybackController : IDisposable
             return;
         }
 
-        _backend.Position = ClampPosition(position);
+        SetPosition(position);
         _hasEnded = false;
         OnStateChanged();
     }
@@ -352,7 +364,7 @@ internal sealed class MediaPlaybackController : IDisposable
         _naturalVideoWidth = Math.Max(0, width);
         _naturalVideoHeight = Math.Max(0, height);
         _backend.Pause();
-        _backend.Position = TimeSpan.Zero;
+        SetPosition(TimeSpan.Zero);
         _isOpening = false;
         _isOpen = true;
         _isPlaying = false;
@@ -377,6 +389,7 @@ internal sealed class MediaPlaybackController : IDisposable
 
         _positionTimer.Stop();
         _backend.Pause();
+        _position = ClampPosition(_backend.Position);
         _isPlaying = false;
         _hasEnded = true;
         OnStateChanged();
@@ -402,8 +415,9 @@ internal sealed class MediaPlaybackController : IDisposable
 
     private void OnPositionTimerTick(object? sender, EventArgs e)
     {
-        if (!_disposed && _isOpen)
+        if (!_disposed && _isOpen && _isPlaying)
         {
+            _position = ClampPosition(_backend.Position);
             OnStateChanged();
         }
     }
@@ -416,6 +430,7 @@ internal sealed class MediaPlaybackController : IDisposable
         _positionTimer.Stop();
         _backend.Close();
         _duration = TimeSpan.Zero;
+        _position = TimeSpan.Zero;
         _naturalVideoWidth = 0;
         _naturalVideoHeight = 0;
         _isOpening = false;
@@ -445,6 +460,7 @@ internal sealed class MediaPlaybackController : IDisposable
         _openCompletion = null;
         _sourcePath = null;
         _duration = TimeSpan.Zero;
+        _position = TimeSpan.Zero;
         _naturalVideoWidth = 0;
         _naturalVideoHeight = 0;
         _failureMessage = null;
@@ -458,6 +474,13 @@ internal sealed class MediaPlaybackController : IDisposable
         {
             OnStateChanged();
         }
+    }
+
+    private void SetPosition(TimeSpan position)
+    {
+        TimeSpan target = ClampPosition(position);
+        _backend.Position = target;
+        _position = target;
     }
 
     private TimeSpan ClampPosition(TimeSpan position)
