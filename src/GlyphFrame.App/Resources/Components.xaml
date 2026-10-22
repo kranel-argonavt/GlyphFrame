@@ -1,17 +1,87 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:views="clr-namespace:GlyphFrame.App.Views">
     <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+    <!-- Shared 24-unit local-file icon vocabulary. No font-dependent glyphs. -->
+    <Geometry x:Key="FolderIcon">M2,6 L9,6 11,8 22,8 22,20 2,20 Z M2,6 L2,4 9,4 11,6</Geometry>
+    <Geometry x:Key="ImageIcon">M2,3 L22,3 22,21 2,21 Z M3,18 L9,11 14,16 17,12 22,18 M15,7 A2,2 0 1 1 11,7 A2,2 0 1 1 15,7</Geometry>
+    <Geometry x:Key="VideoIcon">M2,3 L22,3 22,21 2,21 Z M6,3 L6,21 M18,3 L18,21 M2,8 L6,8 M2,16 L6,16 M18,8 L22,8 M18,16 L22,16 M10,8 L15,12 10,16 Z</Geometry>
+    <Geometry x:Key="SymbolsIcon">M3,3 L8,3 8,8 3,8 Z M16,3 L21,3 21,8 16,8 Z M3,16 L8,16 8,21 3,21 Z M16,16 L21,16 21,21 16,21 Z</Geometry>
+    <Geometry x:Key="ReadyToRenderIcon">M5,22 L5,3 M5,4 L21,4 17,9 21,14 5,14</Geometry>
+    <Geometry x:Key="CharactersIcon">M9,3 L5,21 M19,3 L15,21 M3,8 L22,8 M2,16 L21,16</Geometry>
+    <Geometry x:Key="RenderIcon">M3,8 L3,3 8,3 M16,3 L21,3 21,8 M21,16 L21,21 16,21 M8,21 L3,21 3,16 M16,8 C14,5 8,6 8,9 C8,13 16,11 16,15 C16,18 10,19 8,16</Geometry>
+    <Geometry x:Key="RenderSettingsIcon">M3,6 L8,6 M12,6 L21,6 M8,3 L8,9 M3,12 L14,12 M18,12 L21,12 M18,9 L18,15 M3,18 L6,18 M10,18 L21,18 M6,15 L6,21</Geometry>
+    <Geometry x:Key="SpeakerIcon">M2,9 L7,9 12,4 12,20 7,15 2,15 Z M16,8 Q20,12 16,16 M19,5 Q26,12 19,19</Geometry>
+    <Geometry x:Key="LocalDropIcon">M5,2 L14,2 19,7 19,22 5,22 Z M14,2 L14,7 19,7 M12,10 L12,18 M8,14 L12,18 16,14</Geometry>
+    <Geometry x:Key="LockIcon">M5,10 L19,10 19,22 5,22 Z M8,10 L8,6 A4,4 0 0 1 16,6 L16,10 M12,14 L12,18</Geometry>
+    <Geometry x:Key="InfoIcon">M22,12 A10,10 0 1 1 2,12 A10,10 0 1 1 22,12 M12,10 L12,17 M12,6 L12,7</Geometry>
+    <Geometry x:Key="ExportIcon">M3,14 L3,22 21,22 21,14 M12,2 L12,16 M6,10 L12,16 18,10</Geometry>
+    <Geometry x:Key="CopyIcon">M8,7 L22,7 22,22 8,22 Z M17,7 L17,2 2,2 2,17 8,17</Geometry>
+    <Geometry x:Key="RerenderIcon">M4,8 A9,9 0 1 1 3,16 M4,2 L4,8 10,8</Geometry>
+    <Geometry x:Key="SuccessIcon">M1,8 L7,14 21,1</Geometry>
+    <Geometry x:Key="WarningIcon">M12,2 L22,21 2,21 Z M12,8 L12,14 M12,17 L12,18</Geometry>
+    <Geometry x:Key="ErrorIcon">M1,1 L19,19 M19,1 L1,19</Geometry>
+    <Style x:Key="VectorIconStyle" TargetType="Path">
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="Stroke" Value="{DynamicResource SecondaryTextBrush}" />
+        <Setter Property="StrokeThickness" Value="1.6" />
+        <Setter Property="StrokeStartLineCap" Value="Round" />
+        <Setter Property="StrokeEndLineCap" Value="Round" />
+        <Setter Property="StrokeLineJoin" Value="Round" />
+        <Setter Property="Stretch" Value="Uniform" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+    <Style x:Key="HeadingIconStyle" TargetType="Path" BasedOn="{StaticResource VectorIconStyle}">
+        <Setter Property="Width" Value="20" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="Margin" Value="0,0,8,0" />
+        <Setter Property="Stroke" Value="{DynamicResource AccentHoverBrush}" />
+    </Style>
+    <DataTemplate x:Key="IconActionContent">
+        <StackPanel Orientation="Horizontal">
+            <Path Width="16" Height="16" Margin="0,0,6,0" Style="{StaticResource VectorIconStyle}"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  Data="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
+            <TextBlock Text="{Binding}" VerticalAlignment="Center"
+                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+        </StackPanel>
+    </DataTemplate>
 
     <DrawingImage x:Key="GlyphFrameWindowIcon">
         <DrawingImage.Drawing>
             <DrawingGroup>
-                <GeometryDrawing Brush="{DynamicResource AccentBrush}"
-                                 Geometry="M 0,0 L 16,0 16,16 0,16 Z" />
-                <GeometryDrawing Brush="White"
-                                 Geometry="M 5,3 L 12,8 5,13 Z" />
+                <GeometryDrawing Brush="{DynamicResource AccentSubtleBrush}" Geometry="M0,0 L32,0 32,32 0,32 Z" />
+                <GeometryDrawing Geometry="M2,9 L2,2 9,2 M23,2 L30,2 30,9 M30,23 L30,30 23,30 M9,30 L2,30 2,23">
+                    <GeometryDrawing.Pen><Pen Brush="{DynamicResource AccentBrush}" Thickness="2" /></GeometryDrawing.Pen>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="{DynamicResource PrimaryTextBrush}"
+                                 Geometry="M7,8 L15,8 15,11 10,11 10,21 13,21 13,17 11,17 11,14 16,14 16,24 7,24 Z M18,8 L26,8 26,11 21,11 21,14 25,14 25,17 21,17 21,24 18,24 Z" />
             </DrawingGroup>
         </DrawingImage.Drawing>
     </DrawingImage>
+    <Style x:Key="BrandLogoStyle" TargetType="{x:Type views:BrandLogo}">
+        <Setter Property="Width" Value="54" />
+        <Setter Property="Height" Value="54" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type views:BrandLogo}">
+                    <Border Background="{DynamicResource AccentSubtleBrush}" BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="1" CornerRadius="8">
+                        <views:DecorativeImage Width="38" Height="38"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              Source="{StaticResource GlyphFrameWindowIcon}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 
     <Style x:Key="CardStyle" TargetType="Border">
         <Setter Property="Padding" Value="{StaticResource CardPadding}" />

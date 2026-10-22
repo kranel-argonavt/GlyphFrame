@@ -3,12 +3,14 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using GlyphFrame.App.Presentation;
 using GlyphFrame.App.Views;
 using GlyphFrame.Core.Enums;
 
 namespace GlyphFrame.App.Tests;
 
+[Collection("WPF layout")]
 public sealed class ExportStatusAnimationTests
 {
     [Fact]
@@ -103,6 +105,7 @@ public sealed class ExportStatusAnimationTests
     }
 
     [Theory]
+    [InlineData(54)]
     [InlineData(64)]
     [InlineData(72)]
     public void RingSegments_HaveEqualAngularLengthAndSpacingAtBothSizes(int diameter)
@@ -147,6 +150,41 @@ public sealed class ExportStatusAnimationTests
     private static double AngleFromCenter(Point center, Point point) =>
         Math.Atan2(point.Y - center.Y, point.X - center.X) * 180d / Math.PI;
 
+    [Fact]
+    public void WorkingRing_LoadPercentageCompletionReducedMotionHideAndUnloadReleaseClocks()
+    {
+        RunOnStaThread(() =>
+        {
+            ExportActivityIndicator indicator = new() { Width = 54, Height = 54, IsActive = true, AnimationsEnabled = true };
+            Window host = new() { Content = indicator, SizeToContent = SizeToContent.WidthAndHeight, Left = -10000, ShowActivated = false };
+            try
+            {
+                host.Show(); host.UpdateLayout();
+                Path ring = (Path)indicator.FindName("RingSegments");
+                RotateTransform rotation = (RotateTransform)indicator.FindName("RingRotation");
+                Viewbox completion = (Viewbox)indicator.FindName("CompletionPresenter");
+                Assert.True(rotation.HasAnimatedProperties); Assert.True(ring.HasAnimatedProperties);
+                foreach (string label in new[] { "0%", "1%", "9%", "10%", "76%", "99%", "100%" })
+                {
+                    indicator.PercentageText = label; host.UpdateLayout(); Assert.True(rotation.HasAnimatedProperties);
+                    Assert.Equal(54, indicator.RenderSize.Width, 6); Assert.Equal(54, indicator.RenderSize.Height, 6);
+                }
+                indicator.AnimationsEnabled = false;
+                Assert.False(rotation.HasAnimatedProperties); Assert.False(ring.HasAnimatedProperties);
+                indicator.IsCompleted = true;
+                Assert.Equal(Visibility.Visible, completion.Visibility); Assert.Equal(1, completion.Opacity); Assert.False(completion.HasAnimatedProperties);
+                indicator.IsCompleted = false; indicator.AnimationsEnabled = true;
+                Assert.True(rotation.HasAnimatedProperties);
+                host.Hide(); Assert.False(rotation.HasAnimatedProperties); Assert.False(ring.HasAnimatedProperties);
+                host.Show(); Assert.True(rotation.HasAnimatedProperties);
+                indicator.IsCompleted = true; Assert.False(rotation.HasAnimatedProperties); Assert.True(completion.HasAnimatedProperties);
+                host.Content = null;
+                Assert.False(rotation.HasAnimatedProperties); Assert.False(ring.HasAnimatedProperties); Assert.False(completion.HasAnimatedProperties);
+            }
+            finally { host.Close(); }
+        });
+    }
+
     private static void RunOnStaThread(Action action)
     {
         ExceptionDispatchInfo? failure = null;
@@ -160,6 +198,7 @@ public sealed class ExportStatusAnimationTests
             {
                 failure = ExceptionDispatchInfo.Capture(exception);
             }
+            finally { Dispatcher.CurrentDispatcher.InvokeShutdown(); }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();

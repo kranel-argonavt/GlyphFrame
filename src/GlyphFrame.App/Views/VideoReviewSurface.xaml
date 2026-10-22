@@ -78,7 +78,10 @@
                 Style="{StaticResource PlayerIconButtonStyle}"
                 ToolTip="{Binding PlaybackActionLabel, ElementName=Surface}"
                 AutomationProperties.Name="{Binding PlaybackActionLabel, ElementName=Surface}">
+                <Grid Width="16" Height="16" Focusable="False" IsHitTestVisible="False">
                 <Path
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Focusable="False" IsHitTestVisible="False"
                     Stretch="Uniform"
                     Fill="{DynamicResource PrimaryTextBrush}">
                     <Path.Style>
@@ -87,6 +90,12 @@
                             <Setter
                                 Property="Data"
                                 Value="{StaticResource PlayerPlayIcon}" />
+                            <!-- The 14:18 triangle's ink centroid is about 2 DIPs
+                                 left of center in this 16-DIP slot. A restrained
+                                 half correction balances it without moving layout. -->
+                            <Setter Property="RenderTransform">
+                                <Setter.Value><TranslateTransform X="1" /></Setter.Value>
+                            </Setter>
                             <Style.Triggers>
                                 <DataTrigger
                                     Binding="{Binding IsPlaying, ElementName=Surface}"
@@ -94,11 +103,13 @@
                                     <Setter
                                         Property="Data"
                                         Value="{StaticResource PlayerPauseIcon}" />
+                                    <Setter Property="RenderTransform" Value="{x:Static Transform.Identity}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </Path.Style>
                 </Path>
+                </Grid>
             </Button>
             <TextBlock
                 Grid.Column="1"
@@ -130,7 +141,8 @@
                 AutomationProperties.Name="{Binding MuteActionLabel, ElementName=Surface}">
                 <Path
                     Stretch="Uniform"
-                    Fill="{DynamicResource PrimaryTextBrush}">
+                    Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                    Focusable="False" IsHitTestVisible="False">
                     <Path.Style>
                         <Style
                             TargetType="Path">

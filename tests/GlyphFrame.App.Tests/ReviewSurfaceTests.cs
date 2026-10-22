@@ -15,12 +15,271 @@ using Rectangle = System.Windows.Shapes.Rectangle;
 using System.Windows.Threading;
 using System.Xml.Linq;
 using GlyphFrame.App.Presentation;
+using GlyphFrame.App.Services;
 using GlyphFrame.App.Views;
 
 namespace GlyphFrame.App.Tests;
 
+[Collection("WPF layout")]
 public sealed class ReviewSurfaceTests
 {
+    [Theory]
+    [InlineData(404, false)]
+    [InlineData(590, false)]
+    [InlineData(1100, false)]
+    [InlineData(404, true)]
+    [InlineData(590, true)]
+    [InlineData(1100, true)]
+    public void ProcessingAndCancelling_UseSharedModeWithReachableActions(double width, bool cancelling)
+    {
+        RunSta(() =>
+        {
+            UserControl view = LoadExportStatusViewForLayout();
+            view.Width = width; view.DataContext = new ProcessingLayoutModel(cancelling);
+            StatusLayoutMode mode = width >= 476 ? StatusLayoutMode.CompactWide : StatusLayoutMode.Narrow;
+            Window host = new() { Content = view, SizeToContent = SizeToContent.WidthAndHeight, Left = -10000, ShowActivated = false };
+            try
+            {
+                host.Show(); host.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle); host.UpdateLayout();
+                Border shell = (Border)view.FindName("StatusShell"), active = (Border)view.FindName("ProcessingContent");
+                AdaptiveResultPanel panel = Assert.IsType<AdaptiveResultPanel>(active.Child);
+                Assert.True(active.IsVisible); Assert.Equal(mode, panel.LayoutMode);
+                Assert.Equal(active.DesiredSize.Height + 34, shell.ActualHeight, 4);
+                Assert.True(Assert.Single(VisualDescendants(active).OfType<ExportActivityIndicator>()).IsActive);
+                Button cancel = Assert.Single(VisualDescendants(active).OfType<Button>());
+                Assert.True(cancel.IsVisible); Assert.Equal(!cancelling, cancel.IsEnabled);
+                Assert.Equal("CancelExportCommand", BindingOperations.GetBinding(cancel, Button.CommandProperty)!.Path.Path);
+                foreach (TextBlock field in VisualDescendants(active).OfType<TextBlock>())
+                {
+                    Assert.False(string.IsNullOrWhiteSpace(field.Text));
+                    Rect bounds = BoundsWithin(field, shell);
+                    Assert.True(bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= shell.ActualWidth && bounds.Bottom <= shell.ActualHeight);
+                }
+                Rect button = BoundsWithin(cancel, shell);
+                Assert.True(button.Right <= shell.ActualWidth && button.Bottom <= shell.ActualHeight);
+                Assert.Empty(VisualDescendants(shell).OfType<ScrollViewer>());
+                if (mode == StatusLayoutMode.CompactWide)
+                {
+                    TextBlock title = VisualDescendants(active).OfType<TextBlock>().First(t => t.Text == "Rendering Video");
+                    TextBlock remaining = VisualDescendants(active).OfType<TextBlock>().First(t => t.Text.StartsWith("Remaining", StringComparison.Ordinal));
+                    Assert.InRange(BoundsWithin(title, shell).Top - shell.BorderThickness.Top, 16, 17);
+                    Assert.InRange(shell.ActualHeight - shell.BorderThickness.Bottom - BoundsWithin(remaining, shell).Bottom, 15.99, 17.01);
+                }
+            }
+            finally { host.Close(); }
+        });
+    }
+
+    [Theory]
+    [InlineData(320, StatusLayoutMode.Narrow)]
+    [InlineData(404, StatusLayoutMode.Narrow)]
+    [InlineData(612, StatusLayoutMode.Intermediate)]
+    [InlineData(736, StatusLayoutMode.CompactWide)]
+    [InlineData(1100, StatusLayoutMode.Spacious)]
+    public void ResponsiveResult_UsesApprovedCompositionWithFiniteMetrics(double width, StatusLayoutMode expected)
+    {
+        RunSta(() =>
+        {
+            UserControl view = LoadExportStatusViewForLayout();
+            VideoResultLayoutModel model = new(true);
+            view.DataContext = model;
+
+            view.Width = width;
+            Window host = new() { Content = view, SizeToContent = SizeToContent.WidthAndHeight, Left = -10000, ShowActivated = false };
+            try
+            {
+                host.Show();
+                view.Measure(new Size(width, double.PositiveInfinity));
+                view.Arrange(new Rect(0, 0, width, view.DesiredSize.Height)); view.UpdateLayout();
+                AdaptiveResultPanel result = (AdaptiveResultPanel)view.FindName("VideoResultLayout");
+                FrameworkElement text = (FrameworkElement)view.FindName("VideoResultText");
+                MetricCardsPanel metrics = (MetricCardsPanel)view.FindName("VideoResultMetrics");
+                VideoExportActionsPanel actions = (VideoExportActionsPanel)view.FindName("VideoResultActions");
+                Button export = (Button)view.FindName("VideoExportButton"), folder = (Button)view.FindName("OpenVideoExportFolderButton"), copy = (Button)view.FindName("CopyVideoExportPathButton");
+                Assert.Equal(expected, result.LayoutMode);
+                Assert.True(result.IsVisible && metrics.IsVisible && text.IsVisible);
+                Assert.True(export.IsEnabled && folder.IsEnabled && copy.IsEnabled);
+                Assert.Equal(model.VideoFileSizeText, ((StackPanel)((Border)metrics.Children[0]).Child).Children.OfType<TextBlock>().Last().Text);
+                Assert.Equal(model.ExportPathCopy.Path, copy.ToolTip);
+                Assert.NotNull(BindingOperations.GetBindingExpression(copy, Button.CommandProperty));
+                Assert.InRange(text.ActualWidth, 120, width);
+                Rect t = BoundsWithin(text, result), m = BoundsWithin(metrics, result), a = BoundsWithin(actions, result);
+                Assert.False(Overlaps(t, m)); Assert.False(Overlaps(t, a)); Assert.False(Overlaps(m, a));
+                if (expected == StatusLayoutMode.Spacious)
+                {
+                    Assert.True(t.Right < m.Left && m.Right < a.Left);
+                    Assert.Equal(CenterY(t), CenterY(m), 4); Assert.Equal(CenterY(m), CenterY(a), 4);
+                    Assert.True(text.ActualWidth >= 180);
+                }
+                else if (expected == StatusLayoutMode.CompactWide) { Assert.True(t.Bottom < m.Top && m.Right < a.Left); }
+                else if (expected == StatusLayoutMode.Intermediate) { Assert.True(t.Bottom < m.Top && Math.Max(t.Right, m.Right) < a.Left); }
+                else { Assert.True(t.Bottom < m.Top && m.Bottom < a.Top); Assert.Equal((result.ActualWidth - a.Width) / 2, a.Left, 4); Assert.InRange(a.Width, 1, 360); }
+                Rect e = BoundsWithin(export, actions), f = BoundsWithin(folder, actions), c = BoundsWithin(copy, actions);
+                if (expected == StatusLayoutMode.Intermediate)
+                {
+                    Assert.Equal(e.Width, f.Width); Assert.Equal(f.Width, c.Width);
+                    Assert.Equal(e.Left, f.Left); Assert.Equal(f.Left, c.Left);
+                    Assert.Equal(8, f.Top - e.Bottom, 6); Assert.Equal(8, c.Top - f.Bottom, 6);
+                }
+                else
+                {
+                    Assert.Equal(e.Left, f.Left); Assert.Equal(e.Right, c.Right); Assert.Equal(f.Top, c.Top);
+                    if (expected == StatusLayoutMode.Narrow) { Assert.Equal(f.Width, c.Width); }
+                    else { Assert.Equal(f.Width, c.Width); }
+                    Assert.Equal(e.Width, f.Width + ExportActionsPanel.Gap + c.Width, 6);
+                    Assert.True(e.Bottom < f.Top);
+                }
+                FrameworkElement[] controls = [text, export, folder, copy, .. metrics.Children.Cast<FrameworkElement>()];
+                foreach (FrameworkElement control in controls)
+                {
+                    Rect bounds = BoundsWithin(control, result);
+                    Assert.True(bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= result.ActualWidth + 0.1 && bounds.Bottom <= result.ActualHeight + 0.1);
+                }
+                foreach (FrameworkElement card in metrics.Children)
+                {
+                    Assert.InRange(card.ActualWidth, MetricCardsPanel.MinimumCardWidth, MetricCardsPanel.MaximumCardWidth);
+                    foreach (TextBlock value in VisualDescendants(card).OfType<TextBlock>().Skip(1))
+                    { Assert.Equal(TextWrapping.Wrap, value.TextWrapping); Assert.Equal(TextTrimming.None, value.TextTrimming); }
+                }
+                Assert.DoesNotContain(VisualDescendants(view).OfType<ScrollViewer>(), scroll => scroll.ComputedHorizontalScrollBarVisibility == Visibility.Visible);
+                string? captureDirectory = Environment.GetEnvironmentVariable("GLYPHFRAME_STATUS_CAPTURE_DIRECTORY");
+                if (captureDirectory is not null)
+                {
+                    Directory.CreateDirectory(captureDirectory);
+                    SaveComponent(RenderComponent(view), Path.Combine(captureDirectory, $"component-{expected}-{width}.png"));
+                }
+            }
+            finally { host.Close(); }
+        });
+    }
+
+    [Theory]
+    [InlineData(180)]
+    [InlineData(290)]
+    [InlineData(352)]
+    [InlineData(900)]
+    public void Metrics_BoundedGrowthAndLongValues_ReflowWithoutOverlap(double width)
+    {
+        RunSta(() =>
+        {
+            MetricCardsPanel panel = new();
+            foreach (string value in new[] { "123.45 GB", "16384 × 16384", "Unavailable_日本語_Кириллица" })
+            {
+                panel.Children.Add(new Border
+                {
+                    Padding = new Thickness(10, 8, 10, 8),
+                    Child = new TextBlock
+                    { Text = value, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.None, FontSize = 12 }
+                });
+            }
+            foreach (double available in new[] { width, width + 20, width, width + 1, width })
+            {
+                panel.Measure(new Size(available, double.PositiveInfinity));
+                panel.Arrange(new Rect(0, 0, available, panel.DesiredSize.Height)); panel.UpdateLayout();
+                Rect[] bounds = panel.Children.Cast<FrameworkElement>().Select(c => BoundsWithin(c, panel)).ToArray();
+                Assert.All(bounds, b => { Assert.InRange(b.Width, 88, 112); Assert.True(b.Left >= 0 && b.Right <= available + 0.1 && b.Bottom <= panel.ActualHeight + 0.1); });
+                for (int i = 0; i < bounds.Length; i++)
+                { for (int j = i + 1; j < bounds.Length; j++) { Assert.False(Overlaps(bounds[i], bounds[j])); } }
+                Assert.Equal(available < 280, bounds[0].Top != bounds[^1].Top);
+                Assert.All(panel.Children.Cast<Border>(), card => Assert.True(((TextBlock)card.Child).ActualWidth <= card.ActualWidth - 20 + 0.1));
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(VideoPlaybackSurfaceKind.Original, false)]
+    [InlineData(VideoPlaybackSurfaceKind.Original, true)]
+    [InlineData(VideoPlaybackSurfaceKind.Rendered, false)]
+    [InlineData(VideoPlaybackSurfaceKind.Rendered, true)]
+    public void SharedPlayerTemplate_CentersAllocation_AndOnlyPlayHasOpticalCorrection(VideoPlaybackSurfaceKind role, bool fullscreen)
+    {
+        RunSta(() =>
+        {
+            VideoReviewSurface surface = new() { PlaybackKind = role, IsFullscreen = fullscreen, ShowReplay = true };
+            PositionModel model = new();
+            surface.SetBinding(VideoReviewSurface.IsPlayingProperty, new Binding(nameof(model.IsPlaying)) { Source = model });
+            Window window = new() { Content = surface, Width = 650, Height = 400, Left = -10000, ShowActivated = false };
+            try
+            {
+                window.Show(); window.UpdateLayout();
+                Button play = (Button)surface.FindName("PlayButton");
+                Grid allocation = Assert.IsType<Grid>(play.Content);
+                System.Windows.Shapes.Path icon = Assert.IsType<System.Windows.Shapes.Path>(Assert.Single(allocation.Children.Cast<UIElement>()));
+                Grid row = Assert.IsType<Grid>(play.Parent);
+                Rect rowBounds = BoundsWithin(row, surface), buttonBounds = BoundsWithin(play, surface);
+                Rect[] surrounding = row.Children.OfType<FrameworkElement>().Select(c => BoundsWithin(c, surface)).ToArray();
+                foreach (Button button in VisualDescendants(surface).OfType<Button>().Where(b => b.IsVisible && (b.Content is System.Windows.Shapes.Path || b == play)))
+                {
+                    button.ApplyTemplate();
+                    ContentPresenter presenter = Assert.IsType<ContentPresenter>(button.Template.FindName("IconContent", button));
+                    Rect slot = BoundsWithin(presenter, button);
+                    Assert.Equal(HorizontalAlignment.Center, presenter.HorizontalAlignment);
+                    Assert.Equal(VerticalAlignment.Center, presenter.VerticalAlignment);
+                    Assert.InRange(Math.Abs(slot.Left + slot.Width / 2 - button.ActualWidth / 2), 0, 0.01);
+                    Assert.InRange(Math.Abs(slot.Top + slot.Height / 2 - button.ActualHeight / 2), 0, 0.01);
+                    Assert.True(slot.Left >= 0 && slot.Top >= 0 && slot.Right <= button.ActualWidth && slot.Bottom <= button.ActualHeight);
+                    if (button != play) { Assert.True(((System.Windows.Shapes.Path)button.Content).RenderTransform.Value.IsIdentity); }
+                }
+                Assert.Equal(32, play.ActualWidth); Assert.Equal(32, play.ActualHeight);
+                Assert.Equal(16, allocation.ActualWidth); Assert.Equal(16, allocation.ActualHeight);
+                Assert.Equal(16d * 14 / 18, icon.ActualWidth, 6); Assert.Equal(16, icon.ActualHeight, 6);
+                Assert.Equal(1, icon.RenderTransform.Value.OffsetX);
+                // Uniform-fit triangle: 14/18 aspect; centroid lies one sixth
+                // of its ink width left of its bounds center. The 1-DIP offset
+                // reduces that imbalance without changing the 16-DIP slot.
+                double centroidDeficit = 16d * 14 / 18 / 6;
+                Assert.True(Math.Abs(centroidDeficit - icon.RenderTransform.Value.OffsetX) < centroidDeficit);
+                for (int i = 0; i < 4; i++)
+                {
+                    model.IsPlaying = !model.IsPlaying; window.UpdateLayout();
+                    Assert.Equal(model.IsPlaying, surface.IsPlaying);
+                    Assert.Equal(model.IsPlaying ? 0 : 1, icon.RenderTransform.Value.OffsetX);
+                    Assert.Equal(((Geometry)surface.FindResource(model.IsPlaying ? "PlayerPauseIcon" : "PlayerPlayIcon")).ToString(), icon.Data.ToString());
+                    Assert.Equal(buttonBounds, BoundsWithin(play, surface)); Assert.Equal(rowBounds, BoundsWithin(row, surface));
+                    Assert.Equal(surrounding, row.Children.OfType<FrameworkElement>().Select(c => BoundsWithin(c, surface)).ToArray());
+                }
+                Assert.NotNull(BindingOperations.GetBindingExpression(surface, VideoReviewSurface.IsPlayingProperty));
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Theory]
+    [InlineData(VideoPlaybackSurfaceKind.Original, false)]
+    [InlineData(VideoPlaybackSurfaceKind.Original, true)]
+    [InlineData(VideoPlaybackSurfaceKind.Rendered, false)]
+    [InlineData(VideoPlaybackSurfaceKind.Rendered, true)]
+    public void SharedSoundMute_UsesOutlinedMatchingGeometryInBothRolesAndHosts(VideoPlaybackSurfaceKind role, bool fullscreen)
+    {
+        RunSta(() =>
+        {
+            VideoReviewSurface surface = new() { PlaybackKind = role, IsFullscreen = fullscreen };
+            PositionModel model = new();
+            // IsMuted is the view's presentation input; the controller/role bindings
+            // are separately covered by the existing synchronization/lifetime tests.
+            surface.SetBinding(VideoReviewSurface.IsMutedProperty, new Binding(nameof(model.IsMuted)) { Source = model });
+            Window window = new() { Content = surface, Width = 610, Height = 400, Left = -10000, ShowActivated = false };
+            try
+            {
+                window.Show(); window.UpdateLayout();
+                Grid row = Assert.Single(((Grid)surface.Content).Children.OfType<Grid>(), grid => Grid.GetRow(grid) == 1);
+                Button mute = Assert.Single(row.Children.OfType<Button>(), button => Grid.GetColumn(button) == 4);
+                System.Windows.Shapes.Path icon = Assert.IsType<System.Windows.Shapes.Path>(mute.Content);
+                string sound = icon.Data.ToString();
+                Rect bounds = BoundsWithin(icon, mute);
+                Assert.Null(icon.Fill); Assert.Equal(1.6, icon.StrokeThickness);
+                Assert.Equal(PenLineCap.Round, icon.StrokeStartLineCap); Assert.Equal(PenLineCap.Round, icon.StrokeEndLineCap);
+                Assert.False(icon.Focusable); Assert.InRange(icon.ActualWidth, 14, 20);
+                model.IsMuted = true; window.UpdateLayout();
+                Assert.True(surface.IsMuted); Assert.StartsWith(sound, icon.Data.ToString()); Assert.NotEqual(sound, icon.Data.ToString());
+                Assert.Equal(bounds, BoundsWithin(icon, mute));
+                model.IsMuted = false; window.UpdateLayout(); Assert.Equal(sound, icon.Data.ToString());
+                Assert.NotNull(BindingOperations.GetBindingExpression(surface, VideoReviewSurface.IsMutedProperty));
+            }
+            finally { window.Close(); }
+        });
+    }
+
     [Theory]
     [InlineData(false, true, true)]
     [InlineData(false, true, false)]
@@ -438,8 +697,10 @@ public sealed class ReviewSurfaceTests
     }
 
     [Theory]
-    [InlineData(590, true, true)] // Conservative editor-pane width at MainWindow.MinWidth=1024.
-    [InlineData(590, false, true)]
+    [InlineData(404, true, true)]
+    [InlineData(590, true, false)] // Conservative editor-pane width at MainWindow.MinWidth=1024.
+    [InlineData(404, false, true)]
+    [InlineData(590, false, false)]
     [InlineData(750, true, false)] // Conservative editor-pane width at the default 1280 width.
     [InlineData(750, false, false)]
     public void VideoResultPanel_AdaptsWithoutClippingOrOverlap(
@@ -451,6 +712,7 @@ public sealed class ReviewSurfaceTests
         {
             UserControl view = LoadExportStatusViewForLayout();
             view.DataContext = new VideoResultLayoutModel(exported);
+
             view.Measure(new Size(availableWidth, double.PositiveInfinity));
             view.Arrange(new Rect(0, 0, availableWidth, view.DesiredSize.Height));
             view.UpdateLayout();
@@ -458,16 +720,16 @@ public sealed class ReviewSurfaceTests
             Border card = Assert.IsType<Border>(view.FindName("VideoResultCard"));
             AdaptiveResultPanel layout = Assert.IsType<AdaptiveResultPanel>(view.FindName("VideoResultLayout"));
             StackPanel text = Assert.IsType<StackPanel>(view.FindName("VideoResultText"));
-            Grid metrics = Assert.IsType<Grid>(view.FindName("VideoResultMetrics"));
-            StackPanel actions = Assert.IsType<StackPanel>(view.FindName("VideoResultActions"));
+            MetricCardsPanel metrics = Assert.IsType<MetricCardsPanel>(view.FindName("VideoResultMetrics"));
+            VideoExportActionsPanel actions = Assert.IsType<VideoExportActionsPanel>(view.FindName("VideoResultActions"));
             TextBlock title = Assert.IsType<TextBlock>(view.FindName("VideoResultTitleText"));
             TextBlock summary = Assert.IsType<TextBlock>(view.FindName("VideoResultSummaryText"));
-            TextBlock destination = Assert.IsType<TextBlock>(view.FindName("VideoExportDestinationTextBlock"));
+            Button copy = Assert.IsType<Button>(view.FindName("CopyVideoExportPathButton"));
             Button export = Assert.IsType<Button>(view.FindName("VideoExportButton"));
             Button openFolder = Assert.IsType<Button>(view.FindName("OpenVideoExportFolderButton"));
             Border[] metricCards =
             [
-                Assert.IsType<Border>(view.FindName("VideoFramesMetricCard")),
+                Assert.IsType<Border>(view.FindName("VideoFileSizeMetricCard")),
                 Assert.IsType<Border>(view.FindName("VideoOutputMetricCard")),
                 Assert.IsType<Border>(view.FindName("VideoAudioMetricCard"))
             ];
@@ -476,11 +738,15 @@ public sealed class ReviewSurfaceTests
             Assert.Equal(Visibility.Visible, metrics.Visibility);
             Assert.Equal(Visibility.Visible, actions.Visibility);
             Assert.Equal(expectedCompact, layout.IsCompact);
-            Assert.True(text.ActualWidth >= 180, $"Result text width at {availableWidth}: {text.ActualWidth}");
+            Assert.True(text.ActualWidth >= 120, $"Result text width at {availableWidth}: {text.ActualWidth}");
             Assert.Equal(TextTrimming.None, title.TextTrimming);
             Assert.Equal(TextWrapping.Wrap, title.TextWrapping);
             Assert.True(summary.ActualWidth > 0 && summary.ActualWidth <= text.ActualWidth);
-            Assert.Equal(TextTrimming.CharacterEllipsis, destination.TextTrimming);
+            Assert.Equal(exported ? Visibility.Visible : Visibility.Collapsed, copy.Visibility);
+            Assert.Equal(exported ? new VideoResultLayoutModel(true).ExportPathCopy.Path : string.Empty, copy.ToolTip);
+            Assert.True(copy.Focusable);
+            Assert.Equal(112, copy.MinWidth);
+            Assert.True(double.IsNaN(copy.Width));
             Assert.True(export.IsEnabled);
             Assert.True(export.ActualWidth >= 112);
             Assert.Equal(exported ? Visibility.Visible : Visibility.Collapsed, openFolder.Visibility);
@@ -491,7 +757,7 @@ public sealed class ReviewSurfaceTests
             }
 
             FrameworkElement[] visibleElements = exported
-                ? [title, summary, destination, export, openFolder, .. metricCards]
+                ? [title, summary, copy, export, openFolder, .. metricCards]
                 : [title, summary, export, .. metricCards];
             foreach (FrameworkElement element in visibleElements)
             {
@@ -510,14 +776,25 @@ public sealed class ReviewSurfaceTests
             if (expectedCompact)
             {
                 Assert.True(textBounds.Bottom <= metricsBounds.Top + 0.1);
-                Assert.True(Math.Abs(CenterY(metricsBounds) - CenterY(actionBounds)) <= 0.1);
+                Assert.True(metricsBounds.Bottom <= actionBounds.Top + 0.1);
+            }
+            else if (layout.LayoutMode == StatusLayoutMode.Spacious)
+            {
+                Assert.True(textBounds.Right < metricsBounds.Left && metricsBounds.Right < actionBounds.Left);
+                Assert.Equal(CenterY(textBounds), CenterY(metricsBounds), 4);
+                Assert.Equal(CenterY(metricsBounds), CenterY(actionBounds), 4);
+            }
+            else if (layout.LayoutMode == StatusLayoutMode.Intermediate)
+            {
+                Assert.True(textBounds.Bottom <= metricsBounds.Top + 0.1);
+                Assert.True(Math.Max(textBounds.Right, metricsBounds.Right) <= actionBounds.Left + 0.1);
             }
             else
             {
-                Assert.True(textBounds.Right <= metricsBounds.Left + 0.1);
-                Assert.True(metricsBounds.Right <= actionBounds.Left + 0.1);
-                Assert.True(Math.Abs(CenterY(textBounds) - CenterY(metricsBounds)) <= 0.1);
-                Assert.True(Math.Abs(CenterY(metricsBounds) - CenterY(actionBounds)) <= 0.1);
+                Assert.True(textBounds.Bottom <= metricsBounds.Top + 0.1);
+                if (layout.LayoutMode == StatusLayoutMode.Below) { Assert.True(metricsBounds.Bottom < actionBounds.Top); }
+                else { Assert.True(metricsBounds.Right <= actionBounds.Left + 0.1); }
+                if (!exported && layout.LayoutMode == StatusLayoutMode.CompactWide) { Assert.True(Math.Abs(CenterY(metricsBounds) - CenterY(actionBounds)) <= 0.1); }
             }
 
             for (int index = 1; index < metricCards.Length; index++)
@@ -529,61 +806,39 @@ public sealed class ReviewSurfaceTests
         });
     }
 
+
+
     [Fact]
     public void VideoResultPanel_WideReadyLayoutIsMateriallyMoreCompact()
     {
         RunSta(() =>
         {
-            Border compact = ArrangeVideoResultCard(590, exported: false);
-            Border wide = ArrangeVideoResultCard(750, exported: false);
+            Border compact = ArrangeVideoResultCard(480, exported: false);
+            Border wide = ArrangeVideoResultCard(1100, exported: false);
 
             Assert.True(compact.ActualHeight - wide.ActualHeight >= 30,
                 $"Compact={compact.ActualHeight}; wide={wide.ActualHeight}");
         });
     }
 
-    [Fact]
-    public void VideoResultPanel_UsesHysteresisAroundItsMeasuredBreakpoint()
-    {
-        RunSta(() =>
-        {
-            UserControl view = LoadExportStatusViewForLayout();
-            view.DataContext = new VideoResultLayoutModel(exported: false);
 
-            Arrange(750);
-            AdaptiveResultPanel panel = Assert.IsType<AdaptiveResultPanel>(view.FindName("VideoResultLayout"));
-            Assert.False(panel.IsCompact);
-
-            Arrange(720); // Inside the hysteresis band: retain the current wide mode.
-            Assert.False(panel.IsCompact);
-            Arrange(700); // Cross the lower boundary.
-            Assert.True(panel.IsCompact);
-            Arrange(720); // Inside the band again: retain compact mode.
-            Assert.True(panel.IsCompact);
-            Arrange(750); // Cross the upper boundary.
-            Assert.False(panel.IsCompact);
-
-            void Arrange(double width)
-            {
-                view.Measure(new Size(width, double.PositiveInfinity));
-                view.Arrange(new Rect(0, 0, width, view.DesiredSize.Height));
-                view.UpdateLayout();
-            }
-        });
-    }
 
     [Theory]
-    [InlineData(590, "ready", true)]
+    [InlineData(590, "ready", false)]
     [InlineData(750, "ready", false)]
-    [InlineData(590, "stale", true)]
+    [InlineData(1100, "ready", false)]
+    [InlineData(1100, "exported", false)]
+    [InlineData(404, "ready", true)]
+    [InlineData(404, "exported", true)]
+    [InlineData(590, "stale", false)]
     [InlineData(750, "stale", false)]
-    [InlineData(590, "exported", true)]
+    [InlineData(590, "exported", false)]
     [InlineData(750, "exported", false)]
-    [InlineData(590, "failed", true)]
-    [InlineData(590, "cancelled", true)]
-    [InlineData(590, "export-failure", true)]
-    [InlineData(590, "export-cancellation", true)]
-    [InlineData(590, "fallback", true)]
+    [InlineData(590, "failed", false)]
+    [InlineData(590, "cancelled", false)]
+    [InlineData(590, "export-failure", false)]
+    [InlineData(590, "export-cancellation", false)]
+    [InlineData(590, "fallback", false)]
     [InlineData(750, "fallback", false)]
     [InlineData(590, "initial-failure", false)]
     [InlineData(590, "initial-cancellation", false)]
@@ -597,6 +852,7 @@ public sealed class ReviewSurfaceTests
             UserControl view = LoadExportStatusViewForLayout();
             ImageResultLayoutModel model = new(state);
             view.DataContext = model;
+
             view.Measure(new Size(availableWidth, double.PositiveInfinity));
             view.Arrange(new Rect(0, 0, availableWidth, view.DesiredSize.Height));
             view.UpdateLayout();
@@ -604,13 +860,14 @@ public sealed class ReviewSurfaceTests
             Border card = Assert.IsType<Border>(view.FindName("ImageResultCard"));
             AdaptiveResultPanel layout = Assert.IsType<AdaptiveResultPanel>(view.FindName("ImageResultLayout"));
             StackPanel text = Assert.IsType<StackPanel>(view.FindName("ImageResultText"));
-            StackPanel metrics = Assert.IsType<StackPanel>(view.FindName("ImageResultMetrics"));
-            StackPanel actions = Assert.IsType<StackPanel>(view.FindName("ImageResultActions"));
+            MetricCardsPanel metrics = Assert.IsType<MetricCardsPanel>(view.FindName("ImageResultMetrics"));
+            ImageExportActionsPanel actions = Assert.IsType<ImageExportActionsPanel>(view.FindName("ImageResultActions"));
             TextBlock title = Assert.IsType<TextBlock>(view.FindName("ImageResultTitleText"));
             TextBlock summary = Assert.IsType<TextBlock>(view.FindName("ImageResultSummaryText"));
             TextBlock warning = Assert.IsType<TextBlock>(view.FindName("ImageRenderWarningTextBlock"));
             Button details = Assert.IsType<Button>(view.FindName("ImageResultDetailsButton"));
-            ComboBox format = Assert.IsType<ComboBox>(view.FindName("ImageFormatSelector"));
+            Assert.Null(view.FindName("ImageFormatSelector"));
+            Assert.Empty(VisualDescendants(card).OfType<ComboBox>());
             Button export = Assert.IsType<Button>(view.FindName("ImageExportButton"));
             Button folder = Assert.IsType<Button>(view.FindName("OpenImageExportFolderButton"));
             Border[] metricCards =
@@ -619,10 +876,10 @@ public sealed class ReviewSurfaceTests
                 Assert.IsType<Border>(view.FindName("ImageOutputMetricCard"))
             ];
 
-            Assert.Equal(expectedCompact, layout.IsCompact);
+            Assert.Equal(expectedCompact || !model.ShowImageRenderMetrics, layout.IsCompact);
             Assert.Equal(Visibility.Visible, card.Visibility);
-            Assert.True(text.ActualWidth >= 180, $"Image text width at {availableWidth} in {state}: {text.ActualWidth}");
-            Assert.True(title.ActualWidth >= 180);
+            Assert.True(text.ActualWidth >= 120, $"Image text width at {availableWidth} in {state}: {text.ActualWidth}");
+            Assert.True(title.ActualWidth >= 120);
             Assert.True(summary.ActualWidth > 0 && summary.ActualWidth <= text.ActualWidth);
             Assert.Equal(TextWrapping.Wrap, title.TextWrapping);
             double titleLeft = BoundsWithin(title, text).Left;
@@ -645,7 +902,7 @@ public sealed class ReviewSurfaceTests
                 .. model.ShowImageRenderWarning ? [warning] : Array.Empty<FrameworkElement>(),
                 .. model.ShowImageResultErrorDetails ? [details] : Array.Empty<FrameworkElement>(),
                 .. model.ShowImageRenderMetrics ? metricCards : Array.Empty<FrameworkElement>(),
-                .. model.ShowImageExportControls ? [format, export] : Array.Empty<FrameworkElement>(),
+                .. model.ShowImageExportControls ? [export] : Array.Empty<FrameworkElement>(),
                 .. model.CanOpenExportFolder ? [folder] : Array.Empty<FrameworkElement>()
             ];
             foreach (FrameworkElement element in visibleElements)
@@ -664,7 +921,6 @@ public sealed class ReviewSurfaceTests
 
             if (model.ShowImageExportControls)
             {
-                Assert.True(format.ActualWidth >= 150);
                 Assert.True(export.ActualWidth >= 150);
                 Assert.Equal(state != "stale", export.IsEnabled);
                 Rect textBounds = BoundsWithin(text, layout);
@@ -676,9 +932,21 @@ public sealed class ReviewSurfaceTests
                 {
                     Assert.True(textBounds.Bottom <= metricsBounds.Top + 0.1);
                 }
+                else if (layout.LayoutMode == StatusLayoutMode.Spacious)
+                {
+                    Assert.True(textBounds.Right < metricsBounds.Left && metricsBounds.Right < actionBounds.Left);
+                    Assert.True(text.ActualWidth >= 180);
+                    Assert.Equal(CenterY(textBounds), CenterY(metricsBounds), 4);
+                    Assert.Equal(CenterY(metricsBounds), CenterY(actionBounds), 4);
+                }
+                else if (layout.LayoutMode == StatusLayoutMode.Intermediate)
+                {
+                    Assert.True(textBounds.Bottom <= metricsBounds.Top + 0.1);
+                    Assert.True(Math.Max(textBounds.Right, metricsBounds.Right) <= actionBounds.Left + 0.1);
+                }
                 else
                 {
-                    Assert.True(textBounds.Right <= metricsBounds.Left + 0.1);
+                    Assert.True(textBounds.Bottom <= metricsBounds.Top + 0.1);
                     Assert.True(metricsBounds.Right <= actionBounds.Left + 0.1);
                 }
             }
@@ -688,13 +956,15 @@ public sealed class ReviewSurfaceTests
         });
     }
 
+
+
     [Fact]
     public void ImageResultPanel_WideReadyStateRemainsCompact()
     {
         RunSta(() =>
         {
-            Border compact = ArrangeImageResultCard(590, "ready");
-            Border wide = ArrangeImageResultCard(750, "ready");
+            Border compact = ArrangeImageResultCard(480, "ready");
+            Border wide = ArrangeImageResultCard(1100, "ready");
             Assert.True(compact.ActualHeight - wide.ActualHeight >= 20,
                 $"Compact={compact.ActualHeight}; wide={wide.ActualHeight}");
         });
@@ -763,7 +1033,7 @@ public sealed class ReviewSurfaceTests
         return Path.Combine(directory.FullName, "src", "GlyphFrame.App", "Views", name);
     }
 
-    private static UserControl LoadExportStatusViewForLayout()
+    internal static UserControl LoadExportStatusViewForLayout()
     {
         XDocument document = ReadView("ExportStatusView.xaml");
         XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
@@ -808,6 +1078,12 @@ public sealed class ReviewSurfaceTests
                 resources.Add(new XElement(resource));
             }
         }
+        XElement? localResources = root.Element(presentation + "UserControl.Resources");
+        if (localResources is not null)
+        {
+            foreach (XElement local in localResources.Elements().ToArray()) { resources.Add(local); }
+            localResources.Remove();
+        }
         root.AddFirst(new XElement(presentation + "UserControl.Resources", resources));
         return Assert.IsType<UserControl>(XamlReader.Parse(document.ToString(SaveOptions.DisableFormatting)));
     }
@@ -819,6 +1095,7 @@ public sealed class ReviewSurfaceTests
     {
         UserControl view = LoadExportStatusViewForLayout();
         view.DataContext = new VideoResultLayoutModel(exported);
+
         view.Measure(new Size(availableWidth, double.PositiveInfinity));
         view.Arrange(new Rect(0, 0, availableWidth, view.DesiredSize.Height));
         view.UpdateLayout();
@@ -829,6 +1106,7 @@ public sealed class ReviewSurfaceTests
     {
         UserControl view = LoadExportStatusViewForLayout();
         view.DataContext = new ImageResultLayoutModel(state);
+
         view.Measure(new Size(availableWidth, double.PositiveInfinity));
         view.Arrange(new Rect(0, 0, availableWidth, view.DesiredSize.Height));
         view.UpdateLayout();
@@ -860,6 +1138,10 @@ public sealed class ReviewSurfaceTests
 
     private sealed class PositionModel : INotifyPropertyChanged
     {
+        private bool _playing;
+        public bool IsPlaying { get => _playing; set { _playing = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsPlaying))); } }
+        private bool _muted;
+        public bool IsMuted { get => _muted; set { _muted = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMuted))); } }
         private double _position;
         public event PropertyChangedEventHandler? PropertyChanged;
         public int Writes { get; private set; }
@@ -870,10 +1152,38 @@ public sealed class ReviewSurfaceTests
         }
     }
 
-    private sealed class VideoResultLayoutModel(bool exported)
+    private sealed class ProcessingLayoutModel(bool cancelling) : VideoResultLayoutModel(false)
     {
+        public new bool IsExportStatusVisible => true;
+        public new bool ShowVideoResultPanel => false;
+        public string ExportOperationTitle => "Rendering Video";
+        public string ExportProgressText => cancelling ? "Stopping the current render" : "Processing frames";
+        public string ExportFrameText => "Frame 119 / 284";
+        public string ElapsedText => "Elapsed 0:04";
+        public string RemainingText => "Remaining about 0:06";
+        public string ExportPercentageText => "42%";
+        public double ExportProgress => 42;
+        public long ExportPresentationGeneration => 1;
+        public bool IsExportActive => true;
+        public bool IsExportCompletionVisible => false;
+        public bool IsExportProgressIndeterminate => cancelling;
+        public GlyphFrame.Core.Enums.VideoExportStage ExportStage => cancelling ? GlyphFrame.Core.Enums.VideoExportStage.Cancelling : GlyphFrame.Core.Enums.VideoExportStage.ProcessingFrames;
+        public ICommand CancelExportCommand { get; } = cancelling ? new DisabledCommand() : new EnabledCommand();
+    }
+
+    private class VideoResultLayoutModel(bool exported)
+    {
+        public bool ShowCopyExportPath => exported;
+        public ExportPathCopyPresentation ExportPathCopy { get; } = LayoutCopy(exported ? @"C:\Дуже довга тека\відео-日本語-测试\готове символізоване відео.mp4" : null);
         private static readonly ICommand Command = new EnabledCommand();
 
+        public bool ShowReadyToRender => false;
+        public bool IsVideoSelected => true;
+        public string ReadyToRenderMessage => "Review your settings, then render.";
+        public string PlannedOutputDimensionsText => "1024 × 576";
+        public string PlannedAudioText => "Keep audio";
+        public bool AreExportAnimationsEnabled => false;
+        public bool ShowVideoResultErrorDetails => false;
         public bool IsProcessingResultPanelVisible => true;
         public bool IsExportStatusVisible => false;
         public bool ShowImageResultPanel => false;
@@ -891,6 +1201,7 @@ public sealed class ReviewSurfaceTests
             : "Ready for review and export.";
         public string VideoExportDestinationText => "C:\\Дуже довга тека\\відео-日本語-测试\\готове символізоване відео.mp4";
         public string VideoRenderedFrameCountText => "284";
+        public string VideoFileSizeText => "1.2 MB";
         public string VideoOutputDimensionsText => "1024 × 576";
         public string VideoAudioOutcomeText => "Original";
         public string VideoAudioOutcomeDescription => "Original audio preserved";
@@ -901,9 +1212,17 @@ public sealed class ReviewSurfaceTests
 
     private sealed class ImageResultLayoutModel(string state)
     {
+        public bool ShowCopyExportPath => state == "exported";
+        public ExportPathCopyPresentation ExportPathCopy { get; } = LayoutCopy(state == "exported" ? @"C:\Дуже довга тека\зображення-日本語-测试.png" : null);
         private static readonly ICommand Enabled = new EnabledCommand();
         private static readonly ICommand Disabled = new DisabledCommand();
 
+        public bool ShowReadyToRender => false;
+        public bool IsVideoSelected => false;
+        public string ReadyToRenderMessage => "Review your settings, then render.";
+        public string PlannedOutputDimensionsText => "1448 × 1086";
+        public string PlannedAudioText => "Keep audio";
+        public bool AreExportAnimationsEnabled => false;
         public bool IsProcessingResultPanelVisible => true;
         public bool IsExportStatusVisible => false;
         public bool ShowImageResultPanel => true;
@@ -929,7 +1248,7 @@ public sealed class ReviewSurfaceTests
         public string ImageResultSummary => state switch
         {
             "stale" => "Render settings changed. Review the previous result or render again before exporting.",
-            "exported" => "Saved a symbolized image. The rendered image remains ready for another export.",
+            "exported" => "Ready for review and another export.",
             "failed" => "GlyphFrame could not render the image. Your previous rendered image is still available.",
             "initial-failure" => "GlyphFrame could not render this image. You can try again.",
             "cancelled" => "Image rendering was cancelled. Your previous rendered image is still available.",
@@ -941,12 +1260,22 @@ public sealed class ReviewSurfaceTests
         public string ImageRenderWarningText => "The selected font was unavailable; a fallback was used for this retained result.";
         public string ImageGridDimensionsText => "181 × 67";
         public string ImageOutputDimensionsText => "1448 × 1086";
-        public string[] ImageOutputFormats => ["PNG", "JPEG"];
-        public string SelectedImageOutputFormat { get; set; } = "PNG";
         public string ImageExportActionLabel => state == "exported" ? "Export Again" : "Export Image";
         public ICommand ShowImageResultErrorDetailsCommand => Enabled;
         public ICommand ExportImageCommand => state == "stale" ? Disabled : Enabled;
         public ICommand OpenExportFolderCommand => Enabled;
+    }
+
+    private static ExportPathCopyPresentation LayoutCopy(string? path)
+    {
+        ExportPathCopyPresentation copy = new(new LayoutClipboard());
+        copy.SetDestination(new object(), path);
+        return copy;
+    }
+
+    private sealed class LayoutClipboard : IClipboardService
+    {
+        public ClipboardWriteResult SetText(string text) => ClipboardWriteResult.Completed();
     }
 
     private sealed class DisabledCommand : ICommand

@@ -8,10 +8,12 @@ using System.Windows.Threading;
 using System.Xml.Linq;
 using CommunityToolkit.Mvvm.Input;
 using GlyphFrame.App.Services;
+using GlyphFrame.App.Presentation;
 using GlyphFrame.App.Views;
 
 namespace GlyphFrame.App.Tests;
 
+[Collection("WPF layout")]
 public sealed class Phase13UiTests
 {
     [Theory]
@@ -114,7 +116,7 @@ public sealed class Phase13UiTests
         Assert.Equal("False", root.Attribute("ShowInTaskbar")?.Value);
         Assert.Equal("NoResize", root.Attribute("ResizeMode")?.Value);
         Assert.Contains(document.Descendants(wpf + "TextBlock"), element =>
-            element.Attribute("Text")?.Value.Contains("does not upload media or send telemetry", StringComparison.Ordinal) == true);
+            element.Attribute("Text")?.Value.Contains("does not upload your media or send telemetry", StringComparison.Ordinal) == true);
         XElement close = Assert.Single(document.Descendants(wpf + "Button"), element =>
             element.Attribute("Content")?.Value == "Close");
         Assert.Equal("True", close.Attribute("IsCancel")?.Value);
@@ -239,7 +241,9 @@ public sealed class Phase13UiTests
             window.Show();
             window.UpdateLayout();
             ScrollViewer[] scrolls = Descendants(window).OfType<ScrollViewer>()
-                .Where(scroll => scroll.VerticalScrollBarVisibility is ScrollBarVisibility.Auto or ScrollBarVisibility.Visible).ToArray();
+                .Where(scroll => scroll.Name != "StatusContentScroller"
+                    && scroll.Name != "RenderParameterScroller"
+                    && scroll.VerticalScrollBarVisibility is ScrollBarVisibility.Auto or ScrollBarVisibility.Visible).ToArray();
             Assert.Equal(2, scrolls.Length);
             ScrollViewer left = Assert.Single(scrolls, scroll => Grid.GetColumn(scroll) == 0);
             ScrollViewer right = Assert.Single(scrolls, scroll => Grid.GetColumn(scroll) == 2);
@@ -249,24 +253,17 @@ public sealed class Phase13UiTests
 
             Button render = Assert.Single(Descendants(left).OfType<Button>(), button =>
                 button.IsVisible && button.Content as string == "Render Again");
-            Button? previewFrame = video
-                ? Assert.Single(Descendants(left).OfType<Button>(), button =>
-                    button.IsVisible && button.Content as string == "Preview Frame")
-                : null;
+            Assert.DoesNotContain(Descendants(left).OfType<Button>(), button =>
+                button.IsVisible && button.Content as string == "Preview Frame");
             Border result = Assert.Single(Descendants(left).OfType<Border>(), border =>
                 border.Name == (video ? "VideoResultCard" : "ImageResultCard"));
             Assert.True(result.ActualHeight > 0);
             Assert.True(render.ActualWidth >= (video ? 148 : 188));
             Assert.True(render.IsEnabled);
-            if (video)
-            {
-                Assert.NotNull(previewFrame);
-                Assert.True(previewFrame.ActualWidth >= 132);
-            }
 
             left.ScrollToEnd();
             window.UpdateLayout();
-            foreach (FrameworkElement element in new FrameworkElement?[] { render, previewFrame, result }.OfType<FrameworkElement>())
+            foreach (FrameworkElement element in new FrameworkElement[] { render, result })
             {
                 Rect bounds = element.TransformToAncestor(left).TransformBounds(new Rect(element.RenderSize));
                 Assert.True(bounds.Top >= -1 && bounds.Bottom <= left.ViewportHeight + 1,
@@ -295,7 +292,7 @@ public sealed class Phase13UiTests
             window.Show();
             window.UpdateLayout();
             ScrollViewer settings = Assert.Single(Descendants(window).OfType<ScrollViewer>(), scroll =>
-                Grid.GetColumn(scroll) == 2 && scroll.VerticalScrollBarVisibility == ScrollBarVisibility.Auto);
+                Grid.GetColumn(scroll) == 2 && scroll.VerticalScrollBarVisibility == ScrollBarVisibility.Visible);
             Button details = Assert.Single(Descendants(settings).OfType<Button>(), button =>
                 button.IsVisible && button.Content as string == "Show Details");
             Rect bounds = details.TransformToAncestor(settings).TransformBounds(new Rect(details.RenderSize));
@@ -389,10 +386,17 @@ public sealed class Phase13UiTests
             }
         }
         root.AddFirst(new XElement(wpf + "Window.Resources", dictionary));
+        // Loose XAML needs the assembly qualifier for the real decorative WPF type.
+        XAttribute? viewNamespace = root.Attribute(XNamespace.Xmlns + "views");
+        if (viewNamespace is not null) { viewNamespace.Value = "clr-namespace:GlyphFrame.App.Views;assembly=GlyphFrame.App"; }
+        foreach (XElement element in root.Descendants().Where(e => e.Name.NamespaceName == "clr-namespace:GlyphFrame.App.Views").ToArray())
+        { element.Name = XNamespace.Get("clr-namespace:GlyphFrame.App.Views;assembly=GlyphFrame.App") + element.Name.LocalName; }
+        foreach (XElement element in root.Descendants().Where(e => e.Name.NamespaceName == "clr-namespace:GlyphFrame.App.Views").ToArray())
+        { element.Name = XNamespace.Get("clr-namespace:GlyphFrame.App.Views;assembly=GlyphFrame.App") + element.Name.LocalName; }
         return Assert.IsType<Window>(XamlReader.Parse(document.ToString(SaveOptions.DisableFormatting)));
     }
 
-    private static Window LoadLooseWindow(string view)
+    internal static Window LoadLooseWindow(string view)
     {
         XDocument document = ReadView(view);
         XNamespace wpf = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
@@ -401,6 +405,9 @@ public sealed class Phase13UiTests
         root.Attribute(x + "Class")?.Remove();
         root.Attribute("Icon")?.Remove(); // Root resources are not available until after loose-XAML construction.
         root.Attribute("Background")?.Remove();
+        root.SetAttributeValue(XNamespace.Xmlns + "views", "clr-namespace:GlyphFrame.App.Views;assembly=GlyphFrame.App");
+        foreach (XElement element in root.Descendants().Where(e => e.Name.NamespaceName == "clr-namespace:GlyphFrame.App.Views").ToArray())
+        { element.Name = XNamespace.Get("clr-namespace:GlyphFrame.App.Views;assembly=GlyphFrame.App") + element.Name.LocalName; }
         foreach (XAttribute handler in root.DescendantsAndSelf().SelectMany(element => element.Attributes())
                      .Where(attribute => attribute.Name.LocalName is "Click" or "MouseLeftButtonDown").ToArray())
         {
@@ -414,7 +421,15 @@ public sealed class Phase13UiTests
                 dictionary.Add(new XElement(resource));
             }
         }
+        XElement? localResources = root.Element(wpf + "Window.Resources");
+        if (localResources is not null)
+        {
+            dictionary.Add(localResources.Elements().Select(resource => new XElement(resource)));
+            localResources.Remove();
+        }
         root.AddFirst(new XElement(wpf + "Window.Resources", dictionary));
+        foreach (XElement element in root.Descendants().Where(e => e.Name.NamespaceName == "clr-namespace:GlyphFrame.App.Views").ToArray())
+        { element.Name = XNamespace.Get("clr-namespace:GlyphFrame.App.Views;assembly=GlyphFrame.App") + element.Name.LocalName; }
         return Assert.IsType<Window>(XamlReader.Parse(document.ToString(SaveOptions.DisableFormatting)));
     }
 
@@ -491,13 +506,58 @@ public sealed class Phase13UiTests
         public string LogsDirectory => @"C:\Users\Example\AppData\Local\GlyphFrame\logs";
     }
 
+    private sealed class UnusedClipboard : IClipboardService
+    {
+        public ClipboardWriteResult SetText(string text) => ClipboardWriteResult.Failed();
+    }
+
     internal class MainLayoutData(bool video, bool retainedInputError = false)
     {
+        public ExportPathCopyPresentation ExportPathCopy { get; } = new(new UnusedClipboard());
+        public bool ShowCopyExportPath => false;
+        public bool CanOpenExportFolder => false;
+        public bool ShowImageRenderWarning => false;
+        public bool ShowImageResultErrorDetails => false;
+        public bool ShowVideoResultErrorDetails => false;
+        public bool AreExportAnimationsEnabled => false;
         public bool IsBrowseMediaAvailable => true;
+        public bool ShowPreviewFrameAction => video && !HasVideoArtifact;
+        public bool HasImageResultForRerender => !video;
+        public string InputDisplayName => SelectedFileName;
+        public bool IsInputReady => !retainedInputError;
+        public string InputCardSummary => MetadataPrimaryText;
+        public string SelectedFilePath => @"C:\Медіа\sample.png";
+        public string BrowseMediaActionLabel => "Change file";
+        public string InputDropText => "Drop another file to replace";
+        public string InputReadinessText => retainedInputError ? string.Empty : "Source accepted";
+        public string InputMetadataSummary => MetadataPrimaryText;
+        public bool HasMediaInputError => retainedInputError;
+        public bool AreSettingsEnabled => true;
+        public bool AreVideoAudioSettingsEnabled => video;
+        public bool IsKeepAudioSelected { get; set; } = true;
+        public bool IsRemoveAudioSelected { get; set; }
+        public IReadOnlyList<GlyphFrame.Core.Models.CharacterPresetOption> Presets => GlyphFrame.Core.Models.CharacterPresetOption.BuiltIn;
+        public GlyphFrame.Core.Models.CharacterPresetOption SelectedPreset { get; set; } = GlyphFrame.Core.Models.CharacterPresetOption.Default;
+        public string CharacterRamp => " .:-=+*#%@";
+        public string[] FontFamilies => ["Cascadia Mono", "Consolas"];
+        public string SelectedFont { get; set; } = "Cascadia Mono";
+        public int[] FontSizes => [9, 10, 12];
+        public int SelectedFontSize { get; set; } = 10;
+        public string[] OutputResolutions => ["Same as source", "720p", "1080p"];
+        public string SelectedOutputResolution { get; set; } = "Same as source";
+        public object[] SymbolPolarities => [new { DisplayName = "Light on Dark", Value = 0 }];
+        public int SelectedSymbolPolarity { get; set; }
         public bool ShowRetainedMediaInputErrorDetails => retainedInputError;
         public string InputStatusMessage => retainedInputError ? "This file could not be opened." : "Image ready.";
         public IRelayCommand ShowMediaInputErrorDetailsCommand { get; } = new RelayCommand(() => { });
         public bool IsProcessingResultPanelVisible => true;
+        public bool IsMediaSelected => true;
+        public bool ShowReadyToRender => false;
+        public string ReadyToRenderMessage => "Render the selected source.";
+        public string PlannedOutputDimensionsText => "1280 × 720";
+        public bool ShowVideoAudioUnavailableOverlay => !IsVideoSelected;
+        public string VideoAudioUnavailableReason => "Audio does not apply to images";
+        public string PlannedAudioText => "Keep audio";
         public bool IsExportStatusVisible => false;
         public bool ShowImageResultPanel => !video;
         public bool ShowVideoResultPanel => video;
@@ -516,6 +576,7 @@ public sealed class Phase13UiTests
         public string ImageGridDimensionsText => "80 × 22";
         public string ImageOutputDimensionsText => "640 × 360";
         public string VideoRenderedFrameCountText => "12";
+        public string VideoFileSizeText => "1.2 MB";
         public string VideoOutputDimensionsText => "64 × 48";
         public string VideoAudioOutcomeText => "Original";
         public string VideoAudioOutcomeDescription => "Original audio preserved";
@@ -524,8 +585,6 @@ public sealed class Phase13UiTests
         public string PreviewFrameActionLabel => "Preview Frame";
         public string ImageExportActionLabel => "Export Image";
         public string VideoExportActionLabel => "Export Video";
-        public string[] ImageOutputFormats => ["PNG", "JPEG"];
-        public string SelectedImageOutputFormat { get; set; } = "PNG";
         public string[] FitModes => ["Fit", "Fill", "100%"];
         public string SelectedFitMode { get; set; } = "Fit";
         public string SelectedFileName => video ? "sample.mp4" : "sample.png";

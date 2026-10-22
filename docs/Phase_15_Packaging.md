@@ -1,5 +1,24 @@
 # Phase 15 — Windows x64 portable packaging and validation
 
+Current status (2026-10-21): Phase 15A packaging is implemented; Phase 15B acceptance remains partial/open and Phase 15C clean-machine execution is NOT TESTED. UI changes and dated verification are consolidated in [UI refinement history](UI_Refinement_History.md); the original October 7/8 extracted-package findings below retain their attribution.
+
+## Latest recorded candidate
+
+This identifies the most recently generated local package, not a release or a package rebuilt by documentation cleanup.
+
+| Field | Recorded value |
+| --- | --- |
+| Version / target | 1.0.0 / Release / win-x64 / self-contained |
+| Run | `fb87586d2b6d48da829c8ea46c3e7b60` (October 21 notices-button follow-up) |
+| Base commit | `5fb66ace4378a5818104be95f1ea08a9bdfecd91` — dirty-tree build; the base does not contain the UI changes |
+| ZIP SHA-256 | `A50BF71B056B6D3432EC0D0227CC843400E42145724FC9BA3819AAD41086F4FA` |
+| Local package directory | `artifacts/portable-packages/fb87586d2b6d48da829c8ea46c3e7b60/` (ignored; may be absent in a clone) |
+| Package checks | 11 structural/tool/startup/session checks and 416 payload paths/lengths/hashes passed |
+| Focused validation | 13 About/notices/logo regressions, Release compilation, formatting and diff checks passed |
+| Native limitation | A separately extracted instance exited before targeting; cause/exit code unestablished. No native visual pass for this style-only candidate. |
+
+The later independent repository audit reran all 1,177 tests successfully, but did not regenerate this package or certify its native UI. Earlier About/footer/action-bar native evidence belongs to the preceding candidate, not automatically to these latest bytes. Detailed local provenance remains under `artifacts/notices-button-20261021/` and the run's package/publish reports. No release acceptance is declared.
+
 Phase 15A implements distribution construction and structural verification only. It does not publish a release, prove extracted-ZIP interaction (15B), prove clean-machine compatibility (15C), or close broader Phase 14 testing. The initial repository was clean at `540ae20` (`test: expand verification and fix review UI regressions`). Implementation packages are explicitly dirty-tree builds; that commit does not cover their uncommitted changes.
 
 ## Command and prerequisites
@@ -222,3 +241,7 @@ Final formatter verification and `git diff --check` exited **0**. One repeated s
 - **15C NOT TESTED:** run on clean supported Windows x64 without .NET or FFmpeg installed; record OS/media components and runtime/native availability. A development-machine published-folder launch is not this proof.
 - **16 planned:** portfolio/release materials, product/application license decision, FFmpeg corresponding-source/distribution review and any release publication. No tag, installer, signing workflow, upload or deployment is added.
 - Historical Phase 14 successful and failed evidence remains unchanged. WPF codec/long-path compatibility limitations remain product/runtime considerations, not resolved by making a ZIP.
+
+## UI follow-ups — October 11–21
+
+The [consolidated UI history](UI_Refinement_History.md) replaces repeated per-iteration candidate summaries. It retains changes, superseded decisions, dated automated/native outcomes, failed attempts and open acceptance. Current layouts and dialog behavior are specified in the technical specification, not in historical shell-height tables. Full local handoffs and pre-consolidation Phase 14/15 snapshots remain in the ignored archive described by that history; they are not required in a clean clone.

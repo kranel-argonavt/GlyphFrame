@@ -3,42 +3,50 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:behaviors="clr-namespace:GlyphFrame.App.Behaviors"
              xmlns:views="clr-namespace:GlyphFrame.App.Views"
-             MinHeight="420"
+             MinHeight="360"
              Focusable="False">
     <Border Style="{StaticResource PreviewCardStyle}">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="44" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0">
+            <Grid Grid.Row="0" Height="44" Visibility="{Binding IsMediaSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <ToggleButton Grid.Column="0"
-                              IsChecked="{Binding IsOriginalPreviewSelected, Mode=OneWay}"
+                <Button x:Name="OriginalPreviewTab" Grid.Column="0"
+                              AutomationProperties.Name="Original preview"
                               Command="{Binding SelectOriginalCommand}"
-                              Style="{StaticResource PreviewTabStyle}"
+                              Style="{StaticResource OriginalPreviewTabStyle}"
                               ToolTip="Show the original media preview">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Margin="0,0,8,0" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ToggleButton}, Path=Foreground}" Text="▣" />
-                        <TextBlock Foreground="{Binding RelativeSource={RelativeSource AncestorType=ToggleButton}, Path=Foreground}" Text="Original" />
+                        <Path Margin="0,0,8,0" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                            <Path.Style>
+                                <Style TargetType="Path" BasedOn="{StaticResource VectorIconStyle}">
+                                    <Setter Property="Data" Value="{StaticResource ImageIcon}" />
+                                    <Style.Triggers><DataTrigger Binding="{Binding IsVideoSelected}" Value="True"><Setter Property="Data" Value="{StaticResource VideoIcon}" /></DataTrigger></Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                        <TextBlock Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Text="Original" />
                     </StackPanel>
-                </ToggleButton>
-                <ToggleButton Grid.Column="1"
-                              IsChecked="{Binding IsSymbolizedPreviewSelected, Mode=OneWay}"
+                </Button>
+                <Button x:Name="SymbolizedPreviewTab" Grid.Column="1"
+                              AutomationProperties.Name="Symbolized preview"
                               Command="{Binding SelectSymbolizedCommand}"
-                              Style="{StaticResource PreviewTabStyle}"
+                              Style="{StaticResource SymbolizedPreviewTabStyle}"
                               ToolTip="Show the generated symbolized preview">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Margin="0,0,8,0" Foreground="{Binding RelativeSource={RelativeSource AncestorType=ToggleButton}, Path=Foreground}" Text="⠿" />
-                        <TextBlock Foreground="{Binding RelativeSource={RelativeSource AncestorType=ToggleButton}, Path=Foreground}" Text="Symbolized" />
+                        <Path Margin="0,0,8,0" Style="{StaticResource VectorIconStyle}" Data="{StaticResource SymbolsIcon}"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        <TextBlock Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}" Text="Symbolized" />
                     </StackPanel>
-                </ToggleButton>
+                </Button>
             </Grid>
 
             <Border Grid.Row="1"
@@ -130,35 +138,29 @@
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
                                     TextBlock.TextAlignment="Center">
-                            <Border Width="74"
-                                    Height="74"
-                                    HorizontalAlignment="Center"
-                                    Background="{DynamicResource AccentSubtleBrush}"
-                                    BorderBrush="{DynamicResource AccentBrush}"
-                                    BorderThickness="2"
-                                    CornerRadius="18">
-                                <Grid>
-                                    <TextBlock HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontSize="34"
-                                               Foreground="{DynamicResource AccentHoverBrush}"
-                                               Text="▶" />
-                                </Grid>
-                            </Border>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Path Width="64" Height="64" Margin="0,0,16,0" Style="{StaticResource HeadingIconStyle}" Data="{StaticResource VideoIcon}" />
+                                <Path Width="64" Height="64" Style="{StaticResource HeadingIconStyle}" Data="{StaticResource ImageIcon}" />
+                            </StackPanel>
                             <TextBlock Margin="0,20,0,0"
                                        FontSize="20"
                                        FontWeight="SemiBold"
-                                       Text="Drop media here to begin" />
+                                       Text="Choose an image or video" />
                             <TextBlock Margin="0,12,0,0"
                                        FontSize="13"
                                        Foreground="{StaticResource SecondaryTextBrush}"
-                                       Text="Images and videos stay on this computer" />
+                                       Text="Drop a local file here or browse your computer." TextWrapping="Wrap" />
                             <Button Width="154"
                                     Height="40"
                                     Margin="0,20,0,0"
                                     Command="{Binding BrowseMediaCommand}"
                                     Content="Browse Media"
+                                    Tag="{StaticResource FolderIcon}" ContentTemplate="{StaticResource IconActionContent}"
                                     Style="{StaticResource PrimaryButtonStyle}" />
+                            <TextBlock Margin="0,16,0,0" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"
+                                       Text="PNG, JPG/JPEG, WebP, BMP • MP4, MOV, MKV, AVI" />
+                            <TextBlock Margin="0,12,0,0" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"
+                                       Text="Processed locally. No uploads or telemetry." />
                         </StackPanel>
                     </Grid>
 
@@ -352,7 +354,8 @@
                       Visibility="{Binding IsImageSelected, Converter={StaticResource BooleanToVisibilityConverter}}"
                       ToolTip="Review scale" AutomationProperties.Name="Image review scale" />
 
-            <Border Grid.Row="3" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+            <Border Grid.Row="3" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0"
+                    Visibility="{Binding IsMediaSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid Margin="14,12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -363,50 +366,86 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Margin="0,0,8,0"
-                                       Foreground="{DynamicResource AccentHoverBrush}"
-                                       Text="▣" />
+                            <Path Margin="0,0,8,0">
+                                <Path.Style>
+                                    <Style TargetType="Path" BasedOn="{StaticResource HeadingIconStyle}">
+                                        <Setter Property="Data" Value="{StaticResource ImageIcon}" />
+                                        <Style.Triggers><DataTrigger Binding="{Binding IsVideoSelected}" Value="True"><Setter Property="Data" Value="{StaticResource VideoIcon}" /></DataTrigger></Style.Triggers>
+                                    </Style>
+                                </Path.Style>
+                            </Path>
                             <TextBlock Grid.Column="1"
                                        FontWeight="SemiBold"
                                        Text="{Binding SelectedFileName}"
                                        TextTrimming="CharacterEllipsis"
                                        ToolTip="{Binding SelectedFileName}" />
-                            <TextBlock Grid.Column="2"
-                                       Margin="10,0,0,0"
-                                       Style="{StaticResource MutedTextStyle}"
-                                       Text="{Binding MediaTypeText}" />
                         </Grid>
                         <TextBlock Margin="0,5,0,0"
                                    Style="{StaticResource SecondaryTextStyle}"
-                                   Text="{Binding MetadataPrimaryText}" />
+                                   Text="{Binding MetadataPrimaryText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding MetadataPrimaryText}" />
                         <TextBlock Margin="0,3,0,0"
                                    Style="{StaticResource MutedTextStyle}"
-                                   Text="{Binding MetadataSecondaryText}" />
+                                   Text="{Binding MetadataSecondaryText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding MetadataSecondaryText}" />
                         <TextBlock Margin="0,3,0,0"
                                    Foreground="{StaticResource WarningBrush}"
                                    Text="Same as source is above 1080p; preview and export remain available."
+                                   TextWrapping="Wrap"
                                    Visibility="{Binding ShowResolutionWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
                     <Grid Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
                         <Button MinWidth="188"
                                 Command="{Binding RenderImageCommand}"
                                 Content="{Binding ImageRenderActionLabel}"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Visibility="{Binding IsImageSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                ContentTemplate="{StaticResource IconActionContent}"
+                                Visibility="{Binding IsImageSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                    <Setter Property="Tag" Value="{StaticResource RenderIcon}" />
+                                    <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource AccentHoverBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasImageResultForRerender}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource ElevatedBackgroundBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                                            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+                                            <Setter Property="Tag" Value="{StaticResource RerenderIcon}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                         <StackPanel Orientation="Horizontal"
                                     Visibility="{Binding IsVideoSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Button MinWidth="132"
                                     AutomationProperties.HelpText="Available before a complete rendered video is accepted"
                                     AutomationProperties.Name="Preview the currently selected video frame"
                                     Command="{Binding PreviewFrameCommand}"
-                                    Content="{Binding PreviewFrameActionLabel}" />
+                                    Content="{Binding PreviewFrameActionLabel}"
+                                    Visibility="{Binding ShowPreviewFrameAction, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             <Button MinWidth="148"
                                     Margin="10,0,0,0"
                                     Command="{Binding RenderVideoCommand}"
                                     Content="{Binding VideoRenderActionLabel}"
-                                    Style="{StaticResource PrimaryButtonStyle}" />
+                                    ContentTemplate="{StaticResource IconActionContent}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                        <Setter Property="Tag" Value="{StaticResource RenderIcon}" />
+                                        <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentHoverBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasVideoArtifact}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource ElevatedBackgroundBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+                                                <Setter Property="Tag" Value="{StaticResource RerenderIcon}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                         </StackPanel>
                     </Grid>
                 </Grid>

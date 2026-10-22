@@ -3,359 +3,445 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:presentation="clr-namespace:GlyphFrame.App.Presentation"
              xmlns:views="clr-namespace:GlyphFrame.App.Views"
-             Margin="0,10,0,0"
              Focusable="False"
              Visibility="{Binding IsProcessingResultPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-    <Grid>
-        <Border Style="{StaticResource CardStyle}"
-                Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+    <UserControl.Resources>
+        <Style x:Key="PlannedTargetMetricStyle" TargetType="Border">
+            <Setter Property="MinWidth" Value="100" />
+        </Style>
+        <Style x:Key="StatusTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionHeaderTextStyle}">
+            <Setter Property="FontSize" Value="15" /><Setter Property="LineHeight" Value="20.25" /><Setter Property="TextTrimming" Value="None" />
+        </Style>
+        <Style x:Key="StatusDescriptionStyle" TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
+            <Setter Property="LineHeight" Value="16.8" /><Setter Property="TextTrimming" Value="None" />
+        </Style>
+        <Style x:Key="StatusLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
+            <Setter Property="LineHeight" Value="15.4" /><Setter Property="TextTrimming" Value="None" /><Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="StatusValueStyle" TargetType="TextBlock" BasedOn="{StaticResource MonospaceTextStyle}">
+            <Setter Property="FontFamily" Value="Consolas" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="LineHeight" Value="16.8" />
+        </Style>
+        <Style x:Key="StatusButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Height" Value="Auto" /><Setter Property="MinHeight" Value="38" /><Setter Property="Padding" Value="10,8" /><Setter Property="FontSize" Value="13" />
+        </Style>
+        <Style x:Key="StatusPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Height" Value="Auto" /><Setter Property="MinHeight" Value="38" /><Setter Property="Padding" Value="10,8" /><Setter Property="FontSize" Value="13" />
+        </Style>
+        <Style x:Key="StatusCancelButtonStyle" TargetType="Button" BasedOn="{StaticResource DangerButtonStyle}">
+            <Setter Property="Height" Value="Auto" /><Setter Property="MinHeight" Value="38" /><Setter Property="Padding" Value="10,8" /><Setter Property="FontSize" Value="13" />
+        </Style>
+        <DataTemplate x:Key="StatusIconActionContent">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="86" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <views:ExportActivityIndicator Width="72"
-                                               Height="72"
-                                               HorizontalAlignment="Left"
-                                               VerticalAlignment="Center"
-                                               AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                                               IsActive="{Binding IsExportActive}"
-                                               IsCompleted="{Binding IsExportCompletionVisible}"
-                                               ShowPercentageText="True"
-                                               PercentageText="{Binding ExportPercentageText}" />
-
-                <Grid Grid.Column="1" Margin="0,0,18,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Style="{StaticResource SectionHeaderTextStyle}"
-                               Text="{Binding ExportOperationTitle}" />
-                    <TextBlock Grid.Row="1"
-                               Margin="0,4,0,0"
-                               presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                               presentation:ExportStatusAnimation.Stage="{Binding ExportStage}"
-                               presentation:ExportStatusAnimation.StageText="{Binding ExportProgressText}"
-                               Style="{StaticResource SecondaryTextStyle}"
-                               Text="" />
-                    <TextBlock Grid.Row="2"
-                               Margin="0,4,0,0"
-                               Style="{StaticResource MutedTextStyle}"
-                               Text="{Binding ExportFrameText}" />
-                    <ProgressBar Grid.Row="3"
-                                 Margin="0,10,0,0"
-                                 Maximum="100"
-                                 presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                                 presentation:ExportStatusAnimation.ProgressGeneration="{Binding ExportPresentationGeneration}"
-                                 presentation:ExportStatusAnimation.ProgressIsIndeterminate="{Binding IsExportProgressIndeterminate}"
-                                 presentation:ExportStatusAnimation.ProgressStage="{Binding ExportStage}"
-                                 presentation:ExportStatusAnimation.ProgressValue="{Binding ExportProgress}" />
-                    <StackPanel Grid.Row="4" Margin="0,9,0,0" Orientation="Horizontal">
-                        <TextBlock Style="{StaticResource MutedTextStyle}" Text="{Binding ElapsedText}" />
-                        <TextBlock Margin="24,0,0,0" Style="{StaticResource MutedTextStyle}" Text="{Binding RemainingText}" />
-                    </StackPanel>
-                </Grid>
-
-                <Button Grid.Column="2"
-                        Width="96"
-                        VerticalAlignment="Center"
-                        Command="{Binding CancelExportCommand}"
-                        Content="Cancel"
-                        Style="{StaticResource DangerButtonStyle}"
-                        Visibility="{Binding IsExportActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <Path Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center" Style="{StaticResource VectorIconStyle}"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                      Data="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" />
+                <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" VerticalAlignment="Center"
+                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
             </Grid>
-        </Border>
+        </DataTemplate>
+        <Style x:Key="CopyPathButtonStyle" TargetType="Button" BasedOn="{StaticResource StatusButtonStyle}">
+            <Setter Property="MinWidth" Value="112" />
+            <Setter Property="Height" Value="Auto" />
+            <Setter Property="Tag" Value="{StaticResource CopyIcon}" />
+            <Setter Property="ContentTemplate" Value="{StaticResource StatusIconActionContent}" />
+            <Setter Property="Content" Value="{Binding ExportPathCopy.Label}" />
+            <Setter Property="Command" Value="{Binding ExportPathCopy.Command}" />
+            <Setter Property="ToolTip" Value="{Binding ExportPathCopy.ToolTip}" />
+            <Setter Property="AutomationProperties.Name" Value="{Binding ExportPathCopy.AccessibleName}" />
+            <Setter Property="Visibility" Value="{Binding ShowCopyExportPath, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        </Style>
+    </UserControl.Resources>
+    <Border x:Name="StatusShell" Style="{StaticResource CardStyle}" BorderThickness="1" CornerRadius="10" Padding="16">
 
-        <Border x:Name="ImageResultCard"
-                Style="{StaticResource CardStyle}"
-                Visibility="{Binding ShowImageResultPanel, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <views:AdaptiveResultPanel x:Name="ImageResultLayout">
-                <Grid Width="46"
-                      Height="46"
-                      HorizontalAlignment="Left"
-                      VerticalAlignment="Center"
-                      views:AdaptiveResultPanel.Role="Status">
-                    <Ellipse Fill="{DynamicResource AccentSubtleBrush}"
-                             Stroke="{DynamicResource AccentBrush}"
-                             StrokeThickness="1" />
-                    <Path Width="22"
-                          Height="16"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          Data="M 1,8 L 7,14 L 21,1"
-                          Stroke="{StaticResource SuccessBrush}"
-                          StrokeEndLineCap="Round"
-                          StrokeLineJoin="Round"
-                          StrokeStartLineCap="Round"
-                          StrokeThickness="3"
-                          Stretch="Fill"
-                          Visibility="{Binding IsImageResultSuccess, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <Path Width="4"
-                          Height="20"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          Data="M 2,0 L 2,12 M 2,18 L 2,20"
-                          Stroke="{StaticResource WarningBrush}"
-                          StrokeEndLineCap="Round"
-                          StrokeThickness="3"
-                          Visibility="{Binding IsImageResultWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <Path Width="20"
-                          Height="20"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          Data="M 1,1 L 19,19 M 19,1 L 1,19"
-                          Stroke="{StaticResource ErrorBrush}"
-                          StrokeEndLineCap="Round"
-                          StrokeThickness="2.5"
-                          Visibility="{Binding IsImageResultFailure, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                </Grid>
-
-                <StackPanel x:Name="ImageResultText"
-                            MinWidth="0"
-                            VerticalAlignment="Center"
-                            views:AdaptiveResultPanel.Role="Text">
-                    <TextBlock x:Name="ImageResultTitleText"
-                               Style="{StaticResource SectionHeaderTextStyle}"
-                               Text="{Binding ImageResultTitle}"
-                               TextWrapping="Wrap" />
-                    <TextBlock x:Name="ImageResultSummaryText"
-                               Margin="0,5,0,0"
-                               HorizontalAlignment="Left"
-                               MaxWidth="360"
-                               Style="{StaticResource SecondaryTextStyle}"
-                               Text="{Binding ImageResultSummary}"
-                               TextWrapping="Wrap" />
-                    <TextBlock x:Name="ImageRenderWarningTextBlock"
-                               Margin="0,5,0,0"
-                               HorizontalAlignment="Left"
-                               MaxWidth="360"
-                               Foreground="{StaticResource WarningBrush}"
-                               Text="{Binding ImageRenderWarningText}"
-                               TextWrapping="Wrap"
-                               Visibility="{Binding ShowImageRenderWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <Button x:Name="ImageResultDetailsButton"
-                            Margin="0,5,0,0"
-                            HorizontalAlignment="Left"
-                            Command="{Binding ShowImageResultErrorDetailsCommand}"
-                            Content="Show Details"
-                            Style="{StaticResource TextButtonStyle}"
-                            Visibility="{Binding ShowImageResultErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                </StackPanel>
-
-                <StackPanel x:Name="ImageResultMetrics"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Center"
-                            Orientation="Horizontal"
-                            Visibility="{Binding ShowImageRenderMetrics, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            views:AdaptiveResultPanel.Role="Metrics">
-                    <Border x:Name="ImageGridMetricCard"
-                            MinWidth="112"
-                            Padding="12,8"
-                            Background="{DynamicResource ElevatedBackgroundBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource MutedTextStyle}" Text="SYMBOL GRID" />
-                            <TextBlock Margin="0,3,0,0"
-                                       Style="{StaticResource MonospaceTextStyle}"
-                                       Text="{Binding ImageGridDimensionsText}" />
+            <Grid x:Name="StatusContent" VerticalAlignment="Top">
+                <Border x:Name="ReadyToRenderCard"
+                        presentation:StatusContentTransition.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                        presentation:StatusContentTransition.ContentKey="Ready to render"
+                        Visibility="{Binding ShowReadyToRender, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <views:AdaptiveResultPanel Family="Planned">
+                        <Grid Width="42" Height="42" VerticalAlignment="Center" views:AdaptiveResultPanel.Role="Status">
+                            <Ellipse Fill="{DynamicResource AccentSubtleBrush}" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1" />
+                            <Path Width="22" Height="22" Style="{StaticResource HeadingIconStyle}" Margin="0"
+                                  Data="{StaticResource ReadyToRenderIcon}" HorizontalAlignment="Center" />
+                        </Grid>
+                        <StackPanel VerticalAlignment="Center" views:AdaptiveResultPanel.Role="Text">
+                            <TextBlock Style="{StaticResource StatusTitleStyle}" TextWrapping="Wrap" Text="Ready to render" />
+                            <TextBlock Margin="0,3,0,0" Style="{StaticResource StatusDescriptionStyle}"
+                                       TextWrapping="Wrap" Text="{Binding ReadyToRenderMessage}" />
                         </StackPanel>
-                    </Border>
-                    <Border x:Name="ImageOutputMetricCard"
-                            MinWidth="132"
-                            Margin="10,0,0,0"
-                            Padding="12,8"
-                            Background="{DynamicResource ElevatedBackgroundBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource MutedTextStyle}" Text="OUTPUT" />
-                            <TextBlock Margin="0,3,0,0"
-                                       Style="{StaticResource MonospaceTextStyle}"
-                                       Text="{Binding ImageOutputDimensionsText}" />
+                        <views:MetricCardsPanel VerticalAlignment="Center" views:AdaptiveResultPanel.Role="Metrics">
+                            <Border Style="{StaticResource PlannedTargetMetricStyle}" Padding="10,8" Background="{DynamicResource ElevatedBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatusLabelStyle}" Text="TARGET" />
+                                    <TextBlock Margin="0,3,0,0" Style="{StaticResource StatusValueStyle}" TextWrapping="Wrap" TextTrimming="None" Text="{Binding PlannedOutputDimensionsText}" />
+                                </StackPanel>
+                            </Border>
+                            <Border MinWidth="88" Padding="10,8" Background="{DynamicResource ElevatedBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6"
+                                    Visibility="{Binding IsVideoSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatusLabelStyle}" Text="AUDIO" />
+                                    <TextBlock Margin="0,3,0,0" Style="{StaticResource StatusValueStyle}" TextWrapping="Wrap" TextTrimming="None" Text="{Binding PlannedAudioText}" />
+                                </StackPanel>
+                            </Border>
+                        </views:MetricCardsPanel>
+                    </views:AdaptiveResultPanel>
+                </Border>
+                <Border x:Name="ProcessingContent"
+                        presentation:StatusContentTransition.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                        presentation:StatusContentTransition.ContentKey="{Binding ExportOperationTitle}"
+                        Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <views:AdaptiveResultPanel Family="Working">
+
+                        <views:ExportActivityIndicator views:AdaptiveResultPanel.Role="Status" Width="54"
+                                                       Height="54"
+                                                       HorizontalAlignment="Left"
+                                                       VerticalAlignment="Center"
+                                                       AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                                       IsActive="{Binding IsExportActive}"
+                                                       IsCompleted="{Binding IsExportCompletionVisible}"
+                                                       ShowPercentageText="True"
+                                                       PercentageText="{Binding ExportPercentageText}" />
+
+                        <Grid views:AdaptiveResultPanel.Role="Text" VerticalAlignment="Center">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock TextWrapping="Wrap" Style="{StaticResource StatusTitleStyle}"
+                                       Text="{Binding ExportOperationTitle}" />
+                            <TextBlock Grid.Row="1"
+                                       Margin="0,3,0,0"
+                                       presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                       presentation:ExportStatusAnimation.Stage="{Binding ExportStage}"
+                                       presentation:ExportStatusAnimation.StageText="{Binding ExportProgressText}"
+                                       TextWrapping="Wrap" Style="{StaticResource StatusDescriptionStyle}"
+                                       Text="" />
+                            <TextBlock Grid.Row="2"
+                                       Margin="0,12,0,0"
+                                       Style="{StaticResource StatusDescriptionStyle}"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding ExportFrameText}" />
+                            <ProgressBar Grid.Row="3"
+                                         Margin="0,8,0,0"
+                                         Maximum="100"
+                                         presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                         presentation:ExportStatusAnimation.ProgressGeneration="{Binding ExportPresentationGeneration}"
+                                         presentation:ExportStatusAnimation.ProgressIsIndeterminate="{Binding IsExportProgressIndeterminate}"
+                                         presentation:ExportStatusAnimation.ProgressStage="{Binding ExportStage}"
+                                         presentation:ExportStatusAnimation.ProgressValue="{Binding ExportProgress}" />
+                                                        <Grid Grid.Row="4" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource StatusDescriptionStyle}" TextWrapping="Wrap" Text="{Binding ElapsedText}" />
+                                <TextBlock Grid.Column="1" Margin="12,0,0,0" HorizontalAlignment="Right" Style="{StaticResource StatusDescriptionStyle}" TextWrapping="Wrap" Text="{Binding RemainingText}" />
+                            </Grid>
+                        </Grid>
+
+                        <Button views:AdaptiveResultPanel.Role="Actions"
+                                Width="108"
+                                VerticalAlignment="Center"
+                                Command="{Binding CancelExportCommand}"
+                                Content="Cancel"
+                                Style="{StaticResource StatusCancelButtonStyle}"
+                                Visibility="{Binding IsExportActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </views:AdaptiveResultPanel>
+                </Border>
+
+                <Border x:Name="ImageResultCard"
+                        presentation:StatusContentTransition.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                        presentation:StatusContentTransition.ContentKey="{Binding ImageResultTitle}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="{Binding ShowImageResultPanel, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsExportStatusVisible}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <views:AdaptiveResultPanel x:Name="ImageResultLayout" CompactContentWidth="296">
+                        <Grid Width="42"
+                              Height="42"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Center"
+                              views:AdaptiveResultPanel.Role="Status">
+                            <Ellipse Fill="{DynamicResource AccentSubtleBrush}"
+                                     Stroke="{DynamicResource AccentBrush}"
+                                     StrokeThickness="1" />
+                            <Path Width="22"
+                                  Height="16"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Data="{StaticResource SuccessIcon}"
+                                  Stroke="{StaticResource SuccessBrush}"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  StrokeStartLineCap="Round"
+                                  StrokeThickness="3"
+                                  Stretch="Fill"
+                                  Visibility="{Binding IsImageResultSuccess, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <Path Width="22"
+                                  Height="20"
+                                  Stretch="Uniform"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Data="{StaticResource WarningIcon}"
+                                  Stroke="{StaticResource WarningBrush}"
+                                  StrokeEndLineCap="Round"
+                                  StrokeThickness="3"
+                                  Visibility="{Binding IsImageResultWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <Path Width="20"
+                                  Height="20"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Data="{StaticResource ErrorIcon}"
+                                  Stroke="{StaticResource ErrorBrush}"
+                                  StrokeEndLineCap="Round"
+                                  StrokeThickness="2.5"
+                                  Visibility="{Binding IsImageResultFailure, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </Grid>
+
+                        <StackPanel x:Name="ImageResultText"
+                                    MinWidth="0"
+                                    VerticalAlignment="Center"
+                                    views:AdaptiveResultPanel.Role="Text">
+                            <TextBlock x:Name="ImageResultTitleText"
+                                       Style="{StaticResource StatusTitleStyle}"
+                                       Text="{Binding ImageResultTitle}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock x:Name="ImageResultSummaryText"
+                                       Margin="0,3,0,0"
+                                       HorizontalAlignment="Left"
+
+                                       Style="{StaticResource StatusDescriptionStyle}"
+                                       Text="{Binding ImageResultSummary}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock x:Name="ImageRenderWarningTextBlock"
+                                       Margin="0,3,0,0"
+                                       HorizontalAlignment="Left"
+
+                                       Foreground="{StaticResource WarningBrush}"
+                                       Text="{Binding ImageRenderWarningText}"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding ShowImageRenderWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <Button x:Name="ImageResultDetailsButton"
+                                    Margin="0,3,0,0"
+                                    HorizontalAlignment="Left"
+                                    Command="{Binding ShowImageResultErrorDetailsCommand}"
+                                    Content="Show Details"
+                                    Style="{StaticResource TextButtonStyle}"
+                                    Visibility="{Binding ShowImageResultErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
-                    </Border>
-                </StackPanel>
 
-                <StackPanel x:Name="ImageResultActions"
-                            VerticalAlignment="Center"
-                            Visibility="{Binding ShowImageExportControls, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            views:AdaptiveResultPanel.Role="Actions">
-                    <ComboBox x:Name="ImageFormatSelector"
-                              MinWidth="150"
-                              ItemsSource="{Binding ImageOutputFormats}"
-                              SelectedItem="{Binding SelectedImageOutputFormat}"
-                              ToolTip="Choose the image format used by Export Image" />
-                    <Button x:Name="ImageExportButton"
-                            MinWidth="150"
-                            Margin="0,10,0,0"
-                            Command="{Binding ExportImageCommand}"
-                            Content="{Binding ImageExportActionLabel}"
-                            Style="{StaticResource PrimaryButtonStyle}" />
-                    <Button x:Name="OpenImageExportFolderButton"
-                            Margin="0,8,0,0"
-                            Command="{Binding OpenExportFolderCommand}"
-                            Content="Open Folder"
-                            Visibility="{Binding CanOpenExportFolder, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                </StackPanel>
-            </views:AdaptiveResultPanel>
-        </Border>
+                        <views:MetricCardsPanel x:Name="ImageResultMetrics"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding ShowImageRenderMetrics, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                    views:AdaptiveResultPanel.Role="Metrics">
+                            <Border x:Name="ImageGridMetricCard"
+                                    MinWidth="88"
+                                    Padding="10,8"
+                                    Background="{DynamicResource ElevatedBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatusLabelStyle}" Text="SYMBOL GRID" />
+                                    <TextBlock Margin="0,3,0,0"
+                                               Style="{StaticResource StatusValueStyle}" TextWrapping="Wrap" TextTrimming="None"
+                                               Text="{Binding ImageGridDimensionsText}" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="ImageOutputMetricCard"
+                                    MinWidth="100"
+                                    Padding="10,8"
+                                    Background="{DynamicResource ElevatedBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatusLabelStyle}" Text="OUTPUT" />
+                                    <TextBlock Margin="0,3,0,0"
+                                               Style="{StaticResource StatusValueStyle}" TextWrapping="Wrap" TextTrimming="None"
+                                               Text="{Binding ImageOutputDimensionsText}" />
+                                </StackPanel>
+                            </Border>
+                        </views:MetricCardsPanel>
 
-        <Border x:Name="VideoResultCard"
-                Style="{StaticResource CardStyle}"
-                Visibility="{Binding ShowVideoResultPanel, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <views:AdaptiveResultPanel x:Name="VideoResultLayout">
-                <Grid Width="46"
-                      Height="46"
-                      HorizontalAlignment="Left"
-                      VerticalAlignment="Center"
-                      views:AdaptiveResultPanel.Role="Status">
-                    <Ellipse Fill="{DynamicResource AccentSubtleBrush}"
-                             Stroke="{DynamicResource AccentBrush}"
-                             StrokeThickness="1" />
-                    <Path Width="22"
-                          Height="16"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          Data="M 1,8 L 7,14 L 21,1"
-                          Stroke="{StaticResource SuccessBrush}"
-                          StrokeEndLineCap="Round"
-                          StrokeLineJoin="Round"
-                          StrokeStartLineCap="Round"
-                          StrokeThickness="3"
-                          Stretch="Fill"
-                          Visibility="{Binding IsVideoResultSuccess, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <Path Width="4"
-                          Height="20"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          Data="M 2,0 L 2,12 M 2,18 L 2,20"
-                          Stroke="{StaticResource WarningBrush}"
-                          StrokeEndLineCap="Round"
-                          StrokeThickness="3"
-                          Visibility="{Binding IsVideoResultWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <Path Width="20"
-                          Height="20"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          Data="M 1,1 L 19,19 M 19,1 L 1,19"
-                          Stroke="{StaticResource ErrorBrush}"
-                          StrokeEndLineCap="Round"
-                          StrokeThickness="2.5"
-                          Visibility="{Binding IsVideoResultFailure, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                </Grid>
+                        <views:ImageExportActionsPanel x:Name="ImageResultActions"
+                                                       VerticalAlignment="Center"
+                                                       Visibility="{Binding ShowImageExportControls, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                       views:AdaptiveResultPanel.Role="Actions">
+                            <Button x:Name="ImageExportButton"
+                                    MinWidth="0"
+                                    Command="{Binding ExportImageCommand}"
+                                    Content="{Binding ImageExportActionLabel}"
+                                    Tag="{StaticResource ExportIcon}" ContentTemplate="{StaticResource StatusIconActionContent}"
+                                    Style="{StaticResource StatusPrimaryButtonStyle}" />
+                            <Button x:Name="OpenImageExportFolderButton"
+                                    MinWidth="122"
+                                    Command="{Binding OpenExportFolderCommand}"
+                                    Content="Open Folder" Style="{StaticResource StatusButtonStyle}"
+                                    Tag="{StaticResource FolderIcon}" ContentTemplate="{StaticResource StatusIconActionContent}"
+                                    Visibility="{Binding CanOpenExportFolder, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <Button x:Name="CopyImageExportPathButton" Style="{StaticResource CopyPathButtonStyle}" />
+                        </views:ImageExportActionsPanel>
+                    </views:AdaptiveResultPanel>
+                </Border>
 
-                <StackPanel x:Name="VideoResultText"
-                            MinWidth="0"
-                            VerticalAlignment="Center"
-                            views:AdaptiveResultPanel.Role="Text">
-                    <TextBlock x:Name="VideoResultTitleText"
-                               Style="{StaticResource SectionHeaderTextStyle}"
-                               Text="{Binding VideoResultTitle}"
-                               TextTrimming="None"
-                               TextWrapping="Wrap" />
-                    <TextBlock x:Name="VideoResultSummaryText"
-                               Margin="0,5,0,0"
-                               HorizontalAlignment="Left"
-                               Style="{StaticResource SecondaryTextStyle}"
-                               Text="{Binding VideoResultSummary}"
-                               TextWrapping="Wrap" />
-                    <TextBlock x:Name="VideoExportDestinationTextBlock"
-                               Margin="0,5,0,0"
-                               Style="{StaticResource MutedTextStyle}"
-                               Text="{Binding VideoExportDestinationText}"
-                               TextTrimming="CharacterEllipsis"
-                               ToolTip="{Binding VideoExportDestinationText}"
-                               Visibility="{Binding HasVideoExportDestination, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <Button Margin="0,5,0,0"
-                            HorizontalAlignment="Left"
-                            Command="{Binding ShowVideoResultErrorDetailsCommand}"
-                            Content="Show Details"
-                            Style="{StaticResource TextButtonStyle}"
-                            Visibility="{Binding ShowVideoResultErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                </StackPanel>
+                <Border x:Name="VideoResultCard"
+                        presentation:StatusContentTransition.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                        presentation:StatusContentTransition.ContentKey="{Binding VideoResultTitle}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="{Binding ShowVideoResultPanel, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsExportStatusVisible}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <views:AdaptiveResultPanel x:Name="VideoResultLayout">
+                        <Grid Width="42"
+                              Height="42"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Center"
+                              views:AdaptiveResultPanel.Role="Status">
+                            <Ellipse Fill="{DynamicResource AccentSubtleBrush}"
+                                     Stroke="{DynamicResource AccentBrush}"
+                                     StrokeThickness="1" />
+                            <Path Width="22"
+                                  Height="16"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Data="{StaticResource SuccessIcon}"
+                                  Stroke="{StaticResource SuccessBrush}"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  StrokeStartLineCap="Round"
+                                  StrokeThickness="3"
+                                  Stretch="Fill"
+                                  Visibility="{Binding IsVideoResultSuccess, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <Path Width="22"
+                                  Height="20"
+                                  Stretch="Uniform"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Data="{StaticResource WarningIcon}"
+                                  Stroke="{StaticResource WarningBrush}"
+                                  StrokeEndLineCap="Round"
+                                  StrokeThickness="3"
+                                  Visibility="{Binding IsVideoResultWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <Path Width="20"
+                                  Height="20"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Data="{StaticResource ErrorIcon}"
+                                  Stroke="{StaticResource ErrorBrush}"
+                                  StrokeEndLineCap="Round"
+                                  StrokeThickness="2.5"
+                                  Visibility="{Binding IsVideoResultFailure, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </Grid>
 
-                <StackPanel x:Name="VideoResultActions"
-                            VerticalAlignment="Center"
-                            views:AdaptiveResultPanel.Role="Actions"
-                            Visibility="{Binding HasVideoArtifact, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Button x:Name="VideoExportButton"
-                            MinWidth="112"
-                            Command="{Binding ExportVideoCommand}"
-                            Content="{Binding VideoExportActionLabel}"
-                            Style="{StaticResource PrimaryButtonStyle}" />
-                    <Button x:Name="OpenVideoExportFolderButton"
-                            Margin="0,8,0,0"
-                            Command="{Binding OpenExportFolderCommand}"
-                            Content="Open Folder"
-                            Visibility="{Binding CanOpenExportFolder, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                </StackPanel>
-
-                <Grid x:Name="VideoResultMetrics"
-                      HorizontalAlignment="Left"
-                      Visibility="{Binding ShowVideoRenderMetrics, Converter={StaticResource BooleanToVisibilityConverter}}"
-                      views:AdaptiveResultPanel.Role="Metrics">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Border x:Name="VideoFramesMetricCard"
-                            MinWidth="78"
-                            Padding="10,8"
-                            Background="{DynamicResource ElevatedBackgroundBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource MutedTextStyle}" Text="FRAMES" />
-                            <TextBlock Margin="0,3,0,0"
-                                       Style="{StaticResource MonospaceTextStyle}"
-                                       Text="{Binding VideoRenderedFrameCountText}" />
+                        <StackPanel x:Name="VideoResultText"
+                                    MinWidth="0"
+                                    VerticalAlignment="Center"
+                                    views:AdaptiveResultPanel.Role="Text">
+                            <TextBlock x:Name="VideoResultTitleText"
+                                       Style="{StaticResource StatusTitleStyle}"
+                                       Text="{Binding VideoResultTitle}"
+                                       TextTrimming="None"
+                                       TextWrapping="Wrap" />
+                            <TextBlock x:Name="VideoResultSummaryText"
+                                       Margin="0,3,0,0"
+                                       HorizontalAlignment="Left"
+                                       Style="{StaticResource StatusDescriptionStyle}"
+                                       Text="{Binding VideoResultSummary}"
+                                       TextWrapping="Wrap" />
+                            <Button Margin="0,3,0,0"
+                                    HorizontalAlignment="Left"
+                                    Command="{Binding ShowVideoResultErrorDetailsCommand}"
+                                    Content="Show Details"
+                                    Style="{StaticResource TextButtonStyle}"
+                                    Visibility="{Binding ShowVideoResultErrorDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
-                    </Border>
-                    <Border x:Name="VideoOutputMetricCard"
-                            Grid.Column="1"
-                            MinWidth="112"
-                            Margin="8,0,0,0"
-                            Padding="10,8"
-                            Background="{DynamicResource ElevatedBackgroundBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource MutedTextStyle}" Text="OUTPUT" />
-                            <TextBlock Margin="0,3,0,0"
-                                       Style="{StaticResource MonospaceTextStyle}"
-                                       Text="{Binding VideoOutputDimensionsText}" />
-                        </StackPanel>
-                    </Border>
-                    <Border x:Name="VideoAudioMetricCard"
-                            Grid.Column="2"
-                            MinWidth="92"
-                            Margin="8,0,0,0"
-                            Padding="10,8"
-                            Background="{DynamicResource ElevatedBackgroundBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            ToolTip="{Binding VideoAudioOutcomeDescription}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource MutedTextStyle}" Text="AUDIO" />
-                            <TextBlock Margin="0,3,0,0"
-                                       Style="{StaticResource MonospaceTextStyle}"
-                                       Text="{Binding VideoAudioOutcomeText}" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
-            </views:AdaptiveResultPanel>
-        </Border>
-    </Grid>
+
+                        <views:VideoExportActionsPanel x:Name="VideoResultActions"
+                                    VerticalAlignment="Center"
+                                    views:AdaptiveResultPanel.Role="Actions"
+                                    Visibility="{Binding HasVideoArtifact, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Button x:Name="VideoExportButton"
+                                    MinWidth="0"
+                                    Command="{Binding ExportVideoCommand}"
+                                    Content="{Binding VideoExportActionLabel}"
+                                    Tag="{StaticResource ExportIcon}" ContentTemplate="{StaticResource StatusIconActionContent}"
+                                    Style="{StaticResource StatusPrimaryButtonStyle}" />
+                            <Button x:Name="OpenVideoExportFolderButton"
+                                    MinWidth="122"
+                                    Command="{Binding OpenExportFolderCommand}"
+                                    Content="Open Folder" Style="{StaticResource StatusButtonStyle}"
+                                    Tag="{StaticResource FolderIcon}" ContentTemplate="{StaticResource StatusIconActionContent}"
+                                    Visibility="{Binding CanOpenExportFolder, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <Button x:Name="CopyVideoExportPathButton" Style="{StaticResource CopyPathButtonStyle}" />
+                        </views:VideoExportActionsPanel>
+
+                        <views:MetricCardsPanel x:Name="VideoResultMetrics"
+                              HorizontalAlignment="Stretch"
+                              Visibility="{Binding ShowVideoRenderMetrics, Converter={StaticResource BooleanToVisibilityConverter}}"
+                              views:AdaptiveResultPanel.Role="Metrics">
+                            <Border x:Name="VideoFileSizeMetricCard"
+                                    MinWidth="88"
+                                    Padding="10,8"
+                                    Background="{DynamicResource ElevatedBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatusLabelStyle}" Text="FILE SIZE" />
+                                    <TextBlock Margin="0,3,0,0"
+                                               Style="{StaticResource StatusValueStyle}" TextWrapping="Wrap" TextTrimming="None"
+                                               Text="{Binding VideoFileSizeText}" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="VideoOutputMetricCard" MinWidth="100"
+                                    Padding="10,8"
+                                    Background="{DynamicResource ElevatedBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatusLabelStyle}" Text="OUTPUT" />
+                                    <TextBlock Margin="0,3,0,0"
+                                               Style="{StaticResource StatusValueStyle}" TextWrapping="Wrap" TextTrimming="None"
+                                               Text="{Binding VideoOutputDimensionsText}" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="VideoAudioMetricCard"
+                                    MinWidth="88"
+                                    Padding="10,8"
+                                    Background="{DynamicResource ElevatedBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    ToolTip="{Binding VideoAudioOutcomeDescription}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource StatusLabelStyle}" Text="AUDIO" />
+                                    <TextBlock Margin="0,3,0,0"
+                                               Style="{StaticResource StatusValueStyle}" TextWrapping="Wrap" TextTrimming="None"
+                                               Text="{Binding VideoAudioOutcomeText}" />
+                                </StackPanel>
+                            </Border>
+                        </views:MetricCardsPanel>
+                    </views:AdaptiveResultPanel>
+                </Border>
+            </Grid>
+
+    </Border>
 </UserControl>

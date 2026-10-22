@@ -147,7 +147,7 @@
 
     <Style TargetType="{x:Type ComboBox}">
         <Setter Property="Height" Value="{StaticResource ControlHeight}" />
-        <Setter Property="Padding" Value="10,6,34,6" />
+        <Setter Property="Padding" Value="10,6" />
         <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
         <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
@@ -164,18 +164,21 @@
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="{StaticResource ControlCornerRadius}">
                             <Grid>
-                                <ContentPresenter Margin="{TemplateBinding Padding}"
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="28" /></Grid.ColumnDefinitions>
+                                <ContentPresenter x:Name="SelectionContent" Margin="{TemplateBinding Padding}"
                                                   HorizontalAlignment="Left"
                                                   VerticalAlignment="Center"
                                                   Content="{TemplateBinding SelectionBoxItem}"
                                                   ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
                                                   IsHitTestVisible="False" />
-                                <TextBlock Margin="0,0,12,1"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           FontSize="14"
-                                           Foreground="{StaticResource SecondaryTextBrush}"
-                                           Text="⌄" />
+                                <Grid x:Name="ArrowCell" Grid.Column="1">
+                                    <Path x:Name="Chevron" Width="10" Height="6" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Data="M1,1 L5,5 9,1" Stretch="Uniform" Stroke="{TemplateBinding Foreground}" StrokeThickness="1.6"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                          RenderTransformOrigin="0.5,0.5" Focusable="False" IsHitTestVisible="False">
+                                        <Path.RenderTransform><RotateTransform Angle="0" /></Path.RenderTransform>
+                                    </Path>
+                                </Grid>
                             </Grid>
                         </Border>
                         <ToggleButton Background="Transparent"
@@ -210,6 +213,9 @@
                         </Popup>
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="IsDropDownOpen" Value="True">
+                            <Setter TargetName="Chevron" Property="RenderTransform"><Setter.Value><RotateTransform Angle="180" /></Setter.Value></Setter>
+                        </Trigger>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
                             <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                         </Trigger>
@@ -247,10 +253,17 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{StaticResource ControlCornerRadius}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Path x:Name="SelectionMark" Width="10" Height="8" Margin="0,0,6,0"
+                                  Data="M1,4 L4,7 9,1" Stroke="{TemplateBinding Foreground}" StrokeThickness="1.6"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Stretch="Uniform" Visibility="Collapsed" Focusable="False" IsHitTestVisible="False" />
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </StackPanel>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="SelectionMark" Property="Visibility" Value="Visible" />
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
                             <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                             <Setter Property="Foreground" Value="{DynamicResource AccentHoverBrush}" />
@@ -266,7 +279,10 @@
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.5" />
+                            <Setter Property="Opacity" Value="1" />
+                            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
                             <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -275,7 +291,7 @@
         </Setter>
     </Style>
 
-    <Style x:Key="PreviewTabStyle" TargetType="ToggleButton">
+    <Style x:Key="PreviewTabStyle" TargetType="Button">
         <Setter Property="Height" Value="44" />
         <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" />
         <Setter Property="Background" Value="Transparent" />
@@ -285,7 +301,7 @@
         <Setter Property="FocusVisualStyle" Value="{StaticResource GlyphFrameFocusVisualStyle}" />
         <Setter Property="Template">
             <Setter.Value>
-                <ControlTemplate TargetType="ToggleButton">
+                <ControlTemplate TargetType="Button">
                     <Border x:Name="Chrome"
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
@@ -293,11 +309,6 @@
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-                            <Setter Property="Foreground" Value="{DynamicResource AccentHoverBrush}" />
-                        </Trigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="IsMouseOver" Value="True" />
@@ -316,6 +327,26 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style x:Key="OriginalPreviewTabStyle" TargetType="Button" BasedOn="{StaticResource PreviewTabStyle}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsOriginalPreviewSelected}" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource AccentHoverBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="SymbolizedPreviewTabStyle" TargetType="Button" BasedOn="{StaticResource PreviewTabStyle}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsSymbolizedPreviewSelected}" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource AccentHoverBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
     <Style TargetType="{x:Type ProgressBar}">

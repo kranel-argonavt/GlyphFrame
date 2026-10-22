@@ -34,6 +34,7 @@ public partial class SettingsWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        _viewModel.EndEdit();
         _viewModel.RequestClose -= OnRequestClose;
         SourceInitialized -= OnSourceInitialized;
         Loaded -= OnLoaded;

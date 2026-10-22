@@ -33,16 +33,17 @@
                           HorizontalScrollBarVisibility="Disabled"
                           PanningMode="VerticalOnly"
                           VerticalScrollBarVisibility="Visible">
-                <views:ReviewPanePanel ViewportHeight="{Binding ActualHeight, ElementName=LeftPaneScrollViewer}">
+                <views:ReviewPanePanel ViewportHeight="{Binding ActualHeight, ElementName=LeftPaneScrollViewer}"
+                                       ReserveStatusSpace="{Binding IsMediaSelected}">
                     <views:PreviewPanelView />
                     <views:ExportStatusView />
                 </views:ReviewPanePanel>
             </ScrollViewer>
 
-            <ScrollViewer Grid.Column="2"
+            <ScrollViewer x:Name="SettingsPaneScrollViewer" Grid.Column="2"
                           HorizontalScrollBarVisibility="Disabled"
                           PanningMode="VerticalOnly"
-                          VerticalScrollBarVisibility="Auto">
+                          VerticalScrollBarVisibility="Visible">
                 <views:SettingsPanelView Margin="0,0,4,0" />
             </ScrollViewer>
         </Grid>

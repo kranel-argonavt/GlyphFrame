@@ -1,10 +1,14 @@
 using System.Windows.Media;
+using System.Windows;
 using GlyphFrame.Core.Enums;
 
 namespace GlyphFrame.App.Services;
 
 public sealed class AccentThemeService : IAccentThemeService
 {
+    private readonly ResourceDictionary? _resources;
+    public AccentThemeService() { }
+    internal AccentThemeService(ResourceDictionary resources) => _resources = resources;
     private static readonly IReadOnlyDictionary<AccentPreset, AccentPalette> Palettes =
         new Dictionary<AccentPreset, AccentPalette>
         {
@@ -33,10 +37,10 @@ public sealed class AccentThemeService : IAccentThemeService
             ? palette.Primary
             : Palettes[AccentPreset.Violet].Primary;
 
-    private static void UpdateBrush(string resourceKey, string colorValue)
+    private void UpdateBrush(string resourceKey, string colorValue)
     {
         Color color = (Color)ColorConverter.ConvertFromString(colorValue);
-        System.Windows.Application.Current.Resources[resourceKey] = new SolidColorBrush(color);
+        (_resources ?? Application.Current.Resources)[resourceKey] = new SolidColorBrush(color);
     }
 
     private sealed record AccentPalette(string Primary, string Hover, string Pressed, string Subtle);

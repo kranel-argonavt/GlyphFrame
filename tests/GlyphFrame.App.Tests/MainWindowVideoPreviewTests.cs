@@ -14,8 +14,128 @@ using ImageMetadata = GlyphFrame.Core.Models.ImageMetadata;
 
 namespace GlyphFrame.App.Tests;
 
-public sealed class MainWindowVideoPreviewTests
+public sealed partial class MainWindowVideoPreviewTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CopyExportPath_UsesSuccessfulDisplayedResultAndRetainsItThroughFailedOrCancelledRetry(bool video)
+    {
+        using TestMediaFiles files = new();
+        string source = files.Create(video ? "source-secret.mp4" : "source-secret.png");
+        string first = files.PathFor(video ? "перший_日本語.mp4" : "перший_日本語.png");
+        string second = files.PathFor(video ? "другий_漢字.mp4" : "другий_漢字.png");
+        TestHarness harness = video ? ReadyVideoHarness() : ReadyImageHarness();
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.PathFor("cache-not-export.mp4"), job.Identity)));
+        using MainWindowViewModel vm = harness.CreateViewModel();
+        await vm.DropMediaCommand.ExecuteAsync([source]);
+        Assert.False(vm.ShowCopyExportPath);
+        Assert.False(vm.ExportPathCopy.Command.CanExecute(null));
+        if (video) { await vm.RenderVideoCommand.ExecuteAsync(null); }
+        else { await vm.RenderImageCommand.ExecuteAsync(null); }
+        Assert.False(vm.ExportPathCopy.Command.CanExecute(null));
+        await Export(first);
+        Assert.Equal(video ? "Video exported successfully." : "Image exported successfully.", vm.StatusMessage);
+        Assert.True(vm.ShowCopyExportPath);
+        Assert.Equal(first, vm.ExportPathCopy.ToolTip);
+        var artifact = harness.ManagedArtifacts.Current;
+        RenderWorkflowStatus outcome = vm.WorkflowStatus;
+        int rendersBeforeCopy = harness.ImagePipeline.RenderCalls;
+        int publicationsBeforeCopy = harness.VideoPublications.Calls;
+        int imageExportsBeforeCopy = harness.ImageExporter.Calls;
+        Task feedback = vm.ExportPathCopy.Command.ExecuteAsync(null);
+        Assert.Equal(first, harness.Clipboard.Text);
+        Assert.Equal("Copied!", vm.ExportPathCopy.Label);
+        Assert.Equal(rendersBeforeCopy, harness.ImagePipeline.RenderCalls);
+        Assert.Equal(publicationsBeforeCopy, harness.VideoPublications.Calls);
+        Assert.Equal(imageExportsBeforeCopy, harness.ImageExporter.Calls);
+        Assert.NotEqual(source, harness.Clipboard.Text);
+        if (artifact is not null) { Assert.NotEqual(artifact.FilePath, harness.Clipboard.Text); }
+        vm.StatusMessage = vm.StatusMessage;
+        Assert.Equal("Copied!", vm.ExportPathCopy.Label);
+        Assert.Equal(outcome, vm.WorkflowStatus);
+        Assert.Same(artifact, harness.ManagedArtifacts.Current);
+        await Export(null); // Declined chooser must not erase a valid destination.
+        Assert.Equal(first, vm.ExportPathCopy.Path);
+        harness.ImageExporter.Handler = (_, _, _, _, _) => throw new IOException("controlled export failure");
+        harness.VideoPublications.Handler = (_, _, _) => throw new IOException("controlled publication failure");
+        await Export(second);
+        await feedback;
+        Assert.Equal(first, vm.ExportPathCopy.Path);
+        Assert.True(vm.ShowCopyExportPath);
+        harness.ImageExporter.Handler = (_, _, _, _, _) => throw new OperationCanceledException();
+        harness.VideoPublications.Handler = (_, _, _) => Task.FromResult(VideoExportResult.Cancelled());
+        await Export(second);
+        Assert.Equal(first, vm.ExportPathCopy.Path);
+        harness.ImageExporter.Handler = (_, _, _, _, _) => Task.CompletedTask;
+        harness.VideoPublications.Handler = (job, _, _) => Task.FromResult(VideoExportResult.Completed(job.Destination.FilePath, 1, new PixelDimensions(2, 2), 30));
+        await Export(second);
+        Assert.Equal(second, vm.ExportPathCopy.ToolTip);
+        harness.Clipboard.Success = false;
+        outcome = vm.WorkflowStatus;
+        Task failedFeedback = vm.ExportPathCopy.Command.ExecuteAsync(null);
+        Assert.Equal("Copy failed", vm.ExportPathCopy.Label);
+        Assert.Equal(second, harness.Clipboard.Text);
+        Assert.Equal(outcome, vm.WorkflowStatus);
+        Assert.Contains("Try Copy path again", vm.ExportPathCopy.ToolTip);
+        if (video) { vm.SelectedAudioMode = AudioExportMode.RemoveAudio; }
+        else { vm.SelectedFontSize = 12; }
+        await failedFeedback;
+        Assert.Equal("Copy path", vm.ExportPathCopy.Label);
+        Assert.Equal(second, vm.ExportPathCopy.Path); // Still belongs to the retained result.
+        Assert.False(video ? vm.ExportVideoCommand.CanExecute(null) : vm.ExportImageCommand.CanExecute(null));
+        if (video) { await vm.RenderVideoCommand.ExecuteAsync(null); }
+        else { await vm.RenderImageCommand.ExecuteAsync(null); }
+        Assert.False(vm.ShowCopyExportPath); // A new accepted result has no successful destination.
+        Assert.False(vm.ExportPathCopy.Command.CanExecute(null));
+        await Export(first);
+        Task replacedFeedback = vm.ExportPathCopy.Command.ExecuteAsync(null);
+        await vm.DropMediaCommand.ExecuteAsync([files.Create(video ? "replacement.mp4" : "replacement.png")]);
+        await replacedFeedback;
+        Assert.False(vm.ShowCopyExportPath);
+        Assert.Empty(vm.ExportPathCopy.Path);
+        Assert.False(vm.ExportPathCopy.Command.CanExecute(null));
+
+        async Task Export(string? path)
+        {
+            if (video) { harness.SaveDialogs.VideoOutputPath = path; await vm.ExportVideoCommand.ExecuteAsync(null); }
+            else { harness.SaveDialogs.ImageOutputPaths.Enqueue(path); await vm.ExportImageCommand.ExecuteAsync(null); }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PlannedSettings_UseDisplayDimensionsAndUpdateWithoutAcceptedMetrics(bool video)
+    {
+        using TestMediaFiles files = new();
+        string source = files.Create(video ? "planned.mp4" : "planned.png");
+        TestHarness harness = ReadyImageHarness();
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(video
+            ? MediaInputResult.ForVideo(VideoResult(path!).VideoMetadata! with { Width = 1921, Height = 1081, RotationDegrees = 90 })
+            : MediaInputResult.ForImage(ImageResult(path!).ImageMetadata! with { DisplayWidth = 1081, DisplayHeight = 1921 }));
+        using MainWindowViewModel viewModel = harness.CreateViewModel();
+        Assert.Equal("Unavailable", viewModel.PlannedOutputDimensionsText);
+        await viewModel.DropMediaCommand.ExecuteAsync([source]);
+        Assert.True(viewModel.ShowReadyToRender);
+        Assert.Equal("Review your settings, then render.", viewModel.ReadyToRenderMessage);
+        Assert.Equal(video ? "1080 × 1920" : "1081 × 1921", viewModel.PlannedOutputDimensionsText);
+        Assert.Equal("Keep audio", viewModel.PlannedAudioText);
+        List<string?> changes = [];
+        viewModel.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+        viewModel.SelectedOutputResolution = "720p";
+        Assert.Equal(video ? "720 × 1278" : "720 × 1279", viewModel.PlannedOutputDimensionsText);
+        Assert.Contains(nameof(viewModel.PlannedOutputDimensionsText), changes);
+        viewModel.SelectedAudioMode = AudioExportMode.RemoveAudio;
+        Assert.Equal("Remove audio", viewModel.PlannedAudioText);
+        Assert.Contains(nameof(viewModel.PlannedAudioText), changes);
+        Assert.False(viewModel.ShowImageRenderMetrics || viewModel.ShowVideoRenderMetrics);
+        Assert.False(viewModel.ExportVideoCommand.CanExecute(null));
+        Assert.False(viewModel.ExportImageCommand.CanExecute(null));
+        Assert.Equal(0, harness.ImagePipeline.RenderCalls);
+    }
+
     [Theory]
     [InlineData(1920, 1080, false)]
     [InlineData(1080, 1920, false)]
@@ -411,7 +531,7 @@ public sealed class MainWindowVideoPreviewTests
         Assert.Equal(AudioExportMode.RemoveAudio, harness.VideoPublications.LastJob.Artifact.AudioMode);
         Assert.Equal(100, viewModel.ExportProgress);
         Assert.False(viewModel.IsExportActive);
-        Assert.Contains("Reviewed video saved", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Equal("Video exported successfully.", viewModel.StatusMessage);
         Assert.Equal(outputPath, viewModel.VideoExportDestinationText);
     }
 
@@ -1448,7 +1568,7 @@ public sealed class MainWindowVideoPreviewTests
         await viewModel.PreviewFrameCommand.ExecuteAsync(null);
         Assert.False(viewModel.IsSymbolizedPreviewStale);
 
-        viewModel.SelectedImageOutputFormat = "JPG/JPEG";
+        await harness.Settings.SaveAsync(harness.Settings.Current with { DefaultFontSize = viewModel.SelectedFontSize, DefaultImageExportFormat = ImageExportFormat.Jpeg });
 
         Assert.False(viewModel.IsSymbolizedPreviewStale);
     }
@@ -1564,7 +1684,7 @@ public sealed class MainWindowVideoPreviewTests
         await viewModel.RenderImageCommand.ExecuteAsync(null);
 
         viewModel.SelectedFontSize = viewModel.SelectedFontSize;
-        viewModel.SelectedImageOutputFormat = "JPG/JPEG";
+        await harness.Settings.SaveAsync(harness.Settings.Current with { DefaultImageExportFormat = ImageExportFormat.Jpeg });
         viewModel.SelectedFitMode = "100%";
         viewModel.SelectOriginalCommand.Execute(null);
 
@@ -1591,7 +1711,6 @@ public sealed class MainWindowVideoPreviewTests
         string imagePath = files.Create("reuse.png");
         TestHarness harness = ReadyImageHarness();
         harness.SaveDialogs.ImageOutputPaths.Enqueue(files.PathFor("first.png"));
-        harness.SaveDialogs.ImageOutputPaths.Enqueue(files.PathFor("second.jpg"));
         using MainWindowViewModel viewModel = harness.CreateViewModel();
         await viewModel.DropMediaCommand.ExecuteAsync([imagePath]);
         await viewModel.RenderImageCommand.ExecuteAsync(null);
@@ -1599,7 +1718,7 @@ public sealed class MainWindowVideoPreviewTests
 
         await viewModel.ExportImageCommand.ExecuteAsync(null);
         RenderedImage firstExport = harness.ImageExporter.LastImage!;
-        viewModel.SelectedImageOutputFormat = "JPG/JPEG";
+        harness.SaveDialogs.ImageSelections.Enqueue(new(files.PathFor("second.jpg"), ImageExportFormat.Jpeg));
         await viewModel.ExportImageCommand.ExecuteAsync(null);
 
         Assert.Equal(renderCalls, harness.ImagePipeline.RenderCalls);
@@ -1613,6 +1732,115 @@ public sealed class MainWindowVideoPreviewTests
 
         await viewModel.OpenExportFolderCommand.ExecuteAsync(null);
         Assert.Equal(Path.GetDirectoryName(files.PathFor("second.jpg")), harness.FolderLauncher.LastFolder);
+    }
+
+    [Fact]
+    public async Task ImageSaveSelection_NormalizesBeforeSourceProtection()
+    {
+        using TestMediaFiles files = new();
+        string source = files.Create("protected.png");
+        byte[] before = await File.ReadAllBytesAsync(source);
+        TestHarness harness = ReadyImageHarness();
+        harness.SaveDialogs.ImageSelections.Enqueue(new(files.PathFor("protected.jpg"), ImageExportFormat.Png));
+        int confirmations = 0; harness.UserDialogs.OnConfirm = () => confirmations++;
+        using MainWindowViewModel vm = harness.CreateViewModel();
+        await vm.DropMediaCommand.ExecuteAsync([source]);
+        await vm.RenderImageCommand.ExecuteAsync(null);
+        await vm.ExportImageCommand.ExecuteAsync(null);
+        Assert.Equal(0, harness.ImageExporter.Calls); Assert.Equal(0, confirmations);
+        Assert.Equal(before, await File.ReadAllBytesAsync(source));
+        Assert.False(vm.CanOpenExportFolder); Assert.True(vm.HasImageRender);
+        Assert.Equal(ApplicationErrorCode.DestinationConflict, vm.ImageExportErrorPresentation?.Code);
+    }
+
+    [Theory]
+    [InlineData(ImageExportFormat.Png, ImageExportFormat.Jpeg, "choice.png", "choice.jpg")]
+    [InlineData(ImageExportFormat.Jpeg, ImageExportFormat.Png, "choice.jpg", "choice.png")]
+    [InlineData(ImageExportFormat.Png, ImageExportFormat.Jpeg, "choice.jpeg", "choice.jpeg")]
+    [InlineData(ImageExportFormat.Png, ImageExportFormat.Jpeg, "choice.JPG", "choice.JPG")]
+    [InlineData(ImageExportFormat.Jpeg, ImageExportFormat.Png, "choice", "choice.png")]
+    public async Task ImageSaveSelection_ControlsActualEncodingAndExtensionWithoutChangingDefaults(
+        ImageExportFormat initial, ImageExportFormat selected, string name, string expected)
+    {
+        using TestMediaFiles files = new();
+        TestHarness harness = ReadyImageHarness();
+        await harness.Settings.SaveAsync(harness.Settings.Current with { DefaultImageExportFormat = initial });
+        AppSettings settings = harness.Settings.Current;
+        harness.SaveDialogs.ImageSelections.Enqueue(new(files.PathFor(name), selected));
+        harness.ImageExporter.Handler = new GlyphFrame.Rendering.Skia.SkiaImageExporter().ExportAsync;
+        using MainWindowViewModel vm = harness.CreateViewModel();
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("source.png")]);
+        await vm.RenderImageCommand.ExecuteAsync(null);
+        int renders = harness.ImagePipeline.RenderCalls;
+        await vm.ExportImageCommand.ExecuteAsync(null);
+        Assert.Equal([initial], harness.SaveDialogs.InitialImageFormats);
+        Assert.Same(settings, harness.Settings.Current); Assert.Equal(1, harness.Settings.SaveCalls);
+        Assert.Equal(selected, harness.ImageExporter.LastFormat);
+        Assert.Equal(files.PathFor(expected), harness.ImageExporter.LastPath);
+        Assert.Equal(renders, harness.ImagePipeline.RenderCalls);
+        Assert.Equal(RenderWorkflowStatus.Exported, vm.WorkflowStatus);
+        using (SkiaSharp.SKCodec codec = SkiaSharp.SKCodec.Create(files.PathFor(expected)))
+        {
+            Assert.NotNull(codec);
+            Assert.Equal(selected == ImageExportFormat.Png ? SkiaSharp.SKEncodedImageFormat.Png : SkiaSharp.SKEncodedImageFormat.Jpeg, codec.EncodedFormat);
+            Assert.Equal(2, codec.Info.Width); Assert.Equal(1, codec.Info.Height);
+        }
+        byte[] bytes = await File.ReadAllBytesAsync(files.PathFor(expected));
+        Assert.True(selected == ImageExportFormat.Png ? bytes.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }) : bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255);
+        if (name != expected) { Assert.False(File.Exists(files.PathFor(name))); }
+        Assert.DoesNotContain(Directory.GetFiles(Path.GetDirectoryName(files.PathFor(expected))!), p => p.Contains(".png.jpg", StringComparison.OrdinalIgnoreCase) || p.Contains(".jpg.png", StringComparison.OrdinalIgnoreCase));
+
+        // A subsequent cancellation leaves the accepted destination and workflow
+        // intact and reopens with the settings preference, not the last filter.
+        string accepted = vm.ExportPathCopy.Path!;
+        await vm.ExportImageCommand.ExecuteAsync(null);
+        Assert.Equal(1, harness.ImageExporter.Calls); Assert.Equal(renders, harness.ImagePipeline.RenderCalls);
+        Assert.Equal(RenderWorkflowStatus.Exported, vm.WorkflowStatus);
+        Assert.Equal(accepted, vm.ExportPathCopy.Path);
+        Assert.Equal(new[] { initial, initial }, harness.SaveDialogs.InitialImageFormats);
+        Assert.Same(settings, harness.Settings.Current); Assert.Equal(1, harness.Settings.SaveCalls);
+    }
+
+    [Fact]
+    public async Task ImageSaveSelection_NormalizesBeforeOneOverwritePromptAndRetainsArtifactForRetry()
+    {
+        using TestMediaFiles files = new();
+        TestHarness harness = ReadyImageHarness();
+        string existing = files.Create("existing.jpeg");
+        byte[] before = await File.ReadAllBytesAsync(existing);
+        int confirmations = 0; harness.UserDialogs.OnConfirm = () => confirmations++;
+        harness.UserDialogs.ConfirmResult = false;
+        using MainWindowViewModel vm = harness.CreateViewModel();
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("source.png")]);
+        await vm.RenderImageCommand.ExecuteAsync(null);
+        int renders = harness.ImagePipeline.RenderCalls;
+        // Retaining .jpeg is valid. A refusal must not start encoding.
+        harness.SaveDialogs.ImageSelections.Enqueue(new(existing, ImageExportFormat.Jpeg));
+        await vm.ExportImageCommand.ExecuteAsync(null);
+        Assert.Equal(1, confirmations); Assert.Equal(0, harness.ImageExporter.Calls);
+        Assert.Equal(before, await File.ReadAllBytesAsync(existing));
+        Assert.Equal(RenderWorkflowStatus.RenderReady, vm.WorkflowStatus);
+
+        // The dialog's PNG-looking name resolves to an existing JPEG destination
+        // before conflict checks, producing just the application's one prompt.
+        string jpg = files.Create("existing.jpg");
+        harness.SaveDialogs.ImageSelections.Enqueue(new(files.PathFor("existing.png"), ImageExportFormat.Jpeg));
+        harness.UserDialogs.ConfirmResult = true;
+        harness.ImageExporter.Handler = (_, _, _, _, _) => throw new IOException("task-owned simulated failure");
+        await vm.ExportImageCommand.ExecuteAsync(null);
+        Assert.Equal(2, confirmations); Assert.True(harness.ImageExporter.LastOverwrite);
+        Assert.Equal(jpg, harness.ImageExporter.LastPath);
+        RenderedImage retained = harness.ImageExporter.LastImage!;
+        Assert.Equal(RenderWorkflowStatus.Failed, vm.WorkflowStatus); Assert.True(vm.HasImageRender);
+        harness.SaveDialogs.ImageSelections.Enqueue(new(files.PathFor("existing.png"), ImageExportFormat.Jpeg));
+        harness.ImageExporter.Handler = new GlyphFrame.Rendering.Skia.SkiaImageExporter().ExportAsync;
+        await vm.ExportImageCommand.ExecuteAsync(null);
+        Assert.Equal(3, confirmations); Assert.Equal(2, harness.ImageExporter.Calls);
+        Assert.Equal(RenderWorkflowStatus.Exported, vm.WorkflowStatus);
+        Assert.Same(retained, harness.ImageExporter.LastImage); Assert.False(retained.IsDisposed);
+        Assert.Equal(renders, harness.ImagePipeline.RenderCalls);
+        using SkiaSharp.SKCodec codec = SkiaSharp.SKCodec.Create(jpg);
+        Assert.Equal(SkiaSharp.SKEncodedImageFormat.Jpeg, codec.EncodedFormat);
     }
 
     [Fact]
@@ -4200,6 +4428,48 @@ public sealed class MainWindowVideoPreviewTests
     }
 
     [Fact]
+    public async Task RepeatedSelectedTabCommands_DoNotPauseSeekOpenOrRender()
+    {
+        using TestMediaFiles files = new();
+        TestHarness harness = ReadyVideoHarness();
+        harness.OriginalVideoPlayer.Handler = (_, _) => Task.FromResult(OriginalReady());
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create("active-tab-review.mp4"), job.Identity)));
+        using MainWindowViewModel vm = harness.CreateViewModel();
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("active-tab.mp4")]);
+        await WaitUntilAsync(vm, () => vm.IsOriginalVideoPlaybackReady);
+        Assert.True(vm.ShowReadyToRender);
+        Assert.True(vm.IsProcessingResultPanelVisible);
+        Assert.False(vm.ShowVideoRenderMetrics);
+        await vm.RenderVideoCommand.ExecuteAsync(null);
+        Assert.False(vm.ShowReadyToRender);
+        foreach (bool original in new[] { false, true })
+        {
+            if (original) { await vm.SelectOriginalCommand.ExecuteAsync(null); }
+            vm.OriginalVideoPositionSeconds = 4;
+            vm.RenderedVideoPositionSeconds = 4;
+            if (original) { vm.ToggleOriginalVideoPlaybackCommand.Execute(null); }
+            else { vm.ToggleRenderedVideoPlaybackCommand.Execute(null); }
+            int pauses = harness.OriginalVideoPlayer.PauseCalls + harness.RenderedVideoPlayer.PauseCalls;
+            int seeks = harness.OriginalVideoPlayer.SeekCalls + harness.RenderedVideoPlayer.SeekCalls;
+            int opens = harness.OriginalVideoPlayer.OpenCalls + harness.RenderedVideoPlayer.OpenCalls;
+            int renders = harness.ManagedVideoRenders.Calls + harness.ImagePipeline.RenderCalls;
+            for (int i = 0; i < 4; i++)
+            {
+                if (original) { await vm.SelectOriginalCommand.ExecuteAsync(null); }
+                else { vm.SelectSymbolizedCommand.Execute(null); }
+            }
+            Assert.Equal(pauses, harness.OriginalVideoPlayer.PauseCalls + harness.RenderedVideoPlayer.PauseCalls);
+            Assert.Equal(seeks, harness.OriginalVideoPlayer.SeekCalls + harness.RenderedVideoPlayer.SeekCalls);
+            Assert.Equal(opens, harness.OriginalVideoPlayer.OpenCalls + harness.RenderedVideoPlayer.OpenCalls);
+            Assert.Equal(renders, harness.ManagedVideoRenders.Calls + harness.ImagePipeline.RenderCalls);
+            Assert.Equal(original, harness.OriginalVideoPlayer.IsPlaying);
+            Assert.Equal(!original, harness.RenderedVideoPlayer.IsPlaying);
+            Assert.Equal(TimeSpan.FromSeconds(4), original ? harness.OriginalVideoPlayer.Position : harness.RenderedVideoPlayer.Position);
+        }
+    }
+
+    [Fact]
     public async Task SymbolizedToReadyOriginal_UsesMetadataDurationAndPreservesIndependentAudioState()
     {
         using TestMediaFiles files = new();
@@ -4590,6 +4860,91 @@ public sealed class MainWindowVideoPreviewTests
         return harness;
     }
 
+    [Fact]
+    public async Task AudioSettings_PreservePreferenceAcrossImageSilentVideoAndBusyStates()
+    {
+        using TestMediaFiles files = new();
+        TestHarness harness = ReadyVideoHarness();
+        using MainWindowViewModel vm = harness.CreateViewModel();
+        vm.SelectedAudioMode = AudioExportMode.RemoveAudio;
+        Assert.False(vm.AreVideoAudioSettingsEnabled);
+        List<string?> notifications = [];
+        vm.PropertyChanged += (_, e) => notifications.Add(e.PropertyName);
+        Assert.True(vm.ShowVideoAudioUnavailableOverlay);
+        Assert.Equal("Select a video first", vm.VideoAudioUnavailableReason);
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("silent.mp4")]);
+        Assert.False(vm.AreVideoAudioSettingsEnabled);
+        Assert.True(vm.ShowVideoAudioUnavailableOverlay);
+        Assert.Equal("No audio track in this video", vm.VideoAudioUnavailableReason);
+        Assert.Equal(AudioExportMode.RemoveAudio, vm.SelectedAudioMode);
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(MediaInputResult.ForVideo(VideoMetadataFor(path!) with { HasAudio = true }));
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("with-audio.mp4")]);
+        Assert.True(vm.AreVideoAudioSettingsEnabled);
+        Assert.False(vm.ShowVideoAudioUnavailableOverlay);
+        TaskCompletionSource<ManagedVideoRenderResult> finish = NewCompletion<ManagedVideoRenderResult>();
+        harness.ManagedVideoRenders.Handler = (_, _, _) => finish.Task;
+        Task render = vm.RenderVideoCommand.ExecuteAsync(null);
+        Assert.True(vm.IsExportActive); Assert.False(vm.AreVideoAudioSettingsEnabled);
+        Assert.False(vm.ShowVideoAudioUnavailableOverlay);
+        Assert.Equal(AudioExportMode.RemoveAudio, vm.SelectedAudioMode);
+        vm.CancelExportCommand.Execute(null);
+        finish.SetResult(ManagedVideoRenderResult.Cancelled());
+        await render;
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(ImageResult(path!));
+        harness.ImagePipeline.DecodeResult = SolidFrame(20, 30, 40);
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("image.png")]);
+        Assert.False(vm.AreVideoAudioSettingsEnabled);
+        Assert.True(vm.ShowVideoAudioUnavailableOverlay);
+        Assert.Equal("Audio does not apply to images", vm.VideoAudioUnavailableReason);
+        Assert.Contains(nameof(vm.ShowVideoAudioUnavailableOverlay), notifications);
+        Assert.Contains(nameof(vm.VideoAudioUnavailableReason), notifications);
+        Assert.Equal(AudioExportMode.RemoveAudio, vm.SelectedAudioMode);
+    }
+
+    [Fact]
+    public async Task VideoFileSize_UsesAcceptedArtifactThroughStaleExportRetriesAndReplacement()
+    {
+        using TestMediaFiles files = new();
+        TestHarness harness = ReadyVideoHarness();
+        long size = 4096;
+        harness.ManagedVideoRenders.Handler = (job, _, _) => Task.FromResult(
+            ManagedVideoRenderResult.Completed(Artifact(files.Create(Guid.NewGuid() + ".mp4"), job.Identity) with { FileSizeBytes = size }));
+        using MainWindowViewModel vm = harness.CreateViewModel();
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("source.mp4")]);
+        Assert.Equal("Unavailable", vm.VideoFileSizeText); Assert.False(vm.ShowVideoRenderMetrics);
+        await vm.RenderVideoCommand.ExecuteAsync(null);
+        Assert.Equal("4 KB", vm.VideoFileSizeText);
+        ManagedVideoArtifact retained = harness.ManagedArtifacts.Current!;
+        harness.SaveDialogs.VideoOutputPath = files.PathFor("export.mp4");
+        await vm.ExportVideoCommand.ExecuteAsync(null);
+        Assert.Equal("4 KB", vm.VideoFileSizeText);
+        harness.SaveDialogs.VideoOutputPath = null;
+        await vm.ExportVideoCommand.ExecuteAsync(null);
+        Assert.Equal("4 KB", vm.VideoFileSizeText);
+        harness.SaveDialogs.VideoOutputPath = files.PathFor("retry.mp4");
+        harness.VideoPublications.Handler = (_, _, _) => throw new IOException("controlled publication failure");
+        await vm.ExportVideoCommand.ExecuteAsync(null);
+        Assert.Equal("4 KB", vm.VideoFileSizeText); Assert.Same(retained, harness.ManagedArtifacts.Current);
+        harness.VideoPublications.Handler = (_, _, _) => Task.FromResult(VideoExportResult.Cancelled());
+        await vm.ExportVideoCommand.ExecuteAsync(null);
+        Assert.Equal("4 KB", vm.VideoFileSizeText); Assert.Same(retained, harness.ManagedArtifacts.Current);
+        harness.SaveDialogs.VideoOutputPath = files.Create("existing.mp4");
+        harness.UserDialogs.ConfirmResult = false;
+        await vm.ExportVideoCommand.ExecuteAsync(null);
+        Assert.Equal("4 KB", vm.VideoFileSizeText); Assert.Same(retained, harness.ManagedArtifacts.Current);
+        vm.SelectedAudioMode = AudioExportMode.RemoveAudio;
+        Assert.Equal(RenderWorkflowStatus.RenderStale, vm.WorkflowStatus);
+        Assert.Equal("4 KB", vm.VideoFileSizeText);
+        Assert.Same(retained, harness.ManagedArtifacts.Current);
+        size = 8192;
+        await vm.RenderVideoCommand.ExecuteAsync(null);
+        Assert.Equal("8 KB", vm.VideoFileSizeText);
+        harness.MediaInput.Handler = (path, _) => Task.FromResult(ImageResult(path!));
+        harness.ImagePipeline.DecodeResult = SolidFrame(20, 30, 40);
+        await vm.DropMediaCommand.ExecuteAsync([files.Create("replacement.png")]);
+        Assert.False(vm.ShowVideoRenderMetrics); Assert.Equal("Unavailable", vm.VideoFileSizeText);
+    }
+
     private static TestHarness ReadyImageHarness()
     {
         TestHarness harness = new();
@@ -4726,6 +5081,7 @@ public sealed class MainWindowVideoPreviewTests
 
     private sealed class TestHarness
     {
+        public FakeSettingsManager Settings { get; } = new();
         public FakeMediaInputService MediaInput { get; } = new();
 
         public FakeVideoFrameReader VideoFrames { get; } = new();
@@ -4761,6 +5117,7 @@ public sealed class MainWindowVideoPreviewTests
         public FakeDiagnosticLogger Diagnostics { get; } = new();
 
         public FakeAboutDialogService AboutDialogs { get; } = new();
+        public FakePathClipboard Clipboard { get; } = new();
 
         public MainWindowViewModel CreateViewModel(
             IVideoFrameReader? videoFrameReader = null,
@@ -4773,7 +5130,7 @@ public sealed class MainWindowVideoPreviewTests
             IManagedVideoArtifactSession? managedVideoArtifactSession = null,
             bool allowNullManagedVideoArtifactSession = false) => new(
             ApplicationInfo.Phase11B4,
-            new FakeSettingsManager(),
+            Settings,
             new FakeSettingsDialogService(),
             new FakeMediaDialogService(),
             MediaInput,
@@ -4799,8 +5156,20 @@ public sealed class MainWindowVideoPreviewTests
                 : exportStatusPresentationService ?? ExportStatusPresentation,
             new ErrorPresentationService(),
             ErrorDetailsDialogs,
+            Clipboard,
             Diagnostics,
             AboutDialogs);
+    }
+
+    private sealed class FakePathClipboard : IClipboardService
+    {
+        public string? Text { get; private set; }
+        public bool Success { get; set; } = true;
+        public ClipboardWriteResult SetText(string text)
+        {
+            Text = text;
+            return Success ? ClipboardWriteResult.Completed() : ClipboardWriteResult.Failed();
+        }
     }
 
     private sealed class FakeAboutDialogService : IAboutDialogService
@@ -5396,6 +5765,7 @@ public sealed class MainWindowVideoPreviewTests
 
     private sealed class FakeSettingsManager : IApplicationSettingsManager
     {
+        public int SaveCalls { get; private set; }
         public AppSettings Current { get; private set; } = new();
 
         public string? StartupStatusMessage => null;
@@ -5406,6 +5776,7 @@ public sealed class MainWindowVideoPreviewTests
 
         public Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
         {
+            SaveCalls++;
             Current = settings;
             SettingsChanged?.Invoke(this, settings);
             return Task.CompletedTask;
@@ -5452,8 +5823,12 @@ public sealed class MainWindowVideoPreviewTests
             Calls++;
             LastImage = image;
             LastFormat = format;
+            LastPath = outputPath; LastOverwrite = overwrite;
             return Handler(image, outputPath, format, overwrite, cancellationToken);
         }
+
+        public string? LastPath { get; private set; }
+        public bool LastOverwrite { get; private set; }
     }
 
     private sealed class FakeImageSaveDialogService : IImageSaveDialogService
@@ -5461,11 +5836,18 @@ public sealed class MainWindowVideoPreviewTests
         public int VideoCalls { get; private set; }
         public Action? OnVideoDialog { get; set; }
         public Queue<string?> ImageOutputPaths { get; } = new();
+        public Queue<ImageSaveDialogResult?> ImageSelections { get; } = new();
+        public List<ImageExportFormat> InitialImageFormats { get; } = [];
 
         public string? VideoOutputPath { get; set; }
 
-        public string? SelectOutputFile(string sourcePath, ImageExportFormat format) =>
-            ImageOutputPaths.Count > 0 ? ImageOutputPaths.Dequeue() : null;
+        public ImageSaveDialogResult? SelectOutputFile(string sourcePath, ImageExportFormat initialFormat)
+        {
+            InitialImageFormats.Add(initialFormat);
+            if (ImageSelections.Count > 0) { return ImageSelections.Dequeue(); }
+            string? path = ImageOutputPaths.Count > 0 ? ImageOutputPaths.Dequeue() : null;
+            return path is null ? null : new(path, initialFormat);
+        }
 
         public string? SelectVideoOutputFile(string sourcePath)
         {

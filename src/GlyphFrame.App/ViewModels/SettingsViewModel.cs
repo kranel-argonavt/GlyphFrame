@@ -28,7 +28,7 @@ public sealed class SettingsViewModel : ObservableObject
     private SymbolPolarity _selectedSymbolPolarity = AppSettingsCatalog.Defaults.DefaultSymbolPolarity;
     private ImageExportFormat _selectedImageExportFormat = AppSettingsCatalog.Defaults.DefaultImageExportFormat;
     private AudioExportMode _selectedVideoAudioMode = AppSettingsCatalog.Defaults.DefaultVideoAudioMode;
-    private string _statusMessage = "Review the preferences below, then save or cancel.";
+    private string _statusMessage = string.Empty;
     private bool _isBusy;
     private bool _isInitializing;
     private bool _isFfmpegChecking;
@@ -239,8 +239,13 @@ public sealed class SettingsViewModel : ObservableObject
     public string StatusMessage
     {
         get => _statusMessage;
-        private set => SetProperty(ref _statusMessage, value);
+        private set
+        {
+            if (SetProperty(ref _statusMessage, value)) { OnPropertyChanged(nameof(HasStatusMessage)); }
+        }
     }
+
+    public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
 
     public bool IsBusy
     {
@@ -257,14 +262,14 @@ public sealed class SettingsViewModel : ObservableObject
     public void BeginEdit()
     {
         LoadDraft(_settingsManager.Current);
-        StatusMessage = "Review the preferences below, then save or cancel.";
+        StatusMessage = string.Empty;
         if (!IsFfmpegChecking)
         {
             _ = RefreshFfmpegStatusAsync(forceRefresh: false);
         }
     }
 
-    public void EndEdit() => _themeService.Apply(_settingsManager.Current.AccentPreset);
+    public void EndEdit() => LoadDraft(_settingsManager.Current);
 
     private async Task SaveAsync()
     {
@@ -287,38 +292,25 @@ public sealed class SettingsViewModel : ObservableObject
 
     private void Cancel()
     {
-        _themeService.Apply(_settingsManager.Current.AccentPreset);
+        EndEdit();
         StatusMessage = "Unsaved changes were discarded.";
         RequestClose?.Invoke(this, EventArgs.Empty);
     }
 
-    private async Task ResetAsync()
+    private Task ResetAsync()
     {
         bool confirmed = _dialogService.Confirm(
-            "Reset GlyphFrame settings",
-            "Restore every GlyphFrame preference to its approved default? Logs and media files will not be changed.",
-            "Reset Settings");
+            "Reset draft to defaults",
+            "Load default settings into this draft? Select Save & Close to apply. Logs and media files will not be changed.",
+            "Reset to defaults");
         if (!confirmed)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        IsBusy = true;
-        try
-        {
-            AppSettings defaults = await _settingsManager.ResetAsync();
-            LoadDraft(defaults);
-            StatusMessage = "Settings were reset to approved defaults and saved.";
-        }
-        catch (Exception exception) when (IsExpectedStorageFailure(exception))
-        {
-            StatusMessage = "Settings could not be reset. Existing preferences were left unchanged.";
-            _themeService.Apply(_settingsManager.Current.AccentPreset);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        LoadDraft(AppSettingsCatalog.Defaults);
+        StatusMessage = "Defaults loaded. Select Save & Close to apply.";
+        return Task.CompletedTask;
     }
 
     private async Task OpenLogsFolderAsync()

@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GlyphFrame.App.Services;
+using GlyphFrame.App.Presentation;
 using GlyphFrame.Core.Enums;
 using GlyphFrame.Core.Interfaces;
 using GlyphFrame.Core.Models;
@@ -40,6 +41,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private readonly IApplicationDiagnosticLogger? _diagnosticLogger;
     private readonly IErrorDetailsDialogService _errorDetailsDialogService;
     private readonly IAboutDialogService _aboutDialogService;
+    public ExportPathCopyPresentation ExportPathCopy { get; }
     private readonly SynchronizationContext? _synchronizationContext;
     private readonly DispatcherTimer _exportElapsedTimer;
     private readonly Stopwatch _exportStopwatch = new();
@@ -97,7 +99,6 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     private int _selectedFontSize = 10;
     private string _selectedOutputResolution = "Same as source";
     private SymbolPolarity _selectedSymbolPolarity = SymbolPolarity.LightOnDark;
-    private string _selectedImageOutputFormat = "PNG";
     private AudioExportMode _selectedAudioMode = AudioExportMode.KeepAudio;
     private PreviewMode _previewMode = PreviewMode.Original;
     private string _selectedFitMode = "Fit";
@@ -178,6 +179,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         IExportStatusPresentationService exportStatusPresentationService,
         IErrorPresentationService errorPresentationService,
         IErrorDetailsDialogService errorDetailsDialogService,
+        IClipboardService clipboardService,
         IApplicationDiagnosticLogger? diagnosticLogger = null,
         IAboutDialogService? aboutDialogService = null)
     {
@@ -210,6 +212,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             ?? throw new ArgumentNullException(nameof(errorPresentationService));
         _errorDetailsDialogService = errorDetailsDialogService
             ?? throw new ArgumentNullException(nameof(errorDetailsDialogService));
+        ExportPathCopy = new ExportPathCopyPresentation(clipboardService);
         _diagnosticLogger = diagnosticLogger;
         _aboutDialogService = aboutDialogService ?? throw new ArgumentNullException(nameof(aboutDialogService));
         _synchronizationContext = SynchronizationContext.Current;
@@ -308,9 +311,6 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public IReadOnlyList<SettingOption<SymbolPolarity>> SymbolPolarities => AppSettingsCatalog.SymbolPolarities;
 
-    public IReadOnlyList<string> ImageOutputFormats { get; } =
-        AppSettingsCatalog.ImageExportFormats.Select(option => option.DisplayName).ToArray();
-
     public IReadOnlyList<string> ColorModes { get; } = ["Original Colors"];
 
     public IReadOnlyList<string> FitModes { get; } = ["Fit", "Fill", "100%"];
@@ -387,6 +387,23 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public bool IsVideoSelected => _mediaInputState.SelectedMediaType == MediaSelectionKind.Video;
 
+    public string InputDisplayName => IsMediaSelected ? SelectedFileName : "No media selected";
+    public string InputCardSummary => IsMediaSelected ? InputMetadataSummary : "Choose an image or video.";
+    public string BrowseMediaActionLabel => IsMediaSelected ? "Change file" : "Browse Media";
+    public string InputDropText => IsMediaSelected ? "Drop another file to replace" : "Drop a local file here";
+    public string InputReadinessText => HasMediaInputError ? string.Empty
+        : IsLoadingMedia ? "Reading local media..."
+        : IsImageSelected ? "Image ready"
+        : IsVideoSelected ? "Video source accepted"
+        : "Choose an image or video.";
+    public bool IsInputReady => IsMediaSelected && !IsLoadingMedia && !HasMediaInputError;
+    public bool AreVideoAudioSettingsEnabled => IsVideoSelected && VideoMetadata?.HasAudio != false && AreSettingsEnabled;
+    public bool ShowVideoAudioUnavailableOverlay => AreSettingsEnabled && (!IsVideoSelected || VideoMetadata?.HasAudio == false);
+    public string VideoAudioUnavailableReason => !IsMediaSelected ? "Select a video first"
+        : IsImageSelected ? "Audio does not apply to images" : "No audio track in this video";
+    public bool ShowPreviewFrameAction => IsVideoSelected && !HasVideoArtifact;
+    public bool HasImageResultForRerender => IsImageSelected && HasImageRender;
+
     public bool IsLoadingMedia => _mediaInputState.Status == MediaInputStatus.Loading;
 
     public bool HasMediaInputError => _mediaInputState.Status == MediaInputStatus.Failed;
@@ -452,7 +469,32 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public bool IsExportStatusVisible => IsExportActive || IsExportCompletionVisible;
 
-    public bool IsProcessingResultPanelVisible => IsExportStatusVisible
+    public bool ShowReadyToRender => IsMediaSelected && !IsExportStatusVisible
+        && !ShowImageResultPanel && !ShowVideoResultPanel;
+
+    public string ReadyToRenderMessage => "Review your settings, then render.";
+
+    public string PlannedAudioText => SelectedAudioMode == AudioExportMode.KeepAudio ? "Keep audio" : "Remove audio";
+
+    public string PlannedOutputDimensionsText
+    {
+        get
+        {
+            int? width = ImageMetadata?.DisplayWidth ?? VideoMetadata?.DisplayWidth;
+            int? height = ImageMetadata?.DisplayHeight ?? VideoMetadata?.DisplayHeight;
+            if (width is not > 0 || height is not > 0) { return "Unavailable"; }
+            PixelDimensions dimensions = new GlyphFrame.Rendering.Grid.OutputDimensionResolver().Resolve(
+                new PixelDimensions(width.Value, height.Value), ResolveOutputResolution());
+            if (IsVideoSelected)
+            {
+                if (dimensions.Width < 2 || dimensions.Height < 2) { return "Unavailable"; }
+                dimensions = VideoExportPolicy.NormalizeForYuv420(dimensions);
+            }
+            return $"{dimensions.Width} × {dimensions.Height}";
+        }
+    }
+
+    public bool IsProcessingResultPanelVisible => ShowReadyToRender || IsExportStatusVisible
         || ShowImageResultPanel
         || ShowVideoResultPanel;
 
@@ -475,6 +517,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             {
                 OnPropertyChanged(nameof(IsExportStatusVisible));
                 OnPropertyChanged(nameof(IsProcessingResultPanelVisible));
+                OnPropertyChanged(nameof(ShowReadyToRender));
             }
         }
     }
@@ -690,6 +733,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public bool ShowVideoRenderMetrics => HasVideoArtifact;
 
+    public string VideoFileSizeText => _managedVideoArtifactSession.Current is ManagedVideoArtifact artifact
+        && artifact.FileSizeBytes > 0 ? FormatFileSize(artifact.FileSizeBytes) : "Unavailable";
+
     public string VideoRenderedFrameCountText => _managedVideoArtifactSession.Current is ManagedVideoArtifact artifact
         ? artifact.RenderedFrameCount.ToString("N0")
         : string.Empty;
@@ -782,6 +828,12 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     public string VideoExportActionLabel => HasVideoExportDestination ? "Export Again" : "Export Video";
 
+    public bool HasImageExportDestination => IsImageSelected && HasImageRender
+        && !string.IsNullOrWhiteSpace(_lastImageExportPath);
+
+    public bool ShowCopyExportPath => !_disposed && !IsExportStatusVisible
+        && (IsImageSelected ? HasImageExportDestination : HasVideoExportDestination);
+
     public bool CanOpenExportFolder => !IsExportActive
         && (IsImageSelected ? IsImageExported && !string.IsNullOrWhiteSpace(_lastImageExportPath)
             : HasVideoExportDestination);
@@ -808,7 +860,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     public string ImageResultSummary => _renderWorkflowState.Status switch
     {
         RenderWorkflowStatus.Exported when !string.IsNullOrWhiteSpace(_lastImageExportPath)
-            => $"Saved {Path.GetFileName(_lastImageExportPath)}. The rendered image remains ready for another export.",
+            => "Ready for review and another export.",
         RenderWorkflowStatus.RenderStale
             => "Render settings changed. Review the previous result or render again before exporting.",
         RenderWorkflowStatus.Cancelled
@@ -1125,6 +1177,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _selectedOutputResolution, value))
             {
                 OnPropertyChanged(nameof(ShowResolutionWarning));
+                OnPropertyChanged(nameof(PlannedOutputDimensionsText));
                 InvalidateSymbolizedPreview(ImageRenderSetting.OutputResolution);
             }
         }
@@ -1142,19 +1195,6 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
-    public string SelectedImageOutputFormat
-    {
-        get => _selectedImageOutputFormat;
-        set
-        {
-            if (SetProperty(ref _selectedImageOutputFormat, value))
-            {
-                _renderWorkflowState = _renderWorkflowState.OutputFormatChanged();
-                NotifyImageProperties();
-            }
-        }
-    }
-
     public AudioExportMode SelectedAudioMode
     {
         get => _selectedAudioMode;
@@ -1162,9 +1202,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref _selectedAudioMode, value))
             {
+                ExportPathCopy.ClearFeedback();
                 _renderWorkflowState = _renderWorkflowState.VideoAudioModeChanged(value);
                 CancelInvalidatedPublication();
                 OnPropertyChanged(nameof(IsKeepAudioSelected));
+                OnPropertyChanged(nameof(PlannedAudioText));
                 OnPropertyChanged(nameof(IsRemoveAudioSelected));
                 NotifyVideoArtifactProperties();
                 NotifyCommandStates();
@@ -1428,9 +1470,6 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            ApplyMediaInputState(completed);
-            ApplyPresentationState(UiPresentationState.ForMedia(result.MediaType));
-            PreviewMode = PreviewMode.Original;
             _lastVideoExportPath = null;
             _lastVideoExportArtifactId = null;
             _mediaInputErrorPresentation = null;
@@ -1449,6 +1488,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             {
                 _renderWorkflowState = _renderWorkflowState.VideoAudioModeChanged(SelectedAudioMode);
             }
+
+            // Publish the newly accepted media only after its workflow and
+            // retained-result fields agree. Player Close has already notified
+            // bindings about the old review while cleanup was awaiting.
+            ApplyMediaInputState(completed);
+            ApplyPresentationState(UiPresentationState.ForMedia(result.MediaType));
+            PreviewMode = PreviewMode.Original;
+            NotifyVideoArtifactProperties();
 
             if (result.MediaType == MediaSelectionKind.Image && decodedImage is not null)
             {
@@ -2427,14 +2474,15 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        ImageExportFormat format = ResolveImageExportFormat();
-        string? outputPath = SelectOutputPath(format);
-        if (string.IsNullOrWhiteSpace(outputPath))
+        ImageSaveDialogResult? selection = _imageSaveDialogService.SelectOutputFile(
+            ImageMetadata.FilePath, _settingsManager.Current.DefaultImageExportFormat);
+        if (selection is null || string.IsNullOrWhiteSpace(selection.FilePath))
         {
             return;
         }
 
-        outputPath = NormalizeOutputExtension(outputPath, format);
+        ImageExportFormat format = selection.Format;
+        string outputPath = NormalizeOutputExtension(selection.FilePath, format);
         ImageExportDestinationRequirement destinationRequirement = ImageExportPolicy.Evaluate(
             ImageMetadata.FilePath,
             outputPath,
@@ -2494,7 +2542,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             _imageExportErrorPresentation = null;
             _renderWorkflowState = _renderWorkflowState.CompleteExport(operationId);
             ExportProgress = 100;
-            StatusMessage = $"Symbolized image exported to {Path.GetFileName(outputPath)}.";
+            StatusMessage = "Image exported successfully.";
         }
         catch (OperationCanceledException)
         {
@@ -2641,7 +2689,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 _exportFrameText = string.Empty;
                 _remainingText = string.Empty;
                 NotifyExportProgressProperties();
-                StatusMessage = $"Reviewed video saved to {destination.FilePath}.";
+                StatusMessage = "Video exported successfully.";
                 completed = true;
             }
             else
@@ -2713,10 +2761,6 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             && _renderWorkflowState.VideoArtifactIdentity == artifact.Identity
             && !_renderWorkflowState.IsVideoArtifactStale;
     }
-
-    private string? SelectOutputPath(ImageExportFormat format) => ImageMetadata is null
-        ? null
-        : _imageSaveDialogService.SelectOutputFile(ImageMetadata.FilePath, format);
 
     private (long OperationId, CancellationToken Token) BeginImageOperation(
         RenderWorkflowOperation operation,
@@ -3103,6 +3147,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void InvalidateSymbolizedPreview(ImageRenderSetting setting)
     {
+        ExportPathCopy.ClearFeedback();
         _renderWorkflowState = _renderWorkflowState.RenderingSettingChanged(setting);
         CancelInvalidatedPublication();
         if (HasSymbolizedReview)
@@ -3138,12 +3183,6 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             .FirstOrDefault(option => option.DisplayName.Equals(SelectedOutputResolution, StringComparison.OrdinalIgnoreCase))
             ?.Value
         ?? OutputResolution.SameAsSource;
-
-    private ImageExportFormat ResolveImageExportFormat() =>
-        AppSettingsCatalog.ImageExportFormats
-            .FirstOrDefault(option => option.DisplayName.Equals(SelectedImageOutputFormat, StringComparison.OrdinalIgnoreCase))
-            ?.Value
-        ?? ImageExportFormat.Png;
 
     private bool CanRenderImage() =>
         IsImageSelected
@@ -3734,6 +3773,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         OnPropertyChanged(nameof(IsExportActive));
+        OnPropertyChanged(nameof(ShowReadyToRender));
         OnPropertyChanged(nameof(IsExportStatusVisible));
         OnPropertyChanged(nameof(IsProcessingResultPanelVisible));
         OnPropertyChanged(nameof(CanCancelExport));
@@ -3747,8 +3787,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     {
         string[] propertyNames =
         [
+            // Collapse the previous primary composition before exposing the
+            // planned one, including synchronous binding/layout observers.
+            nameof(ShowVideoResultPanel), nameof(ShowImageResultPanel),
             nameof(CurrentMedia), nameof(ImageMetadata), nameof(VideoMetadata),
+            nameof(ShowReadyToRender), nameof(ReadyToRenderMessage), nameof(PlannedOutputDimensionsText), nameof(PlannedAudioText),
             nameof(IsNoMediaSelected), nameof(IsMediaSelected), nameof(IsImageSelected), nameof(IsVideoSelected),
+            nameof(InputDisplayName), nameof(InputCardSummary), nameof(BrowseMediaActionLabel), nameof(InputDropText), nameof(InputReadinessText), nameof(IsInputReady),
+            nameof(AreVideoAudioSettingsEnabled), nameof(ShowVideoAudioUnavailableOverlay), nameof(VideoAudioUnavailableReason), nameof(ShowPreviewFrameAction),
             nameof(IsLoadingMedia), nameof(HasMediaInputError), nameof(MediaInputErrorPresentation),
             nameof(ShowMediaInputErrorDetails), nameof(ShowRetainedMediaInputErrorDetails),
             nameof(ShowEmptyPreview), nameof(ShowLoadingPreview),
@@ -3767,9 +3813,9 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(VideoFramePositionText),
             nameof(IsOriginalPreviewSelected), nameof(IsSymbolizedPreviewSelected),
             nameof(ShowResolutionWarning), nameof(CurrentPreviewImageSource), nameof(CurrentPreviewPixelWidth), nameof(CurrentPreviewPixelHeight),
-            nameof(WorkflowStatus), nameof(ShowImageResultPanel), nameof(ShowImageExportControls),
+            nameof(WorkflowStatus), nameof(ShowImageExportControls),
             nameof(IsProcessingResultPanelVisible), nameof(HasVideoArtifact), nameof(HasSymbolizedReview),
-            nameof(ShowVideoResultPanel), nameof(VideoRenderActionLabel), nameof(ShowRenderedVideoPlayer),
+            nameof(VideoRenderActionLabel), nameof(ShowRenderedVideoPlayer),
             nameof(ShowRenderedVideoReviewError), nameof(ShowVideoFrameControls),
             nameof(IsOriginalVideoPlaybackOpening), nameof(IsOriginalVideoPlaybackReady),
             nameof(IsOriginalVideoPlaybackFallback), nameof(ShowOriginalVideoPlayer),
@@ -3786,6 +3832,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void NotifyImageProperties()
     {
+        OnPropertyChanged(nameof(ShowReadyToRender));
         OnPropertyChanged(nameof(OriginalImageSource));
         OnPropertyChanged(nameof(SymbolizedImageSource));
         OnPropertyChanged(nameof(CurrentPreviewImageSource));
@@ -3831,13 +3878,14 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         string[] propertyNames =
         [
             nameof(HasVideoArtifact), nameof(HasSymbolizedReview), nameof(IsSymbolizedPreviewStale),
+            nameof(ShowReadyToRender),
             nameof(WorkflowStatus), nameof(ShowVideoResultPanel), nameof(IsVideoResultSuccess),
             nameof(IsVideoResultWarning), nameof(IsVideoResultFailure), nameof(VideoRenderActionLabel),
             nameof(VideoResultTitle), nameof(VideoResultSummary), nameof(VideoRenderTechnicalDetail),
             nameof(VideoRenderErrorPresentation), nameof(VideoPublicationErrorPresentation),
             nameof(VideoReviewErrorPresentation), nameof(ShowVideoReviewErrorDetails),
             nameof(ShowVideoResultErrorDetails),
-            nameof(ShowVideoRenderMetrics), nameof(VideoRenderedFrameCountText), nameof(VideoOutputDimensionsText),
+            nameof(ShowVideoRenderMetrics), nameof(VideoRenderedFrameCountText), nameof(VideoFileSizeText), nameof(VideoOutputDimensionsText),
             nameof(VideoAudioOutcomeText), nameof(VideoAudioOutcomeDescription),
             nameof(HasVideoExportDestination), nameof(VideoExportDestinationText), nameof(VideoExportActionLabel), nameof(CanOpenExportFolder),
             nameof(IsProcessingResultPanelVisible), nameof(ShowRenderedVideoPlayer),
@@ -3935,6 +3983,21 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void NotifyCommandStates()
     {
+        OnPropertyChanged(nameof(AreVideoAudioSettingsEnabled));
+        OnPropertyChanged(nameof(ShowVideoAudioUnavailableOverlay));
+        OnPropertyChanged(nameof(VideoAudioUnavailableReason));
+        OnPropertyChanged(nameof(InputReadinessText));
+        OnPropertyChanged(nameof(ShowPreviewFrameAction));
+        OnPropertyChanged(nameof(HasImageResultForRerender));
+        // Copy feedback is owned by the displayed result, not by workflow notifications.
+        // Repeated updates keep the same identity; replacement/invalidation clears feedback.
+        object? result = IsImageSelected ? _renderedImage : _managedVideoArtifactSession.Current;
+        string? destination = IsImageSelected ? HasImageExportDestination ? _lastImageExportPath : null
+            : HasVideoExportDestination ? _lastVideoExportPath : null;
+        if (IsExportStatusVisible) { destination = null; }
+        ExportPathCopy.SetDestination(result, destination);
+        OnPropertyChanged(nameof(ShowCopyExportPath));
+        OnPropertyChanged(nameof(HasImageExportDestination));
         _browseMediaCommand.NotifyCanExecuteChanged();
         _dropMediaCommand.NotifyCanExecuteChanged();
         _renderImageCommand.NotifyCanExecuteChanged();
@@ -4008,7 +4071,6 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         _selectedFontSize = settings.DefaultFontSize;
         _selectedOutputResolution = AppSettingsCatalog.GetDisplayName(settings.DefaultOutputResolution);
         _selectedSymbolPolarity = settings.DefaultSymbolPolarity;
-        _selectedImageOutputFormat = AppSettingsCatalog.GetDisplayName(settings.DefaultImageExportFormat);
         _selectedAudioMode = settings.DefaultVideoAudioMode;
         if (_selectedAudioMode != previousAudioMode)
         {
@@ -4020,9 +4082,10 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(SelectedFont));
         OnPropertyChanged(nameof(SelectedFontSize));
         OnPropertyChanged(nameof(SelectedOutputResolution));
+        OnPropertyChanged(nameof(PlannedOutputDimensionsText));
         OnPropertyChanged(nameof(SelectedSymbolPolarity));
-        OnPropertyChanged(nameof(SelectedImageOutputFormat));
         OnPropertyChanged(nameof(SelectedAudioMode));
+        OnPropertyChanged(nameof(PlannedAudioText));
         OnPropertyChanged(nameof(IsKeepAudioSelected));
         OnPropertyChanged(nameof(IsRemoveAudioSelected));
 
@@ -4100,6 +4163,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        ExportPathCopy.Dispose();
         Interlocked.Increment(ref _comparisonGeneration);
         _pendingOriginalComparison = null;
         _comparisonFrameRequestActive = false;

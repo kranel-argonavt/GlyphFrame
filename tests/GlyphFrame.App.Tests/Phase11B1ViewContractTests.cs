@@ -92,17 +92,25 @@ public sealed class Phase11B1ViewContractTests
         System.Xml.Linq.XDocument result = System.Xml.Linq.XDocument.Load(Path.Combine(
             FindSolutionDirectory(), "src", "GlyphFrame.App", "Views", "ExportStatusView.xaml"));
         System.Xml.Linq.XElement videoPanel = Assert.Single(result.Descendants(), element =>
-            element.Attribute("Visibility")?.Value.Contains("ShowVideoResultPanel", StringComparison.Ordinal) == true);
-        Assert.Single(videoPanel.Descendants(), element => element.Attribute("Text")?.Value == "FRAMES");
+            element.Attributes().Any(attribute => attribute.Name.LocalName == "Name" && attribute.Value == "VideoResultCard"));
+        Assert.Contains(videoPanel.Descendants(), element => element.Name.LocalName == "Setter"
+            && element.Attribute("Property")?.Value == "Visibility"
+            && element.Attribute("Value")?.Value == "{Binding ShowVideoResultPanel, Converter={StaticResource BooleanToVisibilityConverter}}");
+        Assert.Contains(videoPanel.Descendants(), element => element.Name.LocalName == "DataTrigger"
+            && element.Attribute("Binding")?.Value == "{Binding IsExportStatusVisible}"
+            && element.Elements().Any(setter => setter.Attribute("Property")?.Value == "Visibility" && setter.Attribute("Value")?.Value == "Collapsed"));
+        Assert.Single(videoPanel.Descendants(), element => element.Attribute("Text")?.Value == "FILE SIZE");
         Assert.Single(videoPanel.Descendants(), element => element.Attribute("Text")?.Value == "OUTPUT");
         Assert.Single(videoPanel.Descendants(), element => element.Attribute("Text")?.Value == "AUDIO");
-        Assert.Single(videoPanel.Descendants(), element => element.Attribute("Text")?.Value == "{Binding VideoRenderedFrameCountText}");
+        Assert.Single(videoPanel.Descendants(), element => element.Attribute("Text")?.Value == "{Binding VideoFileSizeText}");
         Assert.Single(videoPanel.Descendants(), element => element.Attribute("Text")?.Value == "{Binding VideoOutputDimensionsText}");
         Assert.Single(videoPanel.Descendants(), element => element.Attribute("Text")?.Value == "{Binding VideoAudioOutcomeText}");
         System.Xml.Linq.XElement metrics = Assert.Single(videoPanel.Descendants(), element =>
             element.Attribute("Visibility")?.Value.Contains("ShowVideoRenderMetrics", StringComparison.Ordinal) == true);
         Assert.Equal(3, metrics.Elements().Count(element => element.Name.LocalName == "Border"));
-        Assert.Equal("Grid", metrics.Name.LocalName);
+        Assert.Equal("MetricCardsPanel", metrics.Name.LocalName);
+        Assert.All(metrics.Descendants().Where(element => element.Attribute("Text")?.Value.StartsWith("{Binding Video", StringComparison.Ordinal) == true),
+            value => { Assert.Equal("Wrap", value.Attribute("TextWrapping")?.Value); Assert.Equal("None", value.Attribute("TextTrimming")?.Value); });
         Assert.Equal("Metrics", metrics.Attributes().Single(attribute => attribute.Name.LocalName == "AdaptiveResultPanel.Role").Value);
         Assert.Contains(videoPanel.Descendants(), element =>
             element.Name.LocalName == "AdaptiveResultPanel"
@@ -117,8 +125,8 @@ public sealed class Phase11B1ViewContractTests
             element.Attribute("Command")?.Value == "{Binding OpenExportFolderCommand}");
         foreach (string name in new[]
         {
-            "VideoResultTitleText", "VideoResultSummaryText", "VideoExportDestinationTextBlock",
-            "VideoFramesMetricCard", "VideoOutputMetricCard", "VideoAudioMetricCard"
+            "VideoResultTitleText", "VideoResultSummaryText", "CopyVideoExportPathButton",
+            "VideoFileSizeMetricCard", "VideoOutputMetricCard", "VideoAudioMetricCard"
         })
         {
             Assert.Single(videoPanel.Descendants(), element =>
@@ -126,7 +134,10 @@ public sealed class Phase11B1ViewContractTests
         }
 
         System.Xml.Linq.XElement imagePanel = Assert.Single(result.Descendants(), element =>
-            element.Attribute("Visibility")?.Value.Contains("ShowImageResultPanel", StringComparison.Ordinal) == true);
+            element.Attributes().Any(attribute => attribute.Name.LocalName == "Name" && attribute.Value == "ImageResultCard"));
+        Assert.Contains(imagePanel.Descendants(), element => element.Name.LocalName == "Setter"
+            && element.Attribute("Property")?.Value == "Visibility"
+            && element.Attribute("Value")?.Value == "{Binding ShowImageResultPanel, Converter={StaticResource BooleanToVisibilityConverter}}");
         Assert.Single(imagePanel.Descendants(), element => element.Attribute("Text")?.Value == "{Binding ImageGridDimensionsText}");
         Assert.Single(imagePanel.Descendants(), element => element.Attribute("Text")?.Value == "{Binding ImageOutputDimensionsText}");
         System.Xml.Linq.XElement fontWarning = Assert.Single(imagePanel.Descendants(), element =>
@@ -134,6 +145,13 @@ public sealed class Phase11B1ViewContractTests
         Assert.Contains("ShowImageRenderWarning", fontWarning.Attribute("Visibility")?.Value, StringComparison.Ordinal);
         Assert.DoesNotContain(imagePanel.Descendants().SelectMany(element => element.Attributes()), attribute =>
             attribute.Value.Contains("VideoAudioOutcome", StringComparison.Ordinal));
+        Assert.DoesNotContain(videoPanel.Descendants(), element => element.Attribute("Text")?.Value == "{Binding VideoExportDestinationText}");
+        var copyStyle = Assert.Single(result.Descendants(), element =>
+            element.Attributes().Any(attribute => attribute.Name.LocalName == "Key" && attribute.Value == "CopyPathButtonStyle"));
+        Assert.Contains(copyStyle.Elements(), element => element.Attribute("Property")?.Value == "Command"
+            && element.Attribute("Value")?.Value == "{Binding ExportPathCopy.Command}");
+        Assert.Contains(copyStyle.Elements(), element => element.Attribute("Property")?.Value == "ToolTip"
+            && element.Attribute("Value")?.Value == "{Binding ExportPathCopy.ToolTip}");
     }
 
     [Fact]

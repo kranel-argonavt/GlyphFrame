@@ -1,6 +1,7 @@
 <Window x:Class="GlyphFrame.App.Views.ErrorDetailsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:GlyphFrame.App.Views"
         xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
         Title="Error Details"
         Width="760"
@@ -45,12 +46,7 @@
                             VerticalAlignment="Center"
                             Background="{DynamicResource AccentSubtleBrush}"
                             CornerRadius="6">
-                        <TextBlock HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   FontSize="11"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource AccentHoverBrush}"
-                                   Text="GF" />
+                        <views:DecorativeImage Width="22" Height="22" Source="{StaticResource GlyphFrameWindowIcon}" />
                     </Border>
                     <TextBlock Grid.Column="1"
                                VerticalAlignment="Center"
@@ -173,6 +169,7 @@
                                 automation:AutomationProperties.Name="Copy error details"
                                 Command="{Binding CopyDetailsCommand}"
                                 Content="Copy Details"
+                                Tag="{StaticResource CopyIcon}" ContentTemplate="{StaticResource IconActionContent}"
                                 Style="{StaticResource PrimaryButtonStyle}" />
                         <Button MinWidth="92"
                                 Margin="10,0,0,0"

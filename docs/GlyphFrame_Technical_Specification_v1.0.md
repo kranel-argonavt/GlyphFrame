@@ -1,8 +1,8 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Updated through Phase 15B extracted-ZIP validation, 2026-10-07 (not signed off: observed transport defects and remaining checks; historical Phase 14 evidence preserved; Phase 15C clean-machine execution NOT TESTED)
-Follow-up: 2026-10-08 paused-position synchronization correction and dirty-tree candidate retest recorded; Phase 15B remains unsigned pending outstanding native/human checks and final committed-package verification.
+Status: Aligned with the current working-tree implementation on 2026-10-21, including responsive status layouts, image Save format selection, About/notices and draft-only Settings actions. This is implementation documentation, not release sign-off.
+Acceptance: Phase 14 remains open; Phase 15A packaging is implemented, Phase 15B acceptance remains partial/open, and Phase 15C clean-machine execution is NOT TESTED. Dated native outcomes and remaining checks are tracked in Phase_14_Coverage.md and Phase_15_Packaging.md; historical evidence is preserved.
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -450,10 +450,10 @@ Changing polarity invalidates an existing symbolized render because it changes b
 
 When the loaded media is an image:
 
-- Audio section is hidden.
+- Video audio remains inside Render, visibly disabled with an image-specific explanation. The stored audio preference is preserved.
 - Video frame slider is hidden.
 - Image mode has no separate frame-preview command.
-- Primary preview-panel action is `Render Image`, changing to `Render Again` when a current or stale result exists.
+- The preview-panel action is `Render Image`, changing to neutral secondary `Render Again` when a retained result exists; Export Image is the result card's primary action.
 - Export button label is `Export Image`.
 - Output format choices are `PNG` and `JPG/JPEG`.
 - PNG is selected by default.
@@ -583,7 +583,7 @@ Design traits:
 - Settings panel on the right.
 - Export status panel at the bottom.
 - Minimal footer.
-- Rounded cards with radius 8 px or less.
+- Card surfaces normally use an 8-DIP radius; the processing/result shell uses its explicit 10-DIP radius.
 - Clean, practical desktop-tool layout.
 - No marketing landing page.
 - No light theme in MVP.
@@ -604,12 +604,12 @@ Reference rules:
 - The application name in the native title bar is `GlyphFrame`.
 - The product header title is `Video & Image to Symbol Converter`.
 - The product header subtitle is `Transform videos and images into beautiful symbol art`.
-- The preset quick selector remains in the upper-right product header area.
+- The sole character-preset selector is in Characters; the agreed composition follow-up removes the redundant header selector.
 - The preview and persistent processing/result areas form the left column.
-- Input, Characters, Render, and conditional Audio form the stacked right column.
+- Input and Characters are compact; Render fills the remaining finite right-pane height and includes persistent Video audio.
 - The loaded-video/exporting state shown in the design reference is the primary desktop reference state.
 - Image mode uses the same shell and spacing while applying the conditional rules in section 8.2.
-- Phase 11B intentionally supersedes the reference's permanent right-column Output card: result format and export actions appear in the processing/result panel only after a current render exists.
+- Phase 11B supersedes the reference's permanent right-column Output card: result/export actions appear below the preview. Image output format and destination are selected in the native Save dialog, not in a persistent format selector.
 - Later implementation may improve accessibility and DPI behavior, but must preserve the approved hierarchy and recognizable composition.
 
 ### 10.3 Color Palette
@@ -640,7 +640,7 @@ MainWindow
 +-- Product Header
 |   +-- Video & Image to Symbol Converter
 |   +-- Product description
-|   +-- Presets quick selector
+|   +-- Scalable GF/frame mark (preset selection lives in Characters)
 |
 +-- Main Content
 |   +-- Left Column
@@ -654,10 +654,11 @@ MainWindow
 |       +-- Input
 |       +-- Characters
 |       +-- Render
-|       +-- Audio when media is video
+|           +-- Persistent Video audio subsection
 |
 +-- Footer
-    +-- Version
+    +-- Assembly-derived version
+    +-- Concise current operation status
     +-- About
     +-- Settings
 ```
@@ -667,12 +668,12 @@ Desktop layout constraints:
 - Default reference viewport is approximately 1440 x 1080 at 100% scaling.
 - Main content uses two columns with the left column approximately 1.65 times the width of the right column.
 - The left and right columns align at their top edge.
-- Preview is the dominant surface. Its finite allocation is derived from the available pane height, independently of result/status content. Media retains its own aspect ratio (including 16:9) inside that allocation.
+- Preview is the dominant surface. The result/status content is measured first; the preview receives the remaining finite pane height, bounded by its minimum. Media retains its own aspect ratio (including 16:9) inside that allocation.
 - The processing/result panel sits directly below the preview, not across the full window width.
-- Results may grow below the preview in the independently scrolling left pane. A reserved outer vertical-scrollbar gutter prevents result growth from changing preview width; internal 100% media scrolling is separate. Retained viewport/canvas extents do not determine parent preview allocation. State updates do not reset the user's outer scroll position.
+- Status height follows its visible content and chosen composition; there is no fixed state-independent shell height. If preview minimum plus status height and their gap exceed the viewport, the existing left-pane scroller exposes the combined content. A stable outer scrollbar gutter preserves width; internal 100% media scrolling is separate. Retained canvas extents do not determine parent allocation.
 - Settings cards remain compact and vertically stacked with approximately 8-12 px gaps.
-- Main outer spacing is approximately 20-24 px; card radius is no more than 8 px.
-- At narrow window sizes, the layout may reflow vertically without clipping controls or text.
+- Main outer spacing is approximately 20–24 DIPs; ordinary card radius is 8 DIPs and the processing/result shell uses 10 DIPs.
+- Within the supported two-column shell, internal controls reflow or use their designated vertical overflow paths without horizontal page scrolling. The main window retains its 1024×720-DIP minimum; it does not switch to a single-column page.
 
 ### 10.5 Title Bar and Product Header
 
@@ -686,7 +687,7 @@ Product header content:
 
 - Title: `Video & Image to Symbol Converter`
 - Subtitle: `Transform videos and images into beautiful symbol art`
-- `Presets` quick selector aligned to the right.
+- Preset selection stays in Characters, without a duplicate header selector.
 
 Header must not contain:
 
@@ -705,7 +706,7 @@ Preview panel contains:
 - `Render Image` for images.
 - `Preview Frame` and `Render Video` for videos.
 - Video frame-position slider for videos only.
-- Fit / Fill / 100% selector; fullscreen entry is available for the rendered-video player, not as a no-op original-frame action.
+- Fit / Fill / 100% selector. Continuous Original and Symbolized video players each own working fullscreen entry/exit; the static original-frame fallback does not expose a no-op fullscreen action.
 
 Preview panel behavior:
 
@@ -713,7 +714,7 @@ Preview panel behavior:
 - Original tab becomes available after media load.
 - Symbolized tab becomes available after an image render, video-frame preview, or full-video render succeeds, and is selected automatically for the new result.
 - Image mode never shows a separate preview command; `Render Image` produces the reusable full image result.
-- Video mode presents `Preview Frame` as a secondary action before full-video artifact acceptance and `Render Video` as the primary action. Once an accepted full artifact has presentation priority, Preview Frame remains visible but disabled; showing a new symbolized frame would require a future explicit review-mode switch.
+- Video mode presents `Preview Frame` as a secondary action before full-video artifact acceptance and `Render Video` as the primary action. Once an accepted full artifact has presentation priority, Preview Frame is hidden; showing a new symbolized frame would require a future explicit review-mode switch.
 - Before full-video render, Symbolized may show the latest frame preview. After full-video render, the completed video player takes priority.
 - Changing a render-affecting setting marks the relevant rendered result stale. A stale result remains reviewable, but export is disabled until Render Again succeeds.
 - Moving the video frame-position slider invalidates only the frame preview and never the completed full-video artifact.
@@ -726,13 +727,23 @@ Preview panel behavior:
 
 ### 10.7 Settings Panel
 
+Current agreed composition: SettingsPanePanel measures content-sized Input/Characters and allocates finite remaining height to RenderSettingsPanel. Render pins its heading and persistent Video audio around a parameter-body ScrollViewer. Normal overflow belongs only to that body. If measured pinned sections plus a usable **88-DIP** parameter viewport cannot fit, whole-pane fallback disables internal scrolling and exposes natural content height to the outer scroller. Stable gutters, no horizontal scrolling and focus BringIntoView are retained. Settings-only padding is **12 horizontal / 8 vertical DIPs**, preserving controls/fonts while reclaiming 24 DIPs versus 12-all-around. Preset and Ramp share an 86-DIP label column; Sparse–Dense is outside the Ramp field row. Font pairs have left-side 86-DIP labels, share a row at **390 DIPs of actual parameter width** (230 family + 150 size + 10 gap), and otherwise stack. Font Family receives remaining width; all size choices remain. Read-only Original colors is unchanged.
+
+The conditional More render settings / Coming soon placeholder is measured as a noninteractive overlay. It appears only when measured spare parameter-body height includes its own height plus 16-DIP clearance, centers within that spare region, and hides for overflow or whole-pane fallback. It never adds desired height, scroll extent or a reserved hidden slot. Heading, parameters and persistent Video audio retain their finite allocation and single scroll-owner policy. Input has no Formats pseudo-control; supported filters and accessible Browse/Change file guidance remain. Source ready appears first in one left-aligned, wrapping metadata line below the filename, with filename containment/full-path help; failed replacement retains media/result but suppresses readiness and keeps its own error/Details. Audio uses one fixed subsection: a passive dark informational surface with the Input drop background, neutral 1-DIP border, muted readable text, Arrow cursor and no focus/interaction covers only genuinely disabled buttons with Select a video first / Audio does not apply to images / No audio track in this video. Its reason is not duplicated above; the rendered-video explanation is static. Busy locks show no absence overlay and preserve a readable selected mode/check. Preference and accepted AUDIO are unchanged.
+
+Vector resources use a frame with a curved capital S for initial Render, sliders for Render settings, refresh for Render Again, matching outlined Sound/diagonal Mute with identical optical bounds, fixed 28-DIP ComboBox arrow cells (down/up without geometry shift), Copy for path/details, and shared GF/frame dialog branding. Decorative paths/images do not add focus/reader stops. Planned TARGET/video AUDIO remain far right; accepted FILE SIZE uses ManagedVideoArtifact.FileSizeBytes and binary-unit formatting, not a filesystem getter/source estimate. Current status dimensions and exported-action compositions are specified in section 10.8; these views do not change processing, player ownership, identity or privacy contracts.
+
+
+
 Right settings sections:
+
+Unavailable Audio buttons retain layout/preference and genuine disabled state with local zero opacity under the opaque passive informational explanation, preventing label/checkmark bleed-through; ordinary operation locks retain normal opacity and no absence surface. Dedicated outlined flag/hash resources serve Ready to render/Characters only; Symbolized and completion vectors are unchanged. The shared player template centers content; a fixed 16-DIP Play/Pause slot uses a Play-only 1-DIP horizontal optical correction (approximately half the fitted triangle's centroid imbalance). Pause and other icons have no such offset. No command or player-timing changes are involved; the current content-driven status-height policy is documented in section 10.8.
 
 ```text
 Input
 Characters
 Render
-Audio
+  Video audio (persistent subsection)
 ```
 
 Input:
@@ -758,13 +769,15 @@ Render:
 
 Audio:
 
-- Visible only for video.
+- Always physically present inside Render, below a thin divider. No media and images disable the segmented controls with explicit explanations; a confirmed silent video says No audio track in this video without changing the stored preference.
 - Keep Audio option.
 - Remove Audio option.
 
-The right column has no permanent Output card after Phase 11B. Image format selection and export actions belong to the ready-result state below the preview; the destination is requested only when the user invokes Export.
+The right column has no permanent Output card after Phase 11B. Export actions belong to the ready-result state below the preview. Image format and destination are selected in the native Save dialog only when Export is invoked; no status-panel format selector is present.
 
 ### 10.8 Processing and Result Panel
+
+The current export-result path interaction is a fixed-width, real **Copy path** Button for images and videos. It appears only for a successful destination associated with the displayed retained result; tooltip and explicit Unicode clipboard copy expose that full path without an inline destination/filename row. The existing injected clipboard service handles contention. A two-second **Copied!** indication or concise **Copy failed** label/retry tooltip does not resize neighboring controls or alter export outcome. Feedback is cancelled at result invalidation/replacement and disposal, with generation/lifetime checks rejecting late continuations. A failed/cancelled retry or declined chooser cannot replace the last successful destination; new accepted results/media clear it. Open Folder remains separate and follows its existing availability rules. Success footers are `Image exported successfully.` / `Video exported successfully.`; full diagnostic details remain in their independent error contexts. Clipboard tests use doubles, not the system clipboard.
 
 The panel is the canonical presentation for long-running work and completed results. It must support:
 
@@ -787,11 +800,27 @@ During full rendering the processing/result panel shows:
 
 The preview busy overlay is limited to the media viewport and exists only while an operation is active. It contains one compact segmented activity ring without a numeric percentage; the ring serves as a neutral activity indication for determinate and indeterminate work alike. The lower processing/result panel alone presents percentage, operation title, stage description, linear bar, frame/timing details, and Cancel. The overlay disappears immediately when processing and cleanup finish; the brief completion animation occurs only in this lower panel and does not cover the completed preview.
 
-After a render succeeds, the panel remains visible and settles into `Image Ready` or `Video Ready`. It shows the green completion mark and a result summary. Image Ready exposes PNG/JPEG selection plus `Export Image`. Video Ready uses matching gray metric cards for accepted `FRAMES`, `OUTPUT`, and `AUDIO` values; `AUDIO` is mapped from the retained artifact's actual mux outcome (`Original`, `AAC`, `Removed`, or `No source`) rather than the mutable audio selector. Candidate or missing metadata is never shown as an accepted metric. The ordinary ready subtitle is the concise `Ready for review and export.` and the exported subtitle is `Ready for review and another export.`; state-specific stale, failure, cancellation, suspension, opening, and playback-unavailable explanations remain detailed. The panel exposes artifact-based `Export Video` without a format selector. Playback controls remain with the Symbolized preview. The permanent Output card and transitional direct-export action are removed in Phase 11B.4. The media action row above the preview is the single location for `Render Image` / `Render Again` and `Render Video` / `Render Again`. After export the panel keeps video metrics visible, shows the trimmed chosen destination with a full-path tooltip, and exposes `Export Again` and `Open Folder`. A stale result remains reviewable with metrics visible, export disabled, and a Render Again explanation. When measured space is sufficient, the title/summary, all three metric cards, and actions share one compact horizontal row aligned with Image Ready. At constrained widths, the same controls and bindings automatically form a two-row layout with text above metrics and actions. The breakpoint is derived from child measurements plus a practical text allowance and a hysteresis band, so it is DPI-independent, stable during resizing, and safe at the supported minimum window width without horizontal scrolling.
+After a render succeeds, the panel remains visible and settles into `Image Ready` or `Video Ready`. It shows the completion mark and concise `Ready for review and export.` summary; after export the summary is `Ready for review and another export.`. Stale, failure, cancellation, suspension, opening and review-unavailable guidance remains state-specific.
 
-Image results use the same measured responsive layout: the title, summary, accepted symbol-grid/output cards, and format/export actions share a compact row when space permits, then reflow into text above metrics and actions at constrained widths. A retained font-fallback warning and Show Details action remain with the readable text column. The same controls and bindings are reused in both layouts; no result guidance or action is hidden solely to fit the supported minimum window width.
+Image Ready exposes `Export Image`; PNG/JPEG is selected only in the native Save dialog. Video Ready exposes `Export Video` without a format selector and shows accepted-artifact `FILE SIZE`, `OUTPUT` and `AUDIO` metrics. AUDIO reports the retained artifact's actual mux outcome (`Original`, `AAC`, `Removed`, or `No source`), not the current audio selector. Candidate or missing metadata is not presented as an accepted metric.
 
-Before an image render exists, the result panel may remain visible to report a failed or cancelled render, but it hides the output-format selector and all export-related action containers. A stale retained render keeps the format selector visible and Export disabled while the preview-panel `Render Again` action remains primary. Failed and cancelled states identify whether rendering or exporting was affected; export failure or cancellation preserves a current retained render for retry without rerendering.
+After export, applicable metrics remain visible with `Export Again`, `Open Folder` and `Copy path`. A stale result remains reviewable with metrics, disables export, and explains the need to rerender. The metadata/action row below the media viewport is the sole location for `Render Image` / `Render Again` and `Render Video` / `Render Again`; the result panel does not duplicate those render actions. Playback controls remain with the media surface.
+
+Measured responsive composition:
+
+- `AdaptiveResultPanel` chooses modes from actual inner width, populated controls, measured minimums and practical text allowances. The current selector has no previous-mode hysteresis band or global Window.Width breakpoint.
+- When all groups fit, spacious mode puts badge/text, metrics and actions on one vertically centered row.
+- A standalone Export uses a normal 150–252-DIP allocation, with a larger readable minimum when measured text requires it. Below spacious mode it stays beside the lower metric row while the minimum layout fits, then moves below. It does not reserve space for future secondary actions.
+- An exported action group normally uses a 252-DIP wide composition: Export Again above paired Open Folder/Copy path, spanning exactly their combined widths and 8-DIP gap. It does not continuously shrink like a standalone Export. When that composition no longer fits, all three actions use an equal-width rail (normally 150 DIPs); when the rail cannot fit beside the information, actions move below.
+- Compact result content is centered inside a maximum 360-DIP video or 296-DIP image envelope. Export sits above the secondary pair; the pair can fall back to a column if its own readable minimum cannot fit. Metric groups are centered, use equal columns per row and center a shorter last row.
+- Metric cards share nominal 88–112-DIP budgets in regular and compact modes. Explicit content/minimum exceptions and wrapping preserve readability; unused width is not automatically assigned to cards.
+- Height follows visible content without future-action reservation. The shell has a 1-DIP border, 16-DIP padding and 10-DIP radius; row/group/card/action gaps are 12/16/8/8 DIPs. Static badges use 42 DIPs; the working indicator uses 54 DIPs with a 12-DIP text gap, 3-DIP rings, 2-DIP colored-ring inset and fixed 14-DIP percentage text.
+- The working circle is centered against the full information/progress body, sharing Cancel's vertical center when side-by-side. A stacked Cancel has its own row and is excluded from the circle's centering. Exported groups are centered against the adjacent information group.
+- Accepted image symbol-grid/output metrics, retained font warnings and Show Details preserve their bindings and semantics. Long guidance increases natural height or uses the established outer overflow path.
+
+Dated outcomes, superseded layout decisions and native limitations are consolidated in [UI refinement history](UI_Refinement_History.md). Complete iteration records are retained locally outside Git as described there; historical measurements are not current requirements or acceptance of later builds.
+
+Before an image render exists, the result panel may remain visible to report a failed or cancelled render, but it hides all export-related action containers. The status panel has no output-format selector in any state. A stale retained render keeps Export disabled; the metadata-row `Render Again` action remains the single rerender control, with the existing neutral retained-result styling. Failed and cancelled states identify whether rendering or exporting was affected; export failure or cancellation preserves a current retained render for retry without rerendering.
 
 Successful image rendering gives the footer the concise `Image ready for review and export.` state message. Symbol-grid and output dimensions remain in the result-panel metric cards; a font-fallback diagnostic, when present for the accepted retained render, appears as a warning beside that result rather than extending the footer. The warning persists with a stale or otherwise retained render and refreshes on successful replacement.
 
@@ -807,7 +836,7 @@ It must not include:
 
 Footer contains:
 
-- `v1.0.0`
+- Assembly-derived application version (for example `v1.0.0`).
 - One concise current-state message. Operation start replaces stale prior-action text immediately; completion, failure, and cancellation use their matching outcome. Detailed percentage, frame count, elapsed time, and ETA remain exclusively in the processing/result panel, and obsolete callbacks cannot restore an older footer state.
 - About button.
 - Settings button.
@@ -817,6 +846,17 @@ Footer does not contain:
 - GPU text.
 - Theme toggle.
 - Hardware information.
+- A permanent privacy/telemetry label; that explanation belongs in About.
+
+### 10.10 About and Third-party Notices
+
+About opens as a themed owner-modal dialog without replacing the current operation status. Header and About use the same BrandLogo template: a 54×54-DIP frame, 1-DIP border, 8-DIP corner radius and centered 38×38 vector artwork. Each in-app drawing keeps its own live resource context so accent preview/rollback updates it without recoloring neutral GF lettering or changing native window icons.
+
+About shows GlyphFrame, the assembly-derived version, the concise product description, a Privacy section explaining local processing/no media uploads/no telemetry, and a Third-party software section naming FFmpeg and SkiaSharp without claiming a complete dependency inventory. Close remains reachable outside the vertically scrollable body, receives initial focus, and supports Escape. Natural height is capped to the owner monitor's usable work area; the body has no horizontal scrolling.
+
+Third-party notices explicitly reads `THIRD_PARTY_NOTICES.md` from the running application's base directory. The owner-modal viewer displays the complete document as selectable read-only, wrapping local text. It does not execute Markdown, follow links or fetch external content. Unreadable/missing notices produce concise local guidance in About; closing the viewer returns focus to its action. The document is included in development and portable output.
+
+Logo/placeholder and About/action-bar verification, including the distinction between fixtures and native checks, is recorded in [UI refinement history](UI_Refinement_History.md#recorded-verification).
 
 ## 11. UI States
 
@@ -964,19 +1004,26 @@ Settings must allow default values for:
 - Font size.
 - Output resolution.
 - Symbol polarity (`Light on Dark` by default).
-- Image export format.
+- Default image export format: initializes PNG/JPEG in Save, where an individual export can change it without changing this preference.
 - Video audio mode.
 
-The polarity is stored as a readable enum name. Existing settings files without the property use `LightOnDark`; invalid values normalize to that default. Reset Settings also restores `LightOnDark` without changing unrelated defaults or transient media state.
+The polarity is stored as a readable enum name. Existing settings files without the property use `LightOnDark`; invalid values normalize to that default. Reset to defaults includes `LightOnDark` in the editable draft; Save & Close applies that draft through the normal settings path without changing transient media ownership.
 
 ### 12.3 Application
 
-Settings must include:
+The scrollable Application section includes:
 
-- Open logs folder.
-- FFmpeg status.
-- Reset settings.
-- Application data location.
+- Selectable read-only application-data and logs-folder paths, with full-path help and standard keyboard copying.
+- Open logs folder, including friendly launch-failure guidance.
+- Bundled FFmpeg/ffprobe availability, versions and location, Refresh, and Show Details when a failed validation retains technical diagnostics.
+
+### 12.4 Editing and Persistent Actions
+
+The persistent bottom action bar has neutral `Reset to defaults` on the left and `Cancel` / primary `Save & Close` on the right. The right pair moves below only when its measured group budget cannot fit beside Reset; exceptionally small available widths allow further vertical reflow. Action heights follow text with their normal minimums; no action depends on scrolling to Application.
+
+Reset loads the application's existing defaults into the editable draft and previews the accent; it does not save or publish settings. Its confirmation describes the draft and the need to Save. Cancel, Escape or window dismissal discards the draft and restores persisted preferences/accent. Save uses the normal persistence path; failure retains the draft and meaningful guidance for retry rather than closing or reporting success. Logs, media, cache and exports remain untouched.
+
+The feedback row above the actions is absent when there is no meaningful message. Reset guidance, save failure and relevant action feedback appear there with wrapping only when present. No permanent introductory instruction or duplicate Reset block is reserved in Application.
 
 ## 13. Architecture
 
@@ -1667,7 +1714,7 @@ Phase 11B.3 implements the `Render Video` / `Render Again` application workflow,
 - Show the current image or completed video in the existing Symbolized tab; give a completed full-video artifact priority over a frame preview.
 - Add in-app playback for the controlled H.264/AAC-or-silent MP4 artifact with play/pause, seek, time, volume/mute, fit, and deterministic handle release.
 - Replace the transient export-status card with a persistent processing/result panel that transitions through Rendering, Render Ready, Render Stale, Exporting, Exported, Cancelling, Cancelled, and Error.
-- Remove the permanent right-column Output card. Request the destination only when Export is invoked, expose image format plus export/result actions in the ready-result panel, and retain Render / Render Again in the preview-panel media action row without duplication.
+- Remove the permanent right-column Output card. Request image format and destination in the native Save dialog only when Export is invoked, keep export/result actions below the preview, and retain Render / Render Again in the metadata/action row without duplication.
 - Export only a current, non-stale rendered result. Image export encodes retained rendered pixels; video export publishes the reviewed artifact through a destination-side partial and atomic move or replace without rerunning symbolization or video encoding.
 - Keep stale results reviewable but disable export until the preview-panel Render Again action succeeds. Render-setting and video-audio changes invalidate the corresponding full result; image format and destination changes do not. Video slider movement invalidates only frame preview.
 - Use unique Unicode-safe artifact paths and clean player handles, render partials, destination partials, and superseded/orphaned artifacts after media replacement, rerender, cancellation, failure, application exit, and subsequent startup recovery.
@@ -1770,7 +1817,7 @@ The package verifier's application data now resides under unique marked `%TEMP%\
 ### Phase 15 - Packaging
 
 - **Phase 15A implemented:** reproducible self-contained Windows x64 folder publish, bundled runtime/native dependencies and FFmpeg, versioned portable ZIP/checksum, payload/archive verification and machine-readable provenance. Existing attribution preserved; public-distribution legal review remains separate.
-- **Phase 15B performed, not signed off (2026-10-07):** actual clean committed-source ZIP extracted and tested natively; structural/workflow/export/cancellation/cleanup passes, fullscreen and tab-position defects, and explicit remaining checks recorded in `docs/Phase_15_Packaging.md`. Requires fixes in a separately authorized implementation task, new committed-package retesting, audibility confirmation and observable publication-cancellation coverage.
+- **Phase 15B partial/open:** the October 7 committed-source native run found fullscreen/tab-position defects; subsequent corrective implementation and dated retests are recorded in `docs/Phase_15_Packaging.md`. Those historical outcomes do not establish acceptance of every current UI/native case. Complete the current-candidate matrix, remaining audibility/publication-cancellation checks, and a new package retest from the eventual clean committed revision before sign-off.
 - **Phase 15C planned:** clean Windows execution without separately installed .NET/FFmpeg.
 
 ### Phase 16 - Portfolio Release
@@ -1801,16 +1848,22 @@ MVP is accepted when all criteria below are met.
 - No UI text uses a previous project name.
 - Main UI visibly matches `GlyphFrame_Design_Reference.png` in hierarchy, proportions, spacing, and control placement.
 - Native-style title bar shows the GlyphFrame mark, `GlyphFrame`, and window controls.
-- Product header shows `Video & Image to Symbol Converter`, its description, and the upper-right preset selector.
+- Product header shows the scalable GF/frame mark, `Video & Image to Symbol Converter` and its description; the single preset selector is in Characters.
 - Left column contains the preview panel and the persistent processing/result panel.
-- Right column contains Input, Characters, Render, and Audio for video in that order; it has no permanent Output card after Phase 11B.
-- Preview panel uses equal-width Original and Symbolized tabs and a 16:9 media stage.
+- Preview tabs are ordinary Buttons whose selected appearance derives only from the ViewModel; repeating an active-tab click does not deselect, pause, seek, reopen, or render. The metadata row retains the media icon and finite-width ellipsized filename/full-name tooltip without repeating Image/Video (the Input card still identifies media type).
+- Successful accepted-media replacement commits the new workflow before status notifications, removes the previous result composition before exposing planned output, and refreshes all video-artifact properties before asynchronous frame loading. Cancelled/failed replacement retains the accepted result; obsolete player/recovery completions cannot republish it after a successful replacement.
+- The processing/result panel follows the measured content-driven compositions in section 10.8: spacious row, standalone Export shrinking before reflow, distinct exported paired/rail/compact actions, bounded metric groups and centered working indicator. It does not reserve a fixed state-independent height or use a prior-mode hysteresis band. Supported-size containment and native acceptance remain separate checks.
+- Before rendering, the shell says `Ready to render` / `Review your settings, then render.` with a static outlined accent-circle glyph (no spinner/check/percentage), planned TARGET resolution and video-only AUDIO (`Keep audio` / `Remove audio`). TARGET uses display-oriented source dimensions and the existing output-resolution/yuv420 rules; unavailable dimensions say Unavailable. These values follow current settings, not an accepted artifact. No additional Render or enabled Export is introduced. Accepted result metrics continue to describe retained artifact/image data independently of planned settings.
+- Meaningful operation/result content changes use a 180 ms opacity transition, not layout or player-size animation. Progress updates do not restart it; reduced motion applies immediately and hidden/unloaded content releases its animation clock. This presentation follow-up is not certification of native comparison timing/races or full Phase 15B closure.
+- Right column contains compact Input and Characters plus a remaining-height Render card with persistent Video audio; it has no permanent Output card after Phase 11B.
+- Preview panel hides tabs/metadata before accepted media, then uses equal-width selection-driven Original and Symbolized tabs and an aspect-preserving media stage.
 - Loaded-image mode shows `Render Image` and no redundant image-preview action.
-- Loaded-video mode asynchronously attempts Original playback after input and metadata acceptance. A ready source shows the shared playback-control design with Original-owned transport and fullscreen; opening preserves the decoded frame, and fallback shows the labelled frame-position slider plus a non-blocking limitation message with no nonfunctional playback controls. Secondary `Preview Frame` and primary `Render Video` remain available according to their workflow rules, and Preview Frame is disabled after an accepted full-video artifact takes presentation priority.
+- Loaded-video mode asynchronously attempts Original playback after input and metadata acceptance. A ready source shows the shared playback-control design with Original-owned transport and fullscreen; opening preserves the decoded frame, and fallback shows the labelled frame-position slider plus a non-blocking limitation message with no nonfunctional playback controls. Secondary `Preview Frame` and primary `Render Video` remain available according to their workflow rules, and Preview Frame is hidden after an accepted full-video artifact takes presentation priority.
 - Rendering mode shows a compact ring-only busy overlay over the media viewport and the detailed circular percentage indicator, progress bar, frame progress, elapsed time, remaining time, and Cancel action exclusively in the lower processing/result panel. Completion never leaves the preview covered.
 - Render Ready mode persists result and export actions below the preview.
-- Video Ready and Video Exported use accepted-artifact FRAMES, OUTPUT, and AUDIO metric cards; AUDIO reflects the artifact's stored mux outcome even after the audio selector makes it stale, while successful subtitles stay concise and state-specific stale, cancellation, failure, suspension, opening, and review-unavailable explanations remain truthful.
-- Footer is present.
+- Video Ready and Video Exported use accepted-artifact FILE SIZE, OUTPUT, and AUDIO metric cards; AUDIO reflects the artifact's stored mux outcome even after the audio selector makes it stale, while successful subtitles stay concise and state-specific stale, cancellation, failure, suspension, opening, and review-unavailable explanations remain truthful.
+- Footer shows the assembly-derived version, concise status, About and Settings, without a permanent privacy label. About provides privacy information and explicit access to the installed notices as described in section 10.10.
+- Settings uses the persistent Reset/Cancel/Save bar and draft/feedback rules in section 12.4.
 - Image/video controls appear conditionally.
 - At 100% Windows scaling, all labels and controls fit at the approved desktop viewport without overlap or clipping.
 - Narrow layouts reflow without losing controls or introducing horizontal page scrolling.
@@ -1835,13 +1888,14 @@ MVP is accepted when all criteria below are met.
 
 - User can export symbolized PNG.
 - User can export symbolized JPG/JPEG.
-- PNG is the default image export format.
+- Settings Reset loads existing defaults into the draft only; it does not save or publish application-wide preferences. Accent preview rolls back and the draft is discarded on Cancel/Escape/close. Save & Close uses the normal persistence path, and failed Save retains truthful guidance. Application-data and logs paths are read-only, selectable, keyboard-copyable fields with full accessible values.
+- PNG is the default image export format. The persisted Settings preference initializes the native Save dialog; choosing a per-export format or cancelling never changes that preference. The dialog offers only PNG (*.png) and JPEG (*.jpg;*.jpeg); its accepted filter controls the encoder and extension normalization before source/conflict checks and the existing single overwrite confirmation.
 - Selected output resolution is respected.
 - Selected symbol polarity is respected and matches the symbolized preview.
 - PNG and JPEG outputs use the same polarity-dependent opaque background.
 - Export uses the current non-stale rendered pixels and never reruns symbolization solely because destination or PNG/JPEG format changed.
 - Export Image is unavailable before a current render exists.
-- Export controls are hidden when no rendered image exists; a stale retained image keeps its format selector visible while Export remains disabled.
+- Export controls are hidden when no rendered image exists; a stale retained image keeps the existing result visible while Export remains disabled.
 - Render and export failures and cancellations have distinct result-panel presentation. Export failure or cancellation preserves the retained pixels for another export attempt.
 - Output overwrite requires confirmation.
 - Unsupported or invalid images show friendly errors.
@@ -1922,7 +1976,7 @@ MVP is accepted when all criteria below are met.
 - Default character preset is persisted.
 - Default font and font size are persisted.
 - Default output resolution is persisted.
-- Default symbol polarity is persisted, safely defaults when missing, and is restored by Reset Settings.
+- Default symbol polarity is persisted, safely defaults when missing, and is loaded into the draft by Reset to defaults, then applied through Save & Close.
 - Default image format is persisted.
 - Default audio mode is persisted.
 - Reset settings works.

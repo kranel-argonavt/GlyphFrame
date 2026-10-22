@@ -2,165 +2,270 @@ using System.ComponentModel;
 using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation;
+using System.Windows.Automation.Provider;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.IO;
+using System.Text.Json;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
 using GlyphFrame.App.Services;
+using GlyphFrame.App.Presentation;
 using GlyphFrame.App.Views;
 using GlyphFrame.Core.Enums;
 
+
 namespace GlyphFrame.App.Tests;
 
+[Collection("WPF layout")]
 public sealed class ReviewPaneLayoutTests
 {
-    // Layout rounding may differ by one device pixel. These are DIP geometry
-    // assertions on real components, not audiovisual or monitor-DPI verification.
-    private const double Tolerance = 1;
+    private sealed class LayoutClipboard : IClipboardService
+    {
+        public bool Success { get; set; } = true;
+        public string? Text { get; private set; }
+        public ClipboardWriteResult SetText(string text)
+        {
+            Text = text;
+            return Success ? ClipboardWriteResult.Completed() : ClipboardWriteResult.Failed();
+        }
+    }
 
     [Theory]
-    [InlineData(1024, 720, true, "Fit")]
-    [InlineData(1280, 820, true, "Fit")]
-    [InlineData(1440, 1080, true, "Fit")]
-    [InlineData(1024, 720, false, "Fit")]
-    [InlineData(1280, 820, false, "Fit")]
-    [InlineData(1440, 1080, false, "Fit")]
-    [InlineData(1024, 720, true, "Fill")]
-    [InlineData(1280, 820, true, "100%")]
-    [InlineData(1024, 720, false, "100%")]
-    public void ActualMediaComponents_KeepAllocationAcrossTransitions(
-        double width, double height, bool video, string scale)
+    [InlineData(1024, false)]
+    [InlineData(1280, false)]
+    [InlineData(1760, false)]
+    [InlineData(1024, true)]
+    [InlineData(1280, true)]
+    [InlineData(1760, true)]
+    public void CopyPath_ActualButtonFeedbackPreservesGeometryAndAccessibleAction(double width, bool video)
     {
         RunSta(() =>
         {
             Window window = Phase13UiTests.LoadLooseMainWindow(realMediaComponents: true);
-            window.Width = width;
-            window.Height = height;
-            window.Left = -10000;
-            window.Top = -10000;
-            window.ShowActivated = false;
-            window.WindowStartupLocation = WindowStartupLocation.Manual;
-            TransitionData data = new(video, scale);
+            TransitionData data = new(video, "Fit");
+            window.Width = width; window.Height = 1080; window.Left = -10000;
+            window.ShowActivated = false; window.DataContext = data;
+            try
+            {
+                window.Show(); data.Set("Ready"); Settle(window);
+                Button copy = Assert.Single(Descendants(window).OfType<Button>(), b => b.Name == (video ? "CopyVideoExportPathButton" : "CopyImageExportPathButton"));
+                Assert.False(copy.IsVisible);
+                data.Set("Exported"); Settle(window);
+                ScrollViewer left = (ScrollViewer)window.FindName("LeftPaneScrollViewer");
+                FrameworkElement pane = (FrameworkElement)left.Content;
+                Border shell = Assert.Single(Descendants(pane).OfType<Border>(), b => b.Name == "StatusShell");
+                FrameworkElement preview = (FrameworkElement)VisualTreeHelper.GetChild(pane, 0);
+                AssertScenario(pane, preview, data);
+                Rect shellBounds = Bounds(shell, pane), previewBounds = Bounds(preview, pane), copyBounds = Bounds(copy, pane);
+                Assert.Equal("Copy export path", AutomationProperties.GetName(copy));
+                Assert.NotNull(copy.FocusVisualStyle); Assert.True(copy.Focusable && copy.IsTabStop);
+                foreach (bool success in new[] { true, false })
+                {
+                    data.Clipboard.Success = success;
+                    Task feedback = data.ExportPathCopy.Command.ExecuteAsync(null);
+                    Settle(window);
+                    Assert.Equal(success ? "Copied!" : "Copy failed", copy.Content);
+                    Assert.Equal(data.ExportPathCopy.Path, data.Clipboard.Text);
+                    Assert.Contains(data.ExportPathCopy.Path, (string)copy.ToolTip);
+                    AssertBounds(copyBounds, Bounds(copy, pane));
+                    AssertBounds(shellBounds, Bounds(shell, pane));
+                    AssertBounds(previewBounds, Bounds(preview, pane));
+                    foreach (Button button in Descendants(shell).OfType<Button>().Where(b => b.IsVisible)) { AssertContained(button, shell); }
+                    data.ExportPathCopy.ClearFeedback();
+                    Settle(window);
+                    // Cancellation schedules the async continuation; it need not
+                    // have completed by the first dispatcher drain under load.
+                    DateTime deadline = DateTime.UtcNow.AddSeconds(2);
+                    while (!feedback.IsCompleted && DateTime.UtcNow < deadline)
+                    { Settle(window); Thread.Sleep(1); }
+                    Assert.True(feedback.IsCompleted);
+                    feedback.GetAwaiter().GetResult();
+                    Assert.Equal("Copy path", copy.Content);
+                }
+            }
+            finally { data.ExportPathCopy.Dispose(); window.Close(); }
+        });
+    }
+    // Layout rounding may differ by one device pixel. These are DIP geometry
+    // assertions on real components, not audiovisual or monitor-DPI verification.
+    private const double Tolerance = 1;
+
+    [Fact]
+    public void ActualTabButtons_RepeatInvocationRetainsSelectionDrivenStyle()
+    {
+        RunSta(() =>
+        {
+            Window window = Phase13UiTests.LoadLooseMainWindow(realMediaComponents: true);
+            TransitionData data = new(true, "Fit");
             window.DataContext = data;
+            window.Left = -10000;
+            window.ShowActivated = false;
             try
             {
                 window.Show();
-                Settle(window);
-                ScrollViewer left = (ScrollViewer)window.FindName("LeftPaneScrollViewer");
-                FrameworkElement content = (FrameworkElement)left.Content;
-                FrameworkElement preview = (FrameworkElement)VisualTreeHelper.GetChild(content, 0);
-                Rect allocation = Bounds(preview, content);
-                Assert.True(allocation.Width > 500 && allocation.Height >= 420);
-                double contentWidth = left.ViewportWidth;
-                bool initiallyScrolls = left.ScrollableHeight > 0;
-                List<Size> playerSizes = [];
-                List<Size> viewportSizes = [];
-                AssertScenario(content, preview, data);
-                AssertFilenameGeometry(preview, data);
-
-                foreach (string state in new[]
-                {
-                    "Rendering", "Ready", "Original", "Ready", "Original", "Ready",
-                    "Exporting", "Exported", "Original", "Exported", "Stale", "Failed", "Cancelled", "Unavailable", "Exported"
-                })
-                {
-                    data.Set(state);
-                    Settle(window);
-                    AssertScenario(content, preview, data);
-                    AssertFilenameGeometry(preview, data);
-                    AssertBounds(allocation, Bounds(preview, content));
-                    AssertClose(contentWidth, left.ViewportWidth);
-                    Assert.Equal(0, left.ScrollableWidth);
-                    Assert.Equal(ScrollBarVisibility.Visible, left.VerticalScrollBarVisibility);
-                    foreach (ReviewViewport viewport in Descendants(preview).OfType<ReviewViewport>().Where(v => v.IsVisible))
-                    {
-                        viewportSizes.Add(viewport.RenderSize);
-                        AssertContained(viewport, preview);
-                    }
-                    foreach (VideoReviewSurface surface in Descendants(preview).OfType<VideoReviewSurface>().Where(v => v.IsVisible))
-                    {
-                        Assert.True(surface.ActualHeight > 100);
-                        playerSizes.Add(surface.RenderSize);
-                        ReviewViewport viewport = Assert.Single(Descendants(surface).OfType<ReviewViewport>());
-                        Assert.True(viewport.ActualHeight > 50);
-                        Assert.Equal(scale, viewport.ScaleMode);
-                        AssertContained(surface, preview);
-                        foreach (Button button in Descendants(surface).OfType<Button>().Where(b => b.IsVisible))
-                        {
-                            AssertContained(button, surface);
-                        }
-                    }
-                    foreach (Button button in Descendants(left).OfType<Button>().Where(b => b.IsVisible))
-                    {
-                        Rect bounds = Bounds(button, content);
-                        Assert.True(bounds.Left >= -Tolerance && bounds.Right <= contentWidth + Tolerance,
-                            $"{state}: {button.Content} exceeds content width: {bounds}");
-                    }
-                    foreach (AdaptiveResultPanel result in Descendants(left).OfType<AdaptiveResultPanel>().Where(p => p.IsVisible))
-                    {
-                        FrameworkElement[] groups = result.Children.Cast<FrameworkElement>().Where(e => e.IsVisible).ToArray();
-                        foreach (FrameworkElement group in groups)
-                        {
-                            AssertContained(group, result);
-                            if (AdaptiveResultPanel.GetRole(group) == AdaptiveResultPanelRole.Text)
-                            {
-                                Assert.True(group.ActualWidth >= 180, $"{state}: result text has no practical reading width.");
-                            }
-                        }
-                        for (int i = 0; i < groups.Length; i++)
-                        {
-                            for (int j = i + 1; j < groups.Length; j++)
-                            {
-                                Assert.False(Bounds(groups[i], result).IntersectsWith(Bounds(groups[j], result)),
-                                    $"{state}: {groups[i].Name} overlaps {groups[j].Name}");
-                            }
-                        }
-                    }
-                }
-                Assert.False(initiallyScrolls);
-                Assert.True(left.ScrollableHeight > 0); // Result growth scrolls below, not into, the preview.
-                Assert.NotEmpty(viewportSizes);
-                foreach (Size size in viewportSizes)
-                {
-                    AssertClose(viewportSizes[0].Width, size.Width);
-                    AssertClose(viewportSizes[0].Height, size.Height);
-                }
-                if (video)
-                {
-                    Assert.NotEmpty(playerSizes);
-                    foreach (Size size in playerSizes) { AssertClose(playerSizes[0].Width, size.Width); AssertClose(playerSizes[0].Height, size.Height); }
-                }
-
-                left.ScrollToVerticalOffset(30);
-                Settle(window);
-                double offset = left.VerticalOffset;
-                data.Set("Failed");
-                Settle(window);
-                AssertClose(offset, left.VerticalOffset);
-                left.ScrollToEnd();
-                Settle(window);
                 data.Set("Ready");
                 Settle(window);
-                Button export = Assert.Single(Descendants(left).OfType<Button>(), b => b.IsVisible && b.Content as string == (video ? "Export Video" : "Export Image"));
-                AssertContained(export, left);
-                Assert.True(export.IsEnabled);
-
-                window.Width = width == 1440 ? width - 160 : width + 160;
-                window.Height = height == 1080 ? height - 120 : height + 120;
-                Settle(window);
-                Rect resized = Bounds(preview, content);
-                Assert.True(Math.Abs(resized.Width - allocation.Width) > 1 && Math.Abs(resized.Height - allocation.Height) > 1);
-                window.Width = width;
-                window.Height = height;
-                Settle(window);
-                AssertBounds(allocation, Bounds(preview, content));
-                AssertScenario(content, preview, data);
-                AssertFilenameGeometry(preview, data);
+                foreach (string name in new[] { "OriginalPreviewTab", "SymbolizedPreviewTab" })
+                {
+                    Button selected = Assert.Single(Descendants(window).OfType<Button>(), button => button.Name == name);
+                    IInvokeProvider invoke = (IInvokeProvider)new ButtonAutomationPeer(selected).GetPattern(PatternInterface.Invoke);
+                    for (int i = 0; i < 4; i++)
+                    {
+                        invoke.Invoke();
+                        Settle(window);
+                        Assert.Same(selected.FindResource("AccentBrush"), selected.BorderBrush);
+                        Assert.Same(selected.FindResource("AccentSubtleBrush"), selected.Background);
+                        Assert.Equal(name == "OriginalPreviewTab", data.IsOriginalPreviewSelected);
+                        Assert.Equal(name == "SymbolizedPreviewTab", data.IsSymbolizedPreviewSelected);
+                    }
+                }
             }
             finally { window.Close(); }
         });
     }
 
+    [Fact]
+    public void StatusTransition_OnlyContentChangesAnimateAndReducedMotionOrUnloadStopsClock()
+    {
+        RunSta(() =>
+        {
+            Border card = new() { Child = new TextBlock { Text = "Rendering" } };
+            Window window = new() { Content = card, Width = 300, Height = 200, Left = -10000, ShowActivated = false };
+            StatusContentTransition.SetContentKey(card, "Rendering");
+            try
+            {
+                window.Show();
+                Settle(window);
+                Assert.False(card.HasAnimatedProperties); // Reduced motion / no preference opt-in.
+                StatusContentTransition.SetAnimationsEnabled(card, true);
+                StatusContentTransition.SetContentKey(card, "Ready");
+                var animation = StatusContentTransition.ActiveAnimation(card);
+                Assert.NotNull(animation);
+                Assert.Equal(TimeSpan.FromMilliseconds(180), animation.Duration.TimeSpan);
+                Assert.True(card.HasAnimatedProperties);
+                StatusContentTransition.SetContentKey(card, "Ready");
+                Assert.Same(animation, StatusContentTransition.ActiveAnimation(card));
+                StatusContentTransition.SetAnimationsEnabled(card, false);
+                Assert.False(card.HasAnimatedProperties);
+                Assert.Equal(1, card.Opacity);
+                StatusContentTransition.SetAnimationsEnabled(card, true);
+                StatusContentTransition.SetContentKey(card, "Exported");
+                Assert.True(card.HasAnimatedProperties);
+                window.Content = null;
+                Settle(window);
+                Assert.False(card.HasAnimatedProperties);
+                Assert.Null(StatusContentTransition.ActiveAnimation(card));
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Fact]
+    public void NoMedia_DoesNotReserveOrDisplayPretendResult()
+    {
+        RunSta(() =>
+        {
+            ReviewPanePanel panel = new() { ViewportHeight = 600 };
+            Border preview = new() { MinHeight = 360 };
+            Border status = new() { Visibility = Visibility.Collapsed };
+            panel.Children.Add(preview);
+            panel.Children.Add(status);
+            panel.Measure(new Size(700, double.PositiveInfinity));
+            panel.Arrange(new Rect(0, 0, 700, panel.DesiredSize.Height));
+            Assert.Equal(600, preview.ActualHeight);
+            Assert.Equal(600, panel.DesiredSize.Height);
+        });
+    }
+
+    [Theory]
+    [InlineData(1024, 720, false, "Fit")]
+    [InlineData(1024, 720, true, "Fit")]
+    [InlineData(1280, 820, false, "Fit")]
+    [InlineData(1280, 820, true, "Fit")]
+    [InlineData(1440, 1080, false, "100%")]
+    [InlineData(1440, 1080, true, "Fill")]
+    [InlineData(1760, 1080, false, "Fit")]
+    [InlineData(1760, 1080, true, "Fit")]
+    public void ActualMediaComponents_AllocateMeasuredStatusAndReturnSpaceToPreview(double width, double height, bool video, string scale)
+    {
+        RunSta(() =>
+        {
+            Window window = Phase13UiTests.LoadLooseMainWindow(realMediaComponents: true);
+            window.Width = width; window.Height = height; window.Left = -10000; window.ShowActivated = false;
+            TransitionData data = new(video, scale); window.DataContext = data;
+            try
+            {
+                window.Show(); Settle(window);
+                ScrollViewer left = (ScrollViewer)window.FindName("LeftPaneScrollViewer");
+                ReviewPanePanel pane = Assert.IsType<ReviewPanePanel>(left.Content);
+                FrameworkElement preview = (FrameworkElement)VisualTreeHelper.GetChild(pane, 0);
+                Border shell = Assert.Single(Descendants(pane).OfType<Border>(), b => b.Name == "StatusShell");
+                Dictionary<string, Size> sizes = [];
+                double plannedHeight = shell.ActualHeight;
+                foreach (double hostWidth in new[] { width, 1024, 1280, width })
+                {
+                    window.Width = hostWidth; Settle(window);
+                    foreach (string state in new[] { "Loaded", "Rendering", "Completing", "Ready", "Original", "Ready", "Exporting", "Exported", "Original", "Exported", "Stale", "Failed", "Cancelled", "Unavailable", "Ready" })
+                    {
+                        data.Set(state); Settle(window);
+                        AssertScenario(pane, preview, data); AssertFilenameGeometry(preview, data);
+                        Border active = Assert.Single(Descendants(shell).OfType<Border>(), b => b.IsVisible && b.Name is "ReadyToRenderCard" or "ProcessingContent" or "ImageResultCard" or "VideoResultCard");
+                        AssertClose(active.DesiredSize.Height + 34, shell.ActualHeight);
+                        Assert.Equal(new Thickness(16), shell.Padding);
+                        AssertClose(Math.Max(preview.MinHeight, left.ViewportHeight - shell.ActualHeight - ReviewPanePanel.CardGap), preview.ActualHeight);
+                        AssertClose(Bounds(preview, pane).Bottom + ReviewPanePanel.CardGap, Bounds(shell, pane).Top);
+                        AssertClose(Math.Max(left.ViewportHeight, preview.MinHeight + shell.ActualHeight + ReviewPanePanel.CardGap), pane.ActualHeight);
+                        Assert.Empty(Descendants(shell).OfType<ScrollViewer>());
+                        AdaptiveResultPanel composition = Assert.IsType<AdaptiveResultPanel>(active.Child);
+                        FrameworkElement? actionGroup = composition.Children.Cast<FrameworkElement>().FirstOrDefault(e => e.IsVisible && AdaptiveResultPanel.GetRole(e) == AdaptiveResultPanelRole.Actions);
+                        if (actionGroup is not null && (composition.Family == StatusLayoutFamily.Working && composition.LayoutMode == StatusLayoutMode.CompactWide
+                            || actionGroup is ExportActionsPanel exports && exports.HasSecondaryActions && composition.LayoutMode != StatusLayoutMode.Narrow))
+                        {
+                            Rect body = Rect.Empty;
+                            foreach (FrameworkElement group in composition.Children.Cast<FrameworkElement>().Where(e => e.IsVisible && !ReferenceEquals(e, actionGroup)))
+                            { body.Union(Bounds(group, composition)); }
+                            Rect actionBounds = Bounds(actionGroup, composition);
+                            // One physical pixel permits independent device rounding of
+                            // the two centers; unrounded component tests use 0.11 DIP.
+                            double pixel = 1 / VisualTreeHelper.GetDpi(composition).DpiScaleY;
+                            Assert.InRange(Math.Abs(body.Top + body.Height / 2 - actionBounds.Top - actionBounds.Height / 2), 0, pixel);
+                        }
+                        CaptureEvidence(window, shell, active, video, state);
+                        Assert.Equal(0, left.ScrollableWidth);
+                        foreach (FrameworkElement control in Descendants(shell).OfType<FrameworkElement>().Where(e => e.IsVisible && e is Button or ComboBox or TextBlock)) { AssertContained(control, shell); }
+                        foreach (VideoReviewSurface surface in Descendants(preview).OfType<VideoReviewSurface>().Where(v => v.IsVisible))
+                        {
+                            AssertContained(surface, preview); Assert.True(surface.ActualHeight > 100);
+                            ReviewViewport viewport = Assert.Single(Descendants(surface).OfType<ReviewViewport>());
+                            Assert.Equal(scale, viewport.ScaleMode); AssertContained(viewport, surface);
+                        }
+                        if (state == "Ready")
+                        {
+                            string key = $"{left.ViewportWidth:F1}";
+                            Size geometry = new(shell.ActualWidth, shell.ActualHeight);
+                            if (sizes.TryGetValue(key, out Size previous)) { AssertClose(previous.Height, geometry.Height); }
+                            sizes[key] = geometry;
+                        }
+                        if (left.ScrollableHeight > 0)
+                        {
+                            left.ScrollToEnd(); Settle(window);
+                            foreach (Button button in Descendants(shell).OfType<Button>().Where(b => b.IsVisible)) { AssertContained(button, left); }
+                        }
+                    }
+                }
+                data.Set("Exported"); Settle(window);
+                Assert.True(plannedHeight < shell.ActualHeight, $"Planned {plannedHeight}; exported {shell.ActualHeight}");
+                window.Height = 720; window.Width = 1024; data.Set("Unavailable"); Settle(window);
+                left.ScrollToEnd(); Settle(window);
+                foreach (Button button in Descendants(shell).OfType<Button>().Where(b => b.IsVisible)) { AssertContained(button, left); }
+            }
+            finally { data.ExportPathCopy.Dispose(); window.Close(); }
+        });
+    }
     [Fact]
     public void RetainedCanvas_DoesNotContributeIntrinsicViewportSizeToParent()
     {
@@ -210,14 +315,17 @@ public sealed class ReviewPaneLayoutTests
         foreach (Button folder in all.OfType<Button>().Where(button => button.Name is "OpenVideoExportFolderButton" or "OpenImageExportFolderButton"))
         {
             bool relevant = folder.Name == (data.IsVideoSelected ? "OpenVideoExportFolderButton" : "OpenImageExportFolderButton");
-            Assert.Equal(relevant && data.CanOpenExportFolder, folder.IsVisible);
+            Assert.Equal(relevant && data.CanOpenExportFolder && !data.IsExportStatusVisible, folder.IsVisible);
             Assert.Equal(data.CanOpenExportFolder, folder.Command!.CanExecute(null));
         }
-        TextBlock destination = Assert.Single(all.OfType<TextBlock>(), text => text.Name == "VideoExportDestinationTextBlock");
-        Assert.Equal(data.HasVideoExportDestination && data.ShowVideoResultPanel, destination.IsVisible);
-        Assert.Equal(data.VideoExportDestinationText, destination.Text);
-        Assert.Equal(data.VideoExportDestinationText, destination.ToolTip);
-        Assert.Equal(TextTrimming.CharacterEllipsis, destination.TextTrimming);
+        foreach (Button copy in all.OfType<Button>().Where(button => button.Name is "CopyVideoExportPathButton" or "CopyImageExportPathButton"))
+        {
+            bool relevant = copy.Name == (data.IsVideoSelected ? "CopyVideoExportPathButton" : "CopyImageExportPathButton");
+            Assert.Equal(relevant && data.ShowCopyExportPath && !data.IsExportStatusVisible, copy.IsVisible);
+            Assert.Same(data.ExportPathCopy.Command, copy.Command);
+            Assert.Equal(data.ExportPathCopy.ToolTip, copy.ToolTip);
+            if (copy.IsVisible) { Assert.True(copy.IsEnabled); AssertContained(copy, content); }
+        }
 
         Border reviewError = Assert.Single(all.OfType<Border>(), border => BindingOperations.GetBinding(border, UIElement.VisibilityProperty)?.Path.Path == nameof(data.ShowRenderedVideoReviewError));
         Assert.Equal(data.ShowRenderedVideoReviewError, reviewError.IsVisible);
@@ -234,10 +342,22 @@ public sealed class ReviewPaneLayoutTests
             Assert.NotEmpty(data.VideoReviewErrorPresentation.TechnicalDetail!);
             Assert.False(data.IsVideoResultSuccess);
         }
-        Assert.Equal(data.ShowVideoResultPanel, Assert.Single(all.OfType<Border>(), element => element.Name == "VideoResultCard").IsVisible);
-        Assert.Equal(data.ShowImageResultPanel, Assert.Single(all.OfType<Border>(), element => element.Name == "ImageResultCard").IsVisible);
+        Assert.Equal(data.ShowVideoResultPanel && !data.IsExportStatusVisible, Assert.Single(all.OfType<Border>(), element => element.Name == "VideoResultCard").IsVisible);
+        Assert.Equal(data.ShowImageResultPanel && !data.IsExportStatusVisible, Assert.Single(all.OfType<Border>(), element => element.Name == "ImageResultCard").IsVisible);
+        Border ready = Assert.Single(all.OfType<Border>(), element => element.Name == "ReadyToRenderCard");
+        Assert.Equal(data.ShowReadyToRender, ready.IsVisible);
+        if (ready.IsVisible)
+        {
+            Assert.Contains(Descendants(ready).OfType<TextBlock>(), text => text.Text == "Ready to render");
+            Assert.Empty(Descendants(ready).OfType<Button>());
+            Assert.False(data.ShowImageRenderMetrics || data.ShowVideoRenderMetrics);
+            Assert.Contains(Descendants(ready).OfType<TextBlock>(), text => text.Text == data.PlannedOutputDimensionsText);
+            Assert.Equal(data.IsVideoSelected, Descendants(ready).OfType<TextBlock>().Any(text => text.IsVisible && text.Text == data.PlannedAudioText));
+            Assert.Empty(Descendants(ready).OfType<ExportActivityIndicator>());
+        }
         ExportActivityIndicator[] indicators = all.OfType<ExportActivityIndicator>().Where(indicator => indicator.IsVisible).ToArray();
-        Assert.Equal(data.IsExportActive ? 2 : 0, indicators.Length);
+        Assert.Equal(data.IsExportActive ? 2 : data.IsExportCompletionVisible ? 1 : 0, indicators.Length);
+        if (data.IsExportCompletionVisible) { Assert.True(Assert.Single(indicators).IsCompleted); }
         if (data.IsExportActive)
         {
             Assert.All(indicators, indicator => Assert.True(indicator.IsActive));
@@ -273,8 +393,9 @@ public sealed class ReviewPaneLayoutTests
     {
         TextBlock filename = Assert.Single(Descendants(preview).OfType<TextBlock>(), text => BindingOperations.GetBinding(text, TextBlock.TextProperty)?.Path.Path == nameof(data.SelectedFileName) && BindingOperations.GetBinding(text, FrameworkElement.ToolTipProperty)?.Path.Path == nameof(data.SelectedFileName));
         Panel row = Assert.IsAssignableFrom<Panel>(filename.Parent);
-        TextBlock icon = Assert.Single(row.Children.OfType<TextBlock>(), text => text.Text == "▣");
-        TextBlock kind = Assert.Single(row.Children.OfType<TextBlock>(), text => text.Text == data.MediaTypeText);
+        System.Windows.Shapes.Path icon = Assert.Single(row.Children.OfType<System.Windows.Shapes.Path>());
+        Assert.DoesNotContain(Descendants(preview).OfType<TextBlock>(), text =>
+            BindingOperations.GetBinding(text, TextBlock.TextProperty)?.Path.Path == nameof(data.MediaTypeText));
         FrameworkElement metadata = (FrameworkElement)row.Parent;
         Grid information = Assert.IsType<Grid>(metadata.Parent);
         FrameworkElement actions = Assert.Single(information.Children.Cast<FrameworkElement>(), element => Grid.GetColumn(element) == 1);
@@ -284,13 +405,13 @@ public sealed class ReviewPaneLayoutTests
         Assert.True(new FormattedText(filename.Text, System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
             new Typeface(filename.FontFamily, filename.FontStyle, filename.FontWeight, filename.FontStretch), filename.FontSize,
             Brushes.White, VisualTreeHelper.GetDpi(filename).PixelsPerDip).Width > filename.ActualWidth);
-        foreach (TextBlock text in new[] { filename, icon, kind })
+        foreach (FrameworkElement text in new FrameworkElement[] { filename, icon })
         {
             Assert.True(text.IsVisible && text.ActualWidth > 0);
             AssertContained(text, metadata);
-            Assert.False(Bounds(text, information).IntersectsWith(Bounds(actions, information)), $"{text.Text} overlaps media actions.");
+            Assert.False(Bounds(text, information).IntersectsWith(Bounds(actions, information)), $"{text.GetType().Name} overlaps media actions.");
         }
-        TextBlock[] parts = [icon, filename, kind];
+        FrameworkElement[] parts = [icon, filename];
         for (int i = 0; i < parts.Length - 1; i++)
         {
             Assert.True(Bounds(parts[i], row).Right <= Bounds(parts[i + 1], row).Left + Tolerance);
@@ -301,6 +422,38 @@ public sealed class ReviewPaneLayoutTests
 
     private static Rect Bounds(FrameworkElement element, Visual ancestor) =>
         element.TransformToAncestor(ancestor).TransformBounds(new Rect(element.RenderSize));
+
+    private static void CaptureEvidence(Window window, Border shell, Border active, bool video, string state)
+    {
+        string? directory = Environment.GetEnvironmentVariable("GLYPHFRAME_STATUS_VIEWPORT_CAPTURES");
+        if (directory is null) { return; }
+        Directory.CreateDirectory(directory);
+        string id = $"wpf-viewport-{(video ? "video" : "image")}-{state}-{window.ActualWidth:F0}x{window.ActualHeight:F0}";
+        string path = Path.Combine(directory, id);
+        if (File.Exists(path + ".png")) { return; }
+        FrameworkElement content = (FrameworkElement)window.Content;
+        RenderTargetBitmap bitmap = new((int)Math.Ceiling(content.ActualWidth), (int)Math.Ceiling(content.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+        DrawingVisual backdrop = new();
+        using (DrawingContext drawing = backdrop.RenderOpen())
+        {
+            Rect area = new(0, 0, content.ActualWidth, content.ActualHeight);
+            drawing.DrawRectangle((Brush)window.FindResource("MainBackgroundBrush"), null, area);
+            drawing.DrawRectangle(new VisualBrush(content), null, area);
+        }
+        bitmap.Render(backdrop);
+        PngBitmapEncoder encoder = new(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using (FileStream stream = File.Create(path + ".png")) { encoder.Save(stream); }
+        Rect bounds = Bounds(active, shell);
+        File.WriteAllText(path + ".json", JsonSerializer.Serialize(new
+        {
+            Kind = "WPF fixed viewport fixture; test data, production XAML and controls; not native application acceptance",
+            Window = new { window.ActualWidth, window.ActualHeight },
+            Panel = new { shell.ActualWidth, shell.ActualHeight },
+            Composition = ((AdaptiveResultPanel)active.Child).LayoutMode.ToString(),
+            Dpi = VisualTreeHelper.GetDpi(window).DpiScaleX,
+            InsetsFromOuterBorder = new { Left = bounds.Left, Top = bounds.Top, Right = shell.ActualWidth - bounds.Right, Bottom = shell.ActualHeight - bounds.Bottom }
+        }, new JsonSerializerOptions { WriteIndented = true }));
+    }
     private static void AssertClose(double expected, double actual) => Assert.InRange(actual, expected - Tolerance, expected + Tolerance);
     private static void AssertBounds(Rect expected, Rect actual)
     {
@@ -342,6 +495,7 @@ public sealed class ReviewPaneLayoutTests
         private readonly bool video;
         public TransitionData(bool isVideo, string scale) : base(isVideo)
         {
+            ExportPathCopy = new(Clipboard);
             video = isVideo;
             SelectedFitMode = scale;
             RenderImageCommand = new RelayCommand(() => { }, () => !video && !IsExportActive);
@@ -351,6 +505,8 @@ public sealed class ReviewPaneLayoutTests
             ToggleRenderedVideoPlaybackCommand = new RelayCommand(() => { }, () => ShowRenderedVideoPlayer && !IsExportActive);
             OriginalFullscreenCommand = new RelayCommand(() => { }, () => ShowOriginalVideoPlayer && !IsExportActive);
             FullscreenCommand = new RelayCommand(() => { }, () => ShowRenderedVideoPlayer && !IsExportActive);
+            SelectOriginalCommand = new RelayCommand(() => { if (!IsOriginalPreviewSelected) { Set("Original"); } });
+            SelectSymbolizedCommand = new RelayCommand(() => { if (!IsSymbolizedPreviewSelected) { Set("Ready"); } });
         }
         private string _state = "Loaded";
         private bool _hasResult;
@@ -361,7 +517,9 @@ public sealed class ReviewPaneLayoutTests
         public void Set(string state)
         {
             _state = state;
-            if (state == "Ready") { _hasResult = true; }
+            ExportPathCopy.SetDestination(this, ShowCopyExportPath
+                ? video ? VideoExportDestinationText : @"C:\Медіа\very long Unicode destination\зображення-日本語.png" : null);
+            if (state is "Ready" or "Completing") { _hasResult = true; }
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
             foreach (IRelayCommand command in new[] { ExportImageCommand, ExportVideoCommand, OpenExportFolderCommand, ShowVideoReviewErrorDetailsCommand,
                 RenderImageCommand, RenderVideoCommand, PreviewFrameCommand, ToggleOriginalVideoPlaybackCommand,
@@ -371,8 +529,18 @@ public sealed class ReviewPaneLayoutTests
             }
         }
         private bool Result => _hasResult;
-        public new bool IsProcessingResultPanelVisible => _state != "Loaded";
-        public new bool IsExportStatusVisible => IsExportActive;
+        public new bool IsProcessingResultPanelVisible => true;
+        public new bool ShowReadyToRender => !IsExportActive && !ShowImageResultPanel && !ShowVideoResultPanel;
+        public new string ReadyToRenderMessage => "Review your settings, then render.";
+        public new string PlannedOutputDimensionsText { get; private set; } = "1280 × 720";
+        public new string PlannedAudioText { get; private set; } = "Keep audio";
+        public void ChangePlannedSettings(string target, string audio)
+        {
+            PlannedOutputDimensionsText = target;
+            PlannedAudioText = audio;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
+        }
+        public new bool IsExportStatusVisible => IsExportActive || IsExportCompletionVisible;
         public bool IsExportActive => _state is "Rendering" or "Exporting";
         public new bool ShowImageResultPanel => !video && Result && !IsExportActive;
         public new bool ShowVideoResultPanel => video && Result && !IsExportActive;
@@ -392,13 +560,19 @@ public sealed class ReviewPaneLayoutTests
         public double RenderedVideoPixelHeight => 720;
         public new string VideoOutputDimensionsText => "1280 × 720";
         public new string SelectedFileName => $"Український оригінал — Кириллица 漢字 — {new string('Ж', 80)} — a substantially long original media filename.{(video ? "mp4" : "png")}";
+        public new string InputDisplayName => SelectedFileName;
+        public new string SelectedFilePath => @"C:\Медіа\" + SelectedFileName;
+        public new string InputCardSummary => MetadataPrimaryText;
         public bool HasVideoExportDestination => video && _state == "Exported";
-        public bool CanOpenExportFolder => _state == "Exported" && !IsExportActive;
+        public new bool CanOpenExportFolder => _state == "Exported" && !IsExportActive;
+        public new bool ShowCopyExportPath => _state == "Exported" && !IsExportStatusVisible;
+        public LayoutClipboard Clipboard { get; } = new();
+        public new ExportPathCopyPresentation ExportPathCopy { get; }
         public string VideoExportDestinationText => HasVideoExportDestination ? @"C:\Медіа\very long destination folder\another long folder\rendered output відео з довгим ім’ям.mp4" : string.Empty;
         public new string ImageResultSummary => _state switch
         {
             "Failed" => "The replacement could not be rendered. The previously accepted image remains available for review and another attempt.",
-            "Exported" => @"Saved to C:\Медіа\long destination folder\rendered output зображення.png. The image remains available for another export.",
+            "Exported" => "Ready for review and another export.",
             "Stale" => "Settings changed. Render Again before exporting the retained image.",
             "Cancelled" => "Rendering was cancelled. The previous image remains available.",
             _ => "Ready for review and export."
@@ -429,9 +603,9 @@ public sealed class ReviewPaneLayoutTests
             "Stale" => "Render Stale",
             _ => "Image Ready"
         };
-        public bool ShowImageRenderWarning => !video && _state == "Failed";
+        public new bool ShowImageRenderWarning => !video && _state == "Failed";
         public string ImageRenderWarningText => "The selected font was unavailable; a supported fallback font was used for this retained result.";
-        public bool ShowVideoResultErrorDetails => video && _state == "Unavailable";
+        public new bool ShowVideoResultErrorDetails => video && _state == "Unavailable";
         public ErrorPresentation? VideoReviewErrorPresentation => ShowRenderedVideoReviewError ? _reviewError : null;
         public bool ShowRenderedVideoReviewError => video && _state == "Unavailable";
         public bool ShowVideoReviewErrorDetails => ShowRenderedVideoReviewError;
@@ -445,6 +619,8 @@ public sealed class ReviewPaneLayoutTests
         public bool IsImageResultFailure => !video && _state == "Failed";
         public bool IsVideoResultFailure => video && _state is "Failed" or "Unavailable";
         public new bool ShowVideoRenderMetrics => HasVideoArtifact;
+        public new bool ShowPreviewFrameAction => video && !HasVideoArtifact;
+        public new bool HasImageResultForRerender => !video && Result;
         public new bool ShowImageRenderMetrics => !video && Result;
         public new bool ShowImageExportControls => !video && Result;
         public new string ImageRenderActionLabel => Result ? "Render Again" : "Render Image";
@@ -460,9 +636,9 @@ public sealed class ReviewPaneLayoutTests
         public string ElapsedText => "Elapsed 0:01";
         public string RemainingText => "Remaining 0:01";
         public long ExportPresentationGeneration => _state == "Exporting" ? 2 : 1;
-        public bool IsExportCompletionVisible => false;
+        public bool IsExportCompletionVisible => _state == "Completing";
         public bool IsExportProgressIndeterminate => false;
-        public bool AreExportAnimationsEnabled => false;
+        public new bool AreExportAnimationsEnabled => false;
         private IRelayCommand? _exportImageCommand, _exportVideoCommand, _openFolderCommand;
         public IRelayCommand ExportImageCommand => _exportImageCommand ??= new RelayCommand(() => { }, () => !video && Result && !IsExportActive && _state != "Stale");
         public IRelayCommand ExportVideoCommand => _exportVideoCommand ??= new RelayCommand(() => { }, () => video && Result && !IsExportActive && _state != "Stale");
@@ -492,18 +668,18 @@ public sealed class ReviewPaneLayoutTests
         public bool ShowVideoFrameControls => false;
         public bool ShowResolutionWarning => false;
         public bool ShowMediaInputErrorDetails => false;
-        public bool ShowImageResultErrorDetails => false;
+        public new bool ShowImageResultErrorDetails => false;
         public bool IsVideoSeekEnabled => false;
         public double TimelinePosition { get; set; }
         public string TimelineText => "0:02 / 0:09";
         public string VideoFrameStatusMessage => string.Empty;
-        public string InputMetadataSummary => MetadataPrimaryText;
+        public new string InputMetadataSummary => MetadataPrimaryText;
         public string OriginalVideoPlaybackLimitationMessage => string.Empty;
         public IRelayCommand ShowOriginalPlaybackErrorDetailsCommand { get; } = new RelayCommand(() => { }, () => false);
         public IRelayCommand ShowVideoFrameErrorDetailsCommand { get; } = new RelayCommand(() => { }, () => false);
         public IRelayCommand ShowImageResultErrorDetailsCommand { get; } = new RelayCommand(() => { }, () => false);
-        public IRelayCommand SelectOriginalCommand { get; } = new RelayCommand(() => { });
-        public IRelayCommand SelectSymbolizedCommand { get; } = new RelayCommand(() => { });
+        public IRelayCommand SelectOriginalCommand { get; }
+        public IRelayCommand SelectSymbolizedCommand { get; }
         public IRelayCommand BrowseMediaCommand { get; } = new RelayCommand(() => { });
         public IRelayCommand DropMediaCommand { get; } = new RelayCommand(() => { });
         public IRelayCommand RestartOriginalVideoCommand { get; } = new RelayCommand(() => { });

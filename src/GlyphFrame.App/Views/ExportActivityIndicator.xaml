@@ -6,9 +6,9 @@
     <Grid>
         <Ellipse Fill="{DynamicResource PanelBackgroundBrush}"
                  Stroke="{DynamicResource BorderBrush}"
-                 StrokeThickness="7" />
+                 StrokeThickness="3" />
         <Path x:Name="RingSegments"
-              Margin="5"
+              Margin="2"
               Opacity="0.9"
               RenderTransformOrigin="0.5,0.5"
               SizeChanged="OnRingSegmentsSizeChanged"
@@ -16,7 +16,7 @@
               Stroke="{DynamicResource AccentBrush}"
               StrokeStartLineCap="Round"
               StrokeEndLineCap="Round"
-              StrokeThickness="5">
+              StrokeThickness="3">
             <Path.RenderTransform>
                 <RotateTransform x:Name="RingRotation" />
             </Path.RenderTransform>
@@ -24,7 +24,8 @@
         <TextBlock x:Name="PercentagePresenter"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
-                   FontSize="16"
+                   FontFamily="Segoe UI"
+                   FontSize="14"
                    FontWeight="SemiBold" />
         <Viewbox x:Name="CompletionPresenter"
                  Width="30"

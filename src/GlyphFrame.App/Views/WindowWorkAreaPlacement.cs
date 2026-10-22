@@ -13,26 +13,8 @@ internal static class WindowWorkAreaPlacement
 
     public static void FitInitialBounds(Window window)
     {
-        nint handle = new WindowInteropHelper(MonitorAnchor(window)).Handle;
-        if (handle == 0)
-        {
-            return;
-        }
-
-        nint monitor = MonitorFromWindow(handle, MonitorDefaultToNearest);
-        MonitorInfo info = new() { Size = Marshal.SizeOf<MonitorInfo>() };
-        if (monitor == 0 || !GetMonitorInfo(monitor, ref info))
-        {
-            return;
-        }
-
-        HwndSource? source = HwndSource.FromHwnd(handle);
-        if (source?.CompositionTarget is null)
-        {
-            return;
-        }
-
-        Rect workArea = ConvertWorkArea(info.Work, source.CompositionTarget.TransformFromDevice);
+        Rect? area = GetWorkArea(window);
+        if (area is not Rect workArea) { return; }
         Rect bounds = CalculateBounds(workArea, new Size(window.Width, window.Height),
             new Size(window.MinWidth, window.MinHeight));
         window.WindowStartupLocation = WindowStartupLocation.Manual;
@@ -40,6 +22,47 @@ internal static class WindowWorkAreaPlacement
         window.Height = bounds.Height;
         window.Left = bounds.Left;
         window.Top = bounds.Top;
+    }
+
+    // Content-sized dialogs keep their natural height until the actual owner monitor requires scrolling.
+    public static void ConstrainContentBounds(Window window)
+    {
+        if (GetWorkArea(window) is not Rect area) { return; }
+        double width = Math.Max(1, area.Width - 2 * WorkAreaInset);
+        double height = Math.Max(1, area.Height - 2 * WorkAreaInset);
+        window.MinWidth = Math.Min(window.MinWidth, width);
+        window.MinHeight = Math.Min(window.MinHeight, height);
+        window.MaxWidth = width;
+        window.MaxHeight = height;
+        if (window.IsLoaded)
+        {
+            window.Left = Math.Clamp(window.Left, area.Left + WorkAreaInset, area.Right - WorkAreaInset - window.ActualWidth);
+            window.Top = Math.Clamp(window.Top, area.Top + WorkAreaInset, area.Bottom - WorkAreaInset - window.ActualHeight);
+        }
+    }
+
+    private static Rect? GetWorkArea(Window window)
+    {
+        nint handle = new WindowInteropHelper(MonitorAnchor(window)).Handle;
+        if (handle == 0)
+        {
+            return null;
+        }
+
+        nint monitor = MonitorFromWindow(handle, MonitorDefaultToNearest);
+        MonitorInfo info = new() { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (monitor == 0 || !GetMonitorInfo(monitor, ref info))
+        {
+            return null;
+        }
+
+        HwndSource? source = HwndSource.FromHwnd(handle);
+        if (source?.CompositionTarget is null)
+        {
+            return null;
+        }
+
+        return ConvertWorkArea(info.Work, source.CompositionTarget.TransformFromDevice);
     }
 
     internal static Window MonitorAnchor(Window window) => window.Owner ?? window;

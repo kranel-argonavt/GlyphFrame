@@ -37,7 +37,7 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
             return new SettingsLoadResult(
                 AppSettingsCatalog.Defaults,
                 SettingsLoadState.DefaultsUsed,
-                "Using approved default settings.");
+                "Using default settings.");
         }
 
         await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -71,7 +71,7 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
                 normalization.Settings,
                 wasNormalized ? SettingsLoadState.Normalized : SettingsLoadState.Loaded,
                 wasNormalized
-                    ? "Some saved settings were invalid and were replaced with approved defaults."
+                    ? "Some saved settings were invalid and were replaced with default settings."
                     : null);
         }
         catch (JsonException)

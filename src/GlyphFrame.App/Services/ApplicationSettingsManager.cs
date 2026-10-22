@@ -35,7 +35,7 @@ public sealed class ApplicationSettingsManager : IApplicationSettingsManager
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
         {
             Current = AppSettingsCatalog.Defaults;
-            StartupStatusMessage = "Settings could not be loaded. GlyphFrame started with approved defaults.";
+            StartupStatusMessage = "Settings could not be loaded. GlyphFrame started with default settings.";
         }
 
         _themeService.Apply(Current.AccentPreset);

@@ -1,5 +1,9 @@
 # Phase 14 — selected coverage gaps
 
+Current coverage (2026-10-21): UI refinements are implemented; broader Phase 14 acceptance remains open. The [consolidated UI history](UI_Refinement_History.md) records changes, dated verification, failed attempts and remaining native gaps without treating fixtures as native passes. Current behavior is specified in the [technical specification](GlyphFrame_Technical_Specification_v1.0.md).
+
+Historical outcomes below retain their original dates and scope. Older local artifact links are evidence locators only; ignored files may be absent in a clean clone. The October 11–21 iteration details were consolidated and preserved locally rather than appended repeatedly here.
+
 This block extends the audited `18cd6a3` baseline (953 tests); it does **not** close all of Phase 14 or produce a Phase 15 release package. The audited block's remaining commit-readiness checks were completed on 2026-10-05 as recorded in the latest section below; earlier pending statements describe their dated runs, not the current status.
 
 ## Coverage map
@@ -126,3 +130,9 @@ The DPI run's first disk-saving helper captured the initial state repeatedly: nu
 The non-blocking `AtomicPublicationFailed` wording observation was subsequently corrected: the friendly message no longer claims that an existing destination was preserved when none existed. Three new error-presentation cases cover the neutral wording and mappings while retaining technical/context information. The latest current-code audit passed **1,007 tests (488 main + 519 application)**, zero failures/skips; Release build, focused error-presentation checks, formatting verification and whitespace validation passed. These results precede the DPI smoke; no new automated run is implied by this documentation update.
 
 **Commit readiness:** the audited Phase 14 block's remaining representative manual checks are complete, including the user-confirmed multi-monitor follow-up; no known reproducible blocking defect remains in that block. This is not a declaration that every broader Phase 14 environment/media combination or Phase 15 release check has passed. Fresh process startup at 150% was not exercised by the live DPI round trip. Clean Windows without installed .NET, final portable packaging and broader unusual-codec/environment coverage remain outside this sign-off.
+
+## Current UI coverage and open acceptance — 2026-10-21
+
+The new regressions cover populated status compositions, replacement notification ordering, bounded metrics/actions, circle/body centering, typed native Save format/encoding, draft Settings, shared live-accent artwork, spare-space placeholder, About/notices and persistent dialog actions. The [consolidated verification record](UI_Refinement_History.md#recorded-verification) owns the dated suite outcomes and native evidence scope; its [risk record](UI_Refinement_History.md#failures-retries-and-unresolved-risks) preserves the historical Copy-feedback failure and its completed test-only stabilization, alongside the still-unattributed Dispatcher aborts.
+
+The earlier representative Phase 14 block's sign-off is not acceptance of every subsequent UI change. Actual minimum/continuous resizing, increased text/DPI/monitor conditions, reliable modal keyboard/path-copy/error cases and the complete current native matrix remain outstanding as listed under [remaining acceptance](UI_Refinement_History.md#remaining-acceptance). User-attributed manual checks are not expanded beyond their supplied conditions. Packaging and clean-machine gates remain in [Phase 15](Phase_15_Packaging.md).
