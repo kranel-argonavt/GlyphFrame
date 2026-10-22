@@ -1,6 +1,8 @@
 # Phase 15 — Windows x64 portable packaging and validation
 
-Current status (2026-10-21): Phase 15A packaging is implemented; Phase 15B acceptance remains partial/open and Phase 15C clean-machine execution is NOT TESTED. UI changes and dated verification are consolidated in [UI refinement history](UI_Refinement_History.md); the original October 7/8 extracted-package findings below retain their attribution.
+Current status (2026-10-22 documentation review): Phase 15A packaging is implemented; Phase 15B acceptance remains partial/open and Phase 15C clean-machine execution is NOT TESTED. UI changes and dated verification are consolidated in [UI refinement history](UI_Refinement_History.md); the original October 7/8 extracted-package findings below retain their attribution. Current outstanding work is tracked in the [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist).
+
+Implementation is now committed in `75aad73`. No package was rebuilt or native/clean-machine test performed by this documentation update. The candidate below retains its actual older provenance; a fresh package from the eventual clean committed revision is still required, not a renamed identity for this ZIP.
 
 ## Latest recorded candidate
 

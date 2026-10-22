@@ -8,7 +8,7 @@ The Render → Review → Export workflow is implemented for images and full vid
 
 The current UI includes measured responsive result layouts, compact Input/Characters cards, a finite-height Render settings area, draft-only Settings editing, and an About dialog with local third-party notices. These features are implemented; implementation and automated coverage do not imply complete native or release acceptance.
 
-Broader Phase 14 coverage remains open. Phase 15A portable packaging is implemented, Phase 15B extracted-package acceptance remains partial/open, and Phase 15C clean-Windows validation without separately installed .NET/FFmpeg remains untested. Current verification, dated native outcomes and limitations are recorded in [Phase 14 coverage](docs/Phase_14_Coverage.md) and [Phase 15 packaging](docs/Phase_15_Packaging.md). Historical passes or failures apply to the builds and conditions recorded there.
+Broader Phase 14 coverage remains open. Phase 15A portable packaging is implemented, Phase 15B extracted-package acceptance remains partial/open, and Phase 15C clean-Windows validation without separately installed .NET/FFmpeg remains untested. Current verification, dated native outcomes and limitations are recorded in [Phase 14 coverage](docs/Phase_14_Coverage.md) and [Phase 15 packaging](docs/Phase_15_Packaging.md). The [release acceptance checklist](docs/Phase_14_Coverage.md#release-acceptance-checklist) consolidates outstanding verification and portfolio-release work. Historical passes or failures apply to the builds and conditions recorded there.
 
 ## Platform and target framework
 

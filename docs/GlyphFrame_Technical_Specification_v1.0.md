@@ -1,8 +1,9 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Aligned with the current working-tree implementation on 2026-10-21, including responsive status layouts, image Save format selection, About/notices and draft-only Settings actions. This is implementation documentation, not release sign-off.
+Status: Implementation contracts reviewed against commit `75aad73` on 2026-10-22, including responsive status layouts, image Save format selection, About/notices and draft-only Settings actions. This documentation update is not a new test run, package or release sign-off.
 Acceptance: Phase 14 remains open; Phase 15A packaging is implemented, Phase 15B acceptance remains partial/open, and Phase 15C clean-machine execution is NOT TESTED. Dated native outcomes and remaining checks are tracked in Phase_14_Coverage.md and Phase_15_Packaging.md; historical evidence is preserved.
+The [current release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist) consolidates outstanding work; the roadmap below distinguishes implementation from acceptance.
 Project name: GlyphFrame  
 Product subtitle: Video & Image to Symbol Converter  
 Product description: Transform videos and images into beautiful symbol art.
@@ -114,7 +115,7 @@ The user should not need to install:
 - Video frame reading: bundled FFmpeg 9.0 through a bounded binary stdout pipe
 - Video encoding and audio processing: bundled FFmpeg
 - Metadata probing: ffprobe
-- Testing: xUnit or NUnit
+- Testing: xUnit (platform-neutral and Windows/WPF test projects)
 
 ### 4.2 Bundled Tools
 
@@ -408,7 +409,7 @@ Portrait targets:
 1080p: 1080 x 1920
 ```
 
-For `Same as source`, GlyphFrame uses the normalized source resolution. If the source resolution is higher than 1080p, the app must show a warning but still allow export.
+For `Same as source`, GlyphFrame uses the display-oriented source resolution. In image mode only, a warning appears when either dimension exceeds its orientation-specific boundary: 1920×1080 for landscape/square or 1080×1920 for portrait. It does not limit rendering or export. Video mode does not show this image-specific warning; its output still follows the selected resolution and yuv420p normalization rules.
 
 ### 7.4 Symbol Polarity
 
@@ -442,8 +443,8 @@ Changing polarity invalidates an existing symbolized render because it changes b
 8. App creates and retains one current full-resolution symbolized image result.
 9. App selects the Symbolized tab and changes the processing panel to Image Ready.
 10. User reviews Original and Symbolized without rerendering.
-11. User chooses PNG or JPG/JPEG and clicks Export Image.
-12. App requests the destination and encodes the current rendered result without rerunning symbolization.
+11. User clicks Export Image to open the native Save dialog.
+12. User chooses the destination and PNG or JPG/JPEG in Save; the accepted filter controls encoding and extension normalization without rerunning symbolization.
 ```
 
 ### 8.2 Image UI Rules
@@ -455,10 +456,9 @@ When the loaded media is an image:
 - Image mode has no separate frame-preview command.
 - The preview-panel action is `Render Image`, changing to neutral secondary `Render Again` when a retained result exists; Export Image is the result card's primary action.
 - Export button label is `Export Image`.
-- Output format choices are `PNG` and `JPG/JPEG`.
-- PNG is selected by default.
+- The native Save dialog offers `PNG` and `JPG/JPEG`. The persisted default image format initializes its selection; the application default is PNG.
 - Metadata row shows image width, height, format, and file size.
-- Image output format and export actions appear in the persistent result panel only after a rendered image exists. Export remains disabled while that retained result is stale.
+- Export actions appear in the persistent result panel only after a rendered image exists. It has no output-format selector in any state; format selection belongs to Save. Export remains disabled while that retained result is stale.
 - Render and export failures or cancellations remain visible in the result panel with operation-specific status text; they do not discard an earlier retained render.
 
 ### 8.3 Image Acceptance Requirements
@@ -930,9 +930,9 @@ Rendering:
 RenderReady:
 
 - Current image pixels or completed video artifact are reviewable in Symbolized.
-- The persistent result panel exposes format and Export actions.
+- The persistent result panel exposes Export actions and result metrics; image format selection is available only in the native Save dialog opened by Export Image.
 - The preview-panel media action row exposes the single Render Again action.
-- Image format may change without making the image render stale.
+- Choosing an image format in Save does not make the image render stale or change the persisted default.
 
 RenderStale:
 
@@ -1029,304 +1029,138 @@ The feedback row above the actions is absent when there is no meaningful message
 
 ### 13.1 Solution Structure
 
+The solution contains four production projects and two test projects:
+
 ```text
 GlyphFrame.sln
-
-GlyphFrame.App
-GlyphFrame.Core
-GlyphFrame.Rendering
-GlyphFrame.Infrastructure
-GlyphFrame.Tests
+├── src/
+│   ├── GlyphFrame.App
+│   ├── GlyphFrame.Core
+│   ├── GlyphFrame.Rendering
+│   └── GlyphFrame.Infrastructure
+└── tests/
+    ├── GlyphFrame.Tests
+    └── GlyphFrame.App.Tests
 ```
+
+Core is platform-neutral and defines contracts, models and policies. Rendering implements the shared symbolization/image pipeline with SkiaSharp. Infrastructure implements local files, settings and bundled-tool processes. App owns WPF presentation, playback and orchestration through dependency injection. The App test project targets Windows/WPF; the other test project targets platform-neutral code and includes real bundled-tool integration tests on the supported environment.
 
 ### 13.2 Folder Structure
 
+Current source folders, excluding generated build output:
+
 ```text
-GlyphFrame
-├── GlyphFrame.App
-│   ├── Views
-│   ├── ViewModels
-│   ├── Controls
-│   ├── Resources
-│   │   ├── Styles
-│   │   ├── Icons
-│   │   └── Themes
-│   └── Services
-├── GlyphFrame.Core
-│   ├── Models
-│   ├── Interfaces
-│   ├── Enums
-│   ├── Presets
-│   └── Validation
-├── GlyphFrame.Rendering
-│   ├── Grid
-│   ├── Mapping
-│   ├── Conversion
-│   └── Skia
-├── GlyphFrame.Infrastructure
-│   ├── Ffmpeg
-│   ├── Media
-│   ├── Audio
-│   ├── Images
-│   ├── Settings
-│   ├── Logging
-│   └── FileSystem
-└── GlyphFrame.Tests
+src/
+├── GlyphFrame.App/
+│   ├── Behaviors/
+│   ├── Presentation/
+│   ├── Resources/
+│   ├── Services/
+│   ├── ViewModels/
+│   └── Views/
+├── GlyphFrame.Core/
+│   ├── Enums/
+│   ├── Imaging/
+│   ├── Interfaces/
+│   ├── Media/
+│   ├── Models/
+│   ├── Policies/
+│   ├── Presets/
+│   └── Settings/
+├── GlyphFrame.Rendering/
+│   ├── Conversion/
+│   ├── Grid/
+│   ├── Mapping/
+│   └── Skia/
+└── GlyphFrame.Infrastructure/
+    ├── Ffmpeg/
+    ├── Media/
+    ├── Paths/
+    ├── Properties/
+    ├── Settings/
+    └── Shell/
 ```
 
 ### 13.3 Core Components
 
-Required components:
+The implementation separates input, rendering, artifact ownership, publication and presentation responsibilities:
 
-```text
-MediaTypeDetector
-ImageMetadataReader
-VideoMetadataReader
-ImageReader
-VideoFrameReader
-PreviewFrameService
-CharacterPresetProvider
-SymbolGridCalculator
-BrightnessToSymbolMapper
-FrameToSymbolConverter
-SkiaSymbolFrameRenderer
-ImageExporter
-StreamingVideoEncoder
-AudioStreamProbe
-AudioCompatibilityPolicy
-AudioMuxer
-ExportService
-FfmpegProcessRunner
-BinaryProcessRunner
-TempFileManager
-SettingsService
-LoggingService
-StartupValidationService
-```
+| Responsibility | Implemented components |
+| --- | --- |
+| Input and metadata | Core `MediaTypeDetector`; Infrastructure `MediaInputService`, `MetadataExtractorImageMetadataReader`, `MetadataExtractorVideoMetadataReader`, `FfprobeVideoMetadataReader` |
+| Shared image/frame symbolization | `ImagePipelineService`, `SkiaImageDecoder`, `OutputDimensionResolver`, `SkiaGlyphMeasurer`, `SymbolGridCalculator`, `BrightnessToSymbolMapper`, `FrameToSymbolConverter`, `SkiaSymbolFrameRenderer`, `SkiaImageExporter` |
+| Tool execution and preview | `BundledFfmpegLocator`, `ProcessRunner`, `BinaryProcessRunner`, `FfmpegVideoFrameReader` |
+| Streaming video and audio | `FfmpegSequentialVideoFrameReader`, `FfmpegVideoEncoder`, `StreamingVideoExportService`, `FfprobeAudioStreamProbe`, `Mp4AudioCompatibilityPolicy`, `FfmpegAudioMuxer` |
+| Review-artifact ownership and publication | `ManagedVideoRenderService`, `ManagedVideoArtifactStore`, `ManagedVideoArtifactSession`, `VideoArtifactPublisher` |
+| Playback | App-owned `OriginalVideoPlayer`, `RenderedVideoPlayer`, shared playback primitives and `VideoPlaybackCoordinator`; separate mutable transports |
+| Settings, diagnostics and dialogs | `JsonSettingsService`, `ApplicationSettingsManager`, `AccentThemeService`, `LocalDiagnosticLogger`, `ErrorPresentationService`, `ErrorDetailsDialogService`, `ThirdPartyNoticesService` |
 
 ### 13.4 Key Interfaces
 
-```csharp
-public interface IMediaTypeDetector
-{
-    MediaType Detect(string path);
-}
-```
+The linked declarations are authoritative for exact signatures, defaults and ownership. This index describes the boundaries without maintaining duplicate API declarations.
 
-```csharp
-public interface IImageMetadataReader
-{
-    Task<ImageMetadata> ReadAsync(string inputPath, CancellationToken cancellationToken);
-}
-```
+| Contract | Current boundary |
+| --- | --- |
+| [IMediaTypeDetector](../src/GlyphFrame.Core/Interfaces/IMediaTypeDetector.cs) | Detects `MediaSelectionKind`, including None. |
+| [IImageMetadataReader](../src/GlyphFrame.Core/Interfaces/IImageMetadataReader.cs), [IVideoMetadataReader](../src/GlyphFrame.Core/Interfaces/IVideoMetadataReader.cs) | Asynchronous typed metadata reads with cancellation. |
+| [IVideoFrameReader](../src/GlyphFrame.Core/Interfaces/IVideoFrameReader.cs) | Random-access normalized position plus optional metadata context; returns an owned frame/result. |
+| [ICharacterPresetProvider](../src/GlyphFrame.Core/Interfaces/ICharacterPresetProvider.cs) | Lists `CharacterPresetOption` values and resolves a `CharacterPresetKind`. |
+| [ISymbolGridCalculator](../src/GlyphFrame.Core/Interfaces/ISymbolGridCalculator.cs) | Calculates from output `PixelDimensions` and measured `GlyphMetrics`. |
+| [IBrightnessToSymbolMapper](../src/GlyphFrame.Core/Interfaces/IBrightnessToSymbolMapper.cs) | Maps luminance through a character ramp and explicit polarity. |
+| [IFrameToSymbolConverter](../src/GlyphFrame.Core/Interfaces/IFrameToSymbolConverter.cs) | Converts `DecodedImage` using grid, metrics, preset, polarity and cancellation. |
+| [ISymbolFrameRenderer](../src/GlyphFrame.Core/Interfaces/ISymbolFrameRenderer.cs) | Renders a `SymbolFrame` to owned `RenderedImage` with cancellation. |
+| [IImageExporter](../src/GlyphFrame.Core/Interfaces/IImageExporter.cs) | Borrows rendered pixels and encodes to a path with format, overwrite policy and cancellation; the caller retains ownership. |
+| [ISequentialVideoFrameReader](../src/GlyphFrame.Core/Interfaces/ISequentialVideoFrameReader.cs) | Owns one sequential decoder for the operation rather than repeatedly invoking random-access preview extraction. |
+| [IVideoEncoder](../src/GlyphFrame.Core/Interfaces/IVideoEncoder.cs) | Accepts an asynchronous rendered-frame stream, disposes each yielded frame and reports accepted-frame progress. |
+| [IVideoExportService](../src/GlyphFrame.Core/Interfaces/IVideoExportService.cs) | Coordinates streaming rendering/encoding/audio through typed jobs, results and progress. |
+| [IManagedVideoRenderService](../src/GlyphFrame.Core/Interfaces/IManagedVideoRenderService.cs), [IManagedVideoArtifactSession](../src/GlyphFrame.Core/Interfaces/IManagedVideoArtifactSession.cs) | Render candidates and accept/reject retained review artifacts under session ownership. |
+| [IVideoArtifactPublisher](../src/GlyphFrame.Core/Interfaces/IVideoArtifactPublisher.cs) | Publishes the accepted artifact without symbolization or video re-encoding. |
 
-```csharp
-public interface IVideoMetadataReader
-{
-    Task<VideoMetadata> ReadAsync(string inputPath, CancellationToken cancellationToken);
-}
-```
-
-```csharp
-public interface IVideoFrameReader
-{
-    Task<VideoFrameReadResult> ReadAsync(
-        string inputPath,
-        double normalizedPosition,
-        VideoMetadata? metadataContext,
-        CancellationToken cancellationToken);
-}
-```
-
-`IVideoFrameReader` is platform-neutral. FFmpeg paths, process arguments, binary pipes, exit codes, and backend diagnostics remain isolated in Infrastructure. A successful result owns an exact, tightly packed, straight-alpha RGBA8888 managed buffer independently of the completed process and reports requested and resolved position/timestamp/frame context only when available.
-
-```csharp
-public interface ICharacterPresetProvider
-{
-    IReadOnlyList<CharacterPreset> GetPresets();
-}
-```
-
-```csharp
-public interface ISymbolGridCalculator
-{
-    SymbolGrid Calculate(MediaDimensions dimensions, RenderSettings settings);
-}
-```
-
-```csharp
-public interface IBrightnessToSymbolMapper
-{
-    char Map(byte luminance, string characterSet, SymbolPolarity polarity);
-}
-```
-
-```csharp
-public interface IFrameToSymbolConverter
-{
-    SymbolFrame Convert(FrameBitmap frame, RenderSettings settings, CharacterPreset preset);
-}
-```
-
-```csharp
-public interface ISymbolFrameRenderer
-{
-    RenderedFrame Render(SymbolFrame frame, RenderSettings settings);
-}
-```
-
-```csharp
-public interface IImageExporter
-{
-    Task ExportAsync(RenderedFrame frame, ImageExportOptions options, CancellationToken cancellationToken);
-}
-```
-
-```csharp
-public interface IVideoEncoder
-{
-    Task<VideoEncodingResult> EncodeAsync(
-        VideoEncodingJob job,
-        IAsyncEnumerable<RenderedImage> frames,
-        CancellationToken cancellationToken,
-        IProgress<VideoEncodingProgress>? progress);
-}
-```
-
-```csharp
-public interface IVideoExportService
-{
-    Task<VideoExportResult> ExportAsync(
-        VideoExportJob job,
-        CancellationToken cancellationToken,
-        IProgress<VideoExportProgress>? progress);
-}
-```
-
-`ISequentialVideoFrameReader` is separate from the random-access preview reader. It owns one bundled-FFmpeg decoder for the export lifetime and yields exactly one owned display-oriented RGBA8888 frame at a time. `IVideoEncoder` owns one bundled-FFmpeg encoder, awaits every stdin write so pipe backpressure bounds memory, and reports a frame only after that write succeeds. `IVideoExportService` coordinates those contracts with the shared image pipeline and reports platform-neutral export snapshots; neither contract exposes processes, WPF, nor native rendering types through Core.
+FFmpeg paths, process arguments, binary pipes, exit codes and backend diagnostics remain in Infrastructure. Successful frame reads own exact straight-alpha RGBA8888 pixels independently of the completed process. Preview extraction and sequential decoding retain their distinct lifetime/cancellation contracts. Awaited encoder writes provide backpressure; Core contracts do not expose WPF, process handles or Skia native types.
 
 ## 14. Data Models
 
-### 14.1 MediaType
+This section describes current model responsibilities. Exact declarations are linked rather than duplicated as an alternative schema.
 
-```csharp
-public enum MediaType
-{
-    Image,
-    Video
-}
-```
+### 14.1 MediaSelectionKind
+
+[MediaSelectionKind](../src/GlyphFrame.Core/Enums/MediaSelectionKind.cs) distinguishes None, Image and Video.
 
 ### 14.2 ImageMetadata
 
-```csharp
-public sealed class ImageMetadata
-{
-    public string FilePath { get; init; } = "";
-    public int Width { get; init; }
-    public int Height { get; init; }
-    public string Format { get; init; } = "";
-    public long FileSizeBytes { get; init; }
-    public bool HasOrientationMetadata { get; init; }
-}
-```
+[ImageMetadata](../src/GlyphFrame.Core/Models/ImageMetadata.cs) is an immutable record containing the path/name, encoded and display-oriented dimensions, format, byte size, normalized orientation and optional raw orientation value. `HasOrientationMetadata` is derived from that optional value; orientation is not reduced to a standalone Boolean.
 
 ### 14.3 VideoMetadata
 
-```csharp
-public sealed class VideoMetadata
-{
-    public string FilePath { get; init; } = "";
-    public int Width { get; init; }
-    public int Height { get; init; }
-    public double Fps { get; init; }
-    public TimeSpan Duration { get; init; }
-    public int FrameCount { get; init; }
-    public bool HasAudio { get; init; }
-    public string? VideoCodec { get; init; }
-    public string? AudioCodec { get; init; }
-    public int? AudioSampleRate { get; init; }
-    public int? RotationDegrees { get; init; }
-    public int? DisplayWidth { get; }
-    public int? DisplayHeight { get; }
-}
-```
-
-Encoded dimensions remain available for diagnostics. Display dimensions apply normalized quarter-turn rotation metadata and define the exact display-oriented RGBA frame layout expected from FFmpeg's default autorotation behavior.
+[VideoMetadata](../src/GlyphFrame.Core/Models/VideoMetadata.cs) retains path/name, container, byte size, optional encoded dimensions, duration, FPS, frame count, codecs, audio presence/sample rate and rotation. Unknown values remain nullable; frame count is `long?`. Display dimensions apply normalized quarter-turn metadata without replacing encoded diagnostics.
 
 ### 14.4 VideoFrameReadResult
 
-The Phase 8 result model contains:
+[VideoFrameReadResult](../src/GlyphFrame.Core/Models/VideoFrameReadResult.cs) carries status and a typed error category, an owned `DecodedImage` on success, requested/resolved normalized positions, optional timestamps/frame context, friendly guidance and separate technical detail. Cancellation is explicit; superseded cancellation is not a user-facing error. Unknown timing fields are not fabricated.
 
-```text
-Status and typed error category
-Owned DecodedImage frame on success
-Requested normalized position
-Actual normalized position when available
-Requested and actual timestamps when available
-Actual frame index when available
-Duration and frame-count context when available
-Friendly user message
-Separate technical detail
-```
+### 14.5 ImageRenderSettings
 
-Cancellation is represented explicitly and superseded cancellation is not treated as a user-facing error. Unknown or unreliable timing fields remain absent rather than being fabricated.
+[ImageRenderSettings](../src/GlyphFrame.Core/Models/ImageRenderSettings.cs) captures font family, font size, `OutputResolution` and `SymbolPolarity`. Its default is Cascadia Mono, size 10, Same as source and Light on Dark.
 
-### 14.5 RenderSettings
+Original Colors is the sole fixed product color policy. The [SymbolFrame](../src/GlyphFrame.Core/Models/SymbolFrame.cs) stores its resolved opaque background, so both the image and video pipelines render without consulting later mutable settings.
 
-```csharp
-public sealed class RenderSettings
-{
-    public string FontFamily { get; init; } = "Cascadia Mono";
-    public int FontSize { get; init; } = 10;
-    public OutputResolutionMode OutputResolution { get; init; } = OutputResolutionMode.SameAsSource;
-    public SymbolPolarity SymbolPolarity { get; init; } = SymbolPolarity.LightOnDark;
-    public ColorMode ColorMode { get; init; } = ColorMode.OriginalColors;
-}
-```
+### 14.6 CharacterPresetOption
 
-The platform-neutral `SymbolFrame` stores the resolved opaque `BackgroundColor`. This makes preview, still-image export, and the future video pipeline deterministic without consulting mutable application settings during rendering.
+[CharacterPresetOption](../src/GlyphFrame.Core/Models/CharacterPresetOption.cs) is an immutable record with kind, name, exact ramp and Unicode flag. It defines the three built-in ramps and Detailed ASCII default; `CharacterPresetProvider` exposes those options.
 
-### 14.6 CharacterPreset
+### 14.7 Render and Publication Jobs
 
-```csharp
-public sealed class CharacterPreset
-{
-    public string Name { get; init; } = "";
-    public string Characters { get; init; } = "";
-    public bool IsUnicode { get; init; }
-}
-```
+Rendering, managed review and destination publication use separate contracts:
 
-### 14.7 ExportJob
+- The image pipeline consumes source pixels, `ImageRenderSettings` and `CharacterPresetOption`; [ImagePipelineResult](../src/GlyphFrame.Core/Models/ImagePipelineResult.cs) retains rendered pixels, grid and glyph metrics. Image export borrows that result through `IImageExporter`.
+- [VideoExportJob](../src/GlyphFrame.Core/Models/VideoExportModels.cs) captures input/output paths, metadata, render settings, preset, overwrite permission and audio mode. Separate sequential-decode and video-encoding jobs describe the pipe stages.
+- [FullVideoRenderIdentity](../src/GlyphFrame.Core/Models/FullVideoRenderIdentity.cs) captures the accepted review identity; frame-slider position is excluded.
+- [VideoArtifactPublicationJob](../src/GlyphFrame.Core/Models/VideoArtifactPublicationJob.cs) couples an accepted artifact to the original input, observed destination version and overwrite permission. Publication is distinct from rendering.
+- App's [ImageSaveDialogResult](../src/GlyphFrame.App/Services/IImageSaveDialogService.cs) returns the accepted path and format; the saved preference only initializes that dialog.
 
-```csharp
-public sealed class ExportJob
-{
-    public string InputPath { get; init; } = "";
-    public string OutputPath { get; init; } = "";
-    public MediaType MediaType { get; init; }
-    public RenderSettings RenderSettings { get; init; } = new();
-    public CharacterPreset CharacterPreset { get; init; } = new();
-    public ImageExportFormat? ImageFormat { get; init; }
-    public AudioExportMode? AudioMode { get; init; }
-}
-```
+### 14.8 VideoExportProgress
 
-### 14.8 ExportProgress
-
-```csharp
-public sealed class ExportProgress
-{
-    public ExportStatus Status { get; init; }
-    public int CurrentFrame { get; init; }
-    public int TotalFrames { get; init; }
-    public double Percentage { get; init; }
-    public TimeSpan Elapsed { get; init; }
-    public TimeSpan? Remaining { get; init; }
-    public string Message { get; init; } = "";
-}
-```
+[VideoExportProgress](../src/GlyphFrame.Core/Models/VideoExportProgress.cs) is an immutable stage snapshot with a `long` processed-frame count, optional `long?` total, optional percentage/ETA, elapsed time, indeterminate flag and stage description. `VideoEncodingProgress` separately reports accepted encoder frames. Workflow state is not a substitute for pipeline-stage progress.
 
 ### 14.9 Managed Video Review Artifact
 
@@ -1346,59 +1180,21 @@ Retained playback availability and diagnostics are independent of the latest ren
 
 ## 15. Enums
 
-```csharp
-public enum AudioExportMode
-{
-    KeepAudio,
-    RemoveAudio
-}
-```
+Current enum declarations are separate source files; UI labels are not additional enum values.
 
-```csharp
-public enum ColorMode
-{
-    OriginalColors
-}
-```
+| Enum | Purpose / values |
+| --- | --- |
+| [MediaSelectionKind](../src/GlyphFrame.Core/Enums/MediaSelectionKind.cs) | None, Image, Video |
+| [AudioExportMode](../src/GlyphFrame.Core/Enums/AudioExportMode.cs) | KeepAudio, RemoveAudio |
+| [OutputResolution](../src/GlyphFrame.Core/Enums/OutputResolution.cs) | SameAsSource, Hd720, FullHd1080 |
+| [ImageExportFormat](../src/GlyphFrame.Core/Enums/ImageExportFormat.cs) | Png, Jpeg |
+| [SymbolPolarity](../src/GlyphFrame.Core/Enums/SymbolPolarity.cs) | LightOnDark, DarkOnLight |
+| [CharacterPresetKind](../src/GlyphFrame.Core/Enums/CharacterPresetKind.cs) | Identifies the three built-in character presets. |
+| [RenderWorkflowStatus](../src/GlyphFrame.Core/Enums/RenderWorkflowStatus.cs) | Durable media/render/review/publication state, including stale, cancelled and failed results. |
+| [VideoExportStage](../src/GlyphFrame.Core/Enums/VideoExportStage.cs) | Preparing, ProcessingFrames, FinishingEncoding, InspectingAudio, MergingAudio, CopyingArtifact, Finalizing, Cancelling, Completed |
+| [VideoExportStatus](../src/GlyphFrame.Core/Enums/VideoExportStatus.cs) | Terminal result status, separate from live stage progress. |
 
-```csharp
-public enum ExportStatus
-{
-    Ready,
-    LoadingMedia,
-    GeneratingPreview,
-    Exporting,
-    MergingAudio,
-    Completed,
-    Cancelled,
-    Failed
-}
-```
-
-```csharp
-public enum OutputResolutionMode
-{
-    SameAsSource,
-    HD720,
-    FullHD1080
-}
-```
-
-```csharp
-public enum ImageExportFormat
-{
-    Png,
-    Jpeg
-}
-```
-
-```csharp
-public enum SymbolPolarity
-{
-    LightOnDark,
-    DarkOnLight
-}
-```
+Original Colors remains the single fixed rendering policy rather than a configurable enum. Workflow state, live pipeline stage and terminal operation result are separate concepts. Additional typed input/process/frame/artifact error and lifetime enums remain in Core; this table is a navigation index, not an exhaustive replacement for their declarations.
 
 ## 16. Privacy and Local Data
 
@@ -1500,7 +1296,7 @@ Minimum test matrix:
 - Polarity persistence, missing-property migration, invalid-value normalization, and reset.
 - Preview invalidation and stale async-result rejection after polarity changes.
 - PNG and JPEG export in both polarity modes.
-- Source resolution above 1080p warning.
+- Image-only Same-as-source warning above the display-oriented 1080p boundary, without limiting render/export.
 - Unicode file paths.
 - Output path already exists.
 - Missing FFmpeg.
@@ -1546,6 +1342,21 @@ Portable deployment is extraction and launch without an installer, **not** besid
 Startup verification of the published folder is not interactive execution of the extracted ZIP. Independent Phase 15B native validation on 2026-10-07 used a fresh ZIP from clean commit `cdb1f8eadaeda3d831c203faf62d89ed56cd8297`, verified all 416 extracted payload hashes, and launched only the extracted EXE with isolated data and an observed production lease. Image/video rendering/publication, full output decoding, active video-render cancellation/retry, and normal exact-session cleanup passed. Repeated fullscreen entry failed time/frame/thumb agreement; returning to Original once reset its position to zero. These are observed defects, not fixes or a complete Phase 15B sign-off. Human audibility and active artifact-publication cancellation remain NOT TESTED; transient image Rendering layout was inconclusive. Phase 15C clean Windows without installed .NET/FFmpeg remains NOT TESTED. See [the dated packaging validation report](Phase_15_Packaging.md#phase-15b--independent-extracted-zip-validation-2026-10-07) for identities, reproduction, per-scenario methods and evidence. No product fix, release/installer/signing or Phase 16 publication was performed.
 
 ## 21. Roadmap
+
+### Current roadmap status — 2026-10-22
+
+This is an implementation/acceptance map for commit `75aad73`, not a claim that every target environment has passed. The detailed phases below retain their scoped historical outcomes; an earlier phase's representative pass does not certify later changes.
+
+| Phase | Current status | Remaining boundary |
+| --- | --- | --- |
+| 1 — Documentation | Maintained specification and reference exist; this update aligns contracts with code | Public-facing documentation and evidence presentation are part of Phase 16. |
+| 2–12, including 11B | Core application, rendering/review/export, settings and error-handling workflows implemented | Historical representative checks do not replace current Phase 14/15 acceptance. |
+| 13 — UI Polish | Implemented, including October UI follow-ups | Current native resize, keyboard, theme and DPI matrix remains open. |
+| 14 — Testing | Automated coverage and selected native checks implemented; overall acceptance open | Complete the [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist). |
+| 15A — Packaging | Self-contained Windows x64 portable construction and structural verification implemented | Generate and verify a fresh candidate from the eventual clean committed revision. |
+| 15B — Extracted-package validation | Partial/open | Retest the fresh extracted package, including the outstanding native/audio/publication scenarios. |
+| 15C — Clean Windows | NOT TESTED | Execute without separately installed .NET/FFmpeg and record the actual OS/media environment. |
+| 16 — Portfolio Release | Not complete | Prepare public documentation, demo assets and architecture overview; resolve licensing/distribution decisions before release. |
 
 Phase 15B follow-up (2026-10-08): the shared playback controller owns a paused-position snapshot. Seek updates it immediately; playing timer ticks, a playing-to-paused transition and natural completion sample the native clock. Surface creation and idempotent pause do not replace a paused seek with delayed native zero/end readback; queued paused ticks are ignored. Replay remains the explicit restart operation. Separate transports, generation checks, media processing, publication and fullscreen ownership are unchanged. Seven delayed-readback/real-surface regression cases and 1,014 solution tests pass. An independently extracted dirty-tree candidate passed three full completion→midpoint→fullscreen-reopen cycles for each role and repeated paused timestamp comparisons. The historical single B2 observation's exact native cause is not retroactively proven. Precise playing-switch tolerance, rapid native switching, active publication cancellation, native SymbolizedPlayback-error/publication interaction, human audibility, sustained minimum-size image Rendering, broader DPI/multi-monitor checks and final clean committed-package retest are not signed off. See the October 8 follow-up in `Phase_15_Packaging.md`; Phase 15C remains separate.
 
@@ -1805,7 +1616,7 @@ If Original is still opening, the requested comparison timestamp is retained onl
 
 Selected coverage gaps are implemented; Phase 14 as a whole remains open. See `docs/Phase_14_Coverage.md` for test names, commands, evidence, and limitations. The playable committed MP4/MOV/MKV/AVI fixtures now exercise production managed rendering, acceptance, decoded symbol-art verification, and two byte-identical Unicode publications; existing rotated-MOV and audio assertions remain. Above-1080p image-warning tests cover display-oriented boundaries, output selection, replacement/notifications, and unblocked render/export. A separate PowerShell package verifier publishes self-contained Windows x64 Release, checks runtime/native dependencies, tools, committed checksums/licenses/notices, outside-repository startup, and bounded shutdown. An explicit marked verification-data root isolates application data; default user-local behavior is unchanged. Isolation must positively observe the launched PID's canonical session and production exclusive lease under that unique root within a bounded timeout; only the specific sharing-violation result is accepted as lock evidence. Shutdown cleanup separately proves that observed session was removed and no session directories remain, with both evidence objects retained in the ignored report. Dependency-free PowerShell regressions exercise the same helpers without publishing. Generated packages/evidence are ignored. The separate October 1 D–G retest records successful published playback, repeated export, Remove Audio, chooser cancellation and overwrite decline, with human sound confirmation on October 2. That functional pass does not establish layout stability. Clean-machine execution without installed .NET remains Phase 15, not proven by a successful development-machine launch.
 
-The package verifier's application data now resides under unique marked `%TEMP%\GFpkg\<run-id>` roots, not inside the deeply nested package/evidence directory. Before launch it checks completed/pending production artifact names (worst-case PID) and escaped absolute file URIs against conservative harness budgets of 220/240 characters. These budgets are verification safeguards, not universal Windows limits or product restrictions. The supplied September 30 probe demonstrated WPF playback failure at a 266-character path while the same MP4 opened at 125 characters; Remove Audio failed at candidate preflight and retained the prior Keep Audio artifact, rather than demonstrating a mux defect. Reports retain prospective/observed path lengths, PID-bound lease/cleanup evidence, and an exact short-root retest command; marked temporary data is retained for inspection/retesting, and verifier-owned working-directory cleanup follows successful session cleanup. Declined overwrite restores settled footer/workflow and prior publication diagnostics only for the current attempt. Review guidance and Show Details remain bound to the independent SymbolizedPlayback context through publication progress/outcomes, clearing on successful recovery or media replacement. October 2 geometry regressions use real ReviewViewport/VideoReviewSurface components in the same main-window layout across state transitions, with a 1-DIP rounding tolerance. The fresh published default-size retest covers video/image loaded, Ready and Exported plus fullscreen return. October 5 native follow-ups additionally passed minimum-size image/video state transitions and actual SymbolizedPlayback-error interaction with publication success, cancellation, declined overwrite, failure and retry. A current Release-build live 125% -> 150% -> 125% run passed review/fullscreen/render/export; its report explicitly records incomplete disk screenshot evidence. Windows scale was restored and exact-session cleanup verified. The user separately confirmed successful cross-monitor movement/fullscreen return and no recurrence of the historical fullscreen-completion timeline observation; this is user-performed validation, not an independent multi-monitor capture or proof of a separate timeline fix. The generic publication-failure message is destination-neutral, with regression coverage; the latest current-code audit passed 1,007 tests. These remaining checks close the audited block's commit-readiness gaps, with no known reproducible blocking defect. Historical failed reports remain unchanged; broader Phase 14 coverage remains open and clean Windows without .NET remains Phase 15.
+The package verifier's application data now resides under unique marked `%TEMP%\GFpkg\<run-id>` roots, not inside the deeply nested package/evidence directory. Before launch it checks completed/pending production artifact names (worst-case PID) and escaped absolute file URIs against conservative harness budgets of 220/240 characters. These budgets are verification safeguards, not universal Windows limits or product restrictions. The supplied September 30 probe demonstrated WPF playback failure at a 266-character path while the same MP4 opened at 125 characters; Remove Audio failed at candidate preflight and retained the prior Keep Audio artifact, rather than demonstrating a mux defect. Reports retain prospective/observed path lengths, PID-bound lease/cleanup evidence, and an exact short-root retest command; marked temporary data is retained for inspection/retesting, and verifier-owned working-directory cleanup follows successful session cleanup. Declined overwrite restores settled footer/workflow and prior publication diagnostics only for the current attempt. Review guidance and Show Details remain bound to the independent SymbolizedPlayback context through publication progress/outcomes, clearing on successful recovery or media replacement. October 2 geometry regressions use real ReviewViewport/VideoReviewSurface components in the same main-window layout across state transitions, with a 1-DIP rounding tolerance. The fresh published default-size retest covers video/image loaded, Ready and Exported plus fullscreen return. October 5 native follow-ups additionally passed minimum-size image/video state transitions and actual SymbolizedPlayback-error interaction with publication success, cancellation, declined overwrite, failure and retry. A current Release-build live 125% -> 150% -> 125% run passed review/fullscreen/render/export; its report explicitly records incomplete disk screenshot evidence. Windows scale was restored and exact-session cleanup verified. The user separately confirmed successful cross-monitor movement/fullscreen return and no recurrence of the historical fullscreen-completion timeline observation; this is user-performed validation, not an independent multi-monitor capture or proof of a separate timeline fix. The generic publication-failure message is destination-neutral, with regression coverage; the October 5 audited block passed 1,007 tests. This is a dated outcome, not the latest suite count; later verification is recorded in the UI refinement history. These remaining checks close the audited block's commit-readiness gaps, with no known reproducible blocking defect. Historical failed reports remain unchanged; broader Phase 14 coverage remains open and clean Windows without .NET remains Phase 15.
 
 - Full media format matrix.
 - Portrait and landscape tests.
@@ -1817,7 +1628,7 @@ The package verifier's application data now resides under unique marked `%TEMP%\
 ### Phase 15 - Packaging
 
 - **Phase 15A implemented:** reproducible self-contained Windows x64 folder publish, bundled runtime/native dependencies and FFmpeg, versioned portable ZIP/checksum, payload/archive verification and machine-readable provenance. Existing attribution preserved; public-distribution legal review remains separate.
-- **Phase 15B partial/open:** the October 7 committed-source native run found fullscreen/tab-position defects; subsequent corrective implementation and dated retests are recorded in `docs/Phase_15_Packaging.md`. Those historical outcomes do not establish acceptance of every current UI/native case. Complete the current-candidate matrix, remaining audibility/publication-cancellation checks, and a new package retest from the eventual clean committed revision before sign-off.
+- **Phase 15B partial/open:** the October 7 committed-source native run found fullscreen/tab-position defects; subsequent corrective implementation and dated retests are recorded in `docs/Phase_15_Packaging.md`. Those historical outcomes do not establish acceptance of every current UI/native case. Commit `75aad73` now contains the UI changes, but a fresh package from the eventual clean committed revision and the current-candidate checklist are still required before sign-off. Do not relabel an older dirty-tree package as a package built from this commit.
 - **Phase 15C planned:** clean Windows execution without separately installed .NET/FFmpeg.
 
 ### Phase 16 - Portfolio Release
@@ -1828,6 +1639,8 @@ The package verifier's application data now resides under unique marked `%TEMP%\
 - Architecture diagram.
 - README.
 - Known limitations.
+- Public documentation must not rely on ignored local evidence being present in a clone; preserve historical outcomes while making unavailable evidence locators explicit.
+- Decide the application license and review bundled FFmpeg corresponding-source/distribution obligations before public distribution; existing notices alone are not release approval.
 - GitHub Release `v1.0.0`.
 
 ## 22. Acceptance Criteria
@@ -1888,7 +1701,6 @@ MVP is accepted when all criteria below are met.
 
 - User can export symbolized PNG.
 - User can export symbolized JPG/JPEG.
-- Settings Reset loads existing defaults into the draft only; it does not save or publish application-wide preferences. Accent preview rolls back and the draft is discarded on Cancel/Escape/close. Save & Close uses the normal persistence path, and failed Save retains truthful guidance. Application-data and logs paths are read-only, selectable, keyboard-copyable fields with full accessible values.
 - PNG is the default image export format. The persisted Settings preference initializes the native Save dialog; choosing a per-export format or cancelling never changes that preference. The dialog offers only PNG (*.png) and JPEG (*.jpg;*.jpeg); its accepted filter controls the encoder and extension normalization before source/conflict checks and the existing single overwrite confirmation.
 - Selected output resolution is respected.
 - Selected symbol polarity is respected and matches the symbolized preview.
@@ -1962,7 +1774,7 @@ MVP is accepted when all criteria below are met.
 - Original and Symbolized remain the canonical review tabs in their current location above the preview surface.
 - A completed image automatically opens in Symbolized and remains available for comparison with Original.
 - A completed video automatically opens in Symbolized and is playable through the in-app result player.
-- The processing panel remains after rendering and exposes result summary plus media-specific format, Export, and Open Folder actions; Render / Render Again remains solely in the preview-panel media action row.
+- The processing panel remains after rendering and exposes result summary plus Export, Open Folder and Copy path actions according to workflow availability. Image format selection belongs only to Save; Render / Render Again remains solely in the preview-panel media action row.
 - Render-affecting changes produce an explicit stale state, keep the old result reviewable, and disable export until rerender succeeds.
 - Image format and destination changes do not invalidate image rendering; video slider movement does not invalidate full-video rendering.
 - Only one current full-video artifact is retained for the active media session, and superseded or orphaned artifacts are cleaned safely.
@@ -1979,7 +1791,8 @@ MVP is accepted when all criteria below are met.
 - Default symbol polarity is persisted, safely defaults when missing, and is loaded into the draft by Reset to defaults, then applied through Save & Close.
 - Default image format is persisted.
 - Default audio mode is persisted.
-- Reset settings works.
+- Reset loads existing defaults into the draft only; it does not save or publish application-wide preferences. Accent preview rolls back and the draft is discarded on Cancel/Escape/close. Save & Close uses the normal persistence path, and failed Save retains the draft and truthful guidance for retry.
+- Application-data and logs paths are read-only, selectable, keyboard-copyable fields with full accessible values.
 
 ### 22.11 Privacy
 

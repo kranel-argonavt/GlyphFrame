@@ -2,7 +2,7 @@
 
 Consolidated on 2026-10-21 from the October 11–21 iteration records. This is a maintained change/verification summary, not a new test run or release sign-off. Historical observations apply only to their recorded builds and conditions.
 
-The [technical specification](GlyphFrame_Technical_Specification_v1.0.md#108-processing-and-result-panel) owns current behavior and geometry. [Phase 14](Phase_14_Coverage.md) owns broader coverage, and [Phase 15](Phase_15_Packaging.md) owns packaging rules, the latest recorded candidate and release gates. Do not use superseded iteration measurements as current requirements.
+The [technical specification](GlyphFrame_Technical_Specification_v1.0.md#108-processing-and-result-panel) owns current behavior and geometry. [Phase 14](Phase_14_Coverage.md) owns broader coverage and the consolidated release acceptance checklist; [Phase 15](Phase_15_Packaging.md) owns packaging rules, the latest recorded candidate and dated extracted-package outcomes. Do not use superseded iteration measurements as current requirements.
 
 ## Changes and superseded decisions
 
@@ -51,14 +51,7 @@ Native screenshots, WPF-rendered fixtures and user reports are distinct evidence
 
 Phase 13 UI is implemented with these follow-ups. Broader Phase 14 remains open; Phase 15A packaging is implemented; Phase 15B is partial/open; Phase 15C clean-Windows execution without separately installed .NET/FFmpeg is NOT TESTED.
 
-Before release acceptance:
-
-1. On the eventual committed-source package, verify actual minimum sizes and continuous resizing through measured status/action boundaries in both directions, including intermediate/compact layouts and constrained-height scroll reachability.
-2. Recheck Settings, About and notices with reliable keyboard focus: Escape, Reset dismissal routes, focus return, full path-copy round trip, and missing/unreadable notices/log-launch guidance.
-3. Exercise direct editing of all six accents, preview/rollback/Save/restart, larger OS text/DPI and constrained/multiple-monitor work areas. WPF pixel/geometry fixtures are not native certification.
-4. Complete the remaining theme/reduced-motion/keyboard matrix, representative progress labels and side-to-stacked Cancel, Copy failure and retained-error cases on current bytes.
-5. Finish existing Phase 15B playing-switch/rapid-race checks, human audibility, observable active artifact-publication cancellation, native playback-error/publication interaction and sustained image Rendering. Earlier focused passes do not close these gates.
-6. Rerun final validation after any further code/test cleanup, then verify a fresh package from the eventual clean committed revision. The identified Copy-feedback completion-order assumption has been corrected as recorded above. Perform Phase 15C separately; release/legal/publication decisions remain outside this documentation task.
+The [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist) is the single current worklist for native layouts, dialogs, theme/DPI, playback/audio, operation boundaries, committed-source packaging, clean Windows and portfolio/distribution readiness. It supersedes the duplicated worklist previously kept here, without changing the historical observations above. Commit `75aad73` now contains these UI refinements; no fresh package or additional acceptance is implied by that commit. The identified Copy-feedback completion-order assumption is resolved as recorded above, while unattributed historical Dispatcher-host risk is not relabeled as resolved.
 
 ## Evidence retention and repository policy
 
