@@ -1,12 +1,34 @@
 # Phase 15 — Windows x64 portable packaging and validation
 
-Current status (2026-10-22 documentation review): Phase 15A packaging is implemented; Phase 15B acceptance remains partial/open and Phase 15C clean-machine execution is NOT TESTED. UI changes and dated verification are consolidated in [UI refinement history](UI_Refinement_History.md); the original October 7/8 extracted-package findings below retain their attribution. Current outstanding work is tracked in the [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist).
+Current status (A1/A2 evidence recorded 2026-10-22): Phase 15A packaging and A2 committed-source/extracted-startup verification passed for clean `1ddbab1`; interactive Phase 15B acceptance remains partial/open and Phase 15C clean-machine execution is NOT TESTED. Earlier UI verification is consolidated in [UI refinement history](UI_Refinement_History.md); the original October 7/8 extracted-package findings below retain their attribution. Current outstanding work is tracked in the [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist).
 
-Implementation is now committed in `75aad73`. No package was rebuilt or native/clean-machine test performed by this documentation update. The candidate below retains its actual older provenance; a fresh package from the eventual clean committed revision is still required, not a renamed identity for this ZIP.
+The pre-image-navigation UI implementation is committed in `75aad73`, with aligned documentation in `1ddbab1`. The fresh A2 package below was actually built and independently extracted/launched from clean `1ddbab1` before recording these results. No native visual/media-workflow or clean-machine pass is inferred; the older candidate remains a separate historical identity.
 
 ## Latest recorded candidate
 
-This identifies the most recently generated local package, not a release or a package rebuilt by documentation cleanup.
+The latest provisional image-navigation correction is run **`fbd50cd47e264d57b0c515ec2ae6071e`**, Release/win-x64/self-contained 1.0.0, recorded under [image-navigation package provenance](#image-navigation-package-provenance). Its source parent is `1ddbab13f354914d7951aa81ed819a1ffc051aca` with **WorkingTreeDirty=true**; that commit does not contain these changes. It is separate from the clean A2 package below; startup/payload verification and interactive native acceptance have different scopes. Final committed-source packaging/retest remains necessary before release acceptance.
+
+## Recorded A2 committed-source candidate
+
+This identifies the October 22 A2 package, not a public release. Detailed local run IDs, absolute paths, process/session evidence and logs remain in ignored artifacts and are not dependencies of a public clone.
+
+| Field | Recorded value |
+| --- | --- |
+| Version / target | 1.0.0 / Release / win-x64 / self-contained / untrimmed folder publish |
+| Source commit | `1ddbab13f354914d7951aa81ed819a1ffc051aca`; clean working tree/index at build and extracted validation |
+| ZIP | `GlyphFrame-1.0.0-win-x64-portable.zip`, 148,737,136 bytes |
+| ZIP SHA-256 | `2fb83a3e3adf3ee3ff9d4a6041a14d98273ab7cb92f99561e7ba3d355b1f981b` |
+| A1 baseline | 1,177 tests passed, zero failures/skips; Release build zero warnings/errors; format/diff and 35 separate helper checks passed after retained environment retries |
+| Package checks | 11 publish structural/tool/startup/session checks; 416 staged/archive payload paths/lengths/hashes verified; PDBs excluded |
+| Independent extracted verification | 9 checks passed: actual ZIP checksum/archive recheck, all 416 extracted files, version/README, exact extracted EXE, responsive window/3-second observation, positively observed PID-bound exclusive lease, normal exit 0, exact session removal/zero remaining sessions, unchanged ZIP/extracted hashes and clean source |
+| Retention | ZIP/checksum, manifests/reports, fresh extracted folder and marked isolated data retained locally; no old run reused or broad cleanup |
+| Acceptance boundary | A2 PASS; native visual/media workflows A3–A7 and clean Windows A8 remain open; no publication or licensing sign-off |
+
+The application was launched with a hidden-window request only for bounded automated startup; no screenshot, audible playback, rendering/export interaction, resize or DPI acceptance is claimed. The verifier closed only its own process, without forced termination. Normal user-local preferences/logs/cache were not used. No failed product check occurred in A2. The recording changes to this document and the checklist were made afterward and do not relabel the package as built from a later documentation revision.
+
+### Historical October 21 candidate — superseded
+
+The previous latest-candidate record is retained below with its original source identity, hash, checks and limitations. It is not the October 22 A2 package.
 
 | Field | Recorded value |
 | --- | --- |
@@ -247,3 +269,17 @@ Final formatter verification and `git diff --check` exited **0**. One repeated s
 ## UI follow-ups — October 11–21
 
 The [consolidated UI history](UI_Refinement_History.md) replaces repeated per-iteration candidate summaries. It retains changes, superseded decisions, dated automated/native outcomes, failed attempts and open acceptance. Current layouts and dialog behavior are specified in the technical specification, not in historical shell-height tables. Full local handoffs and pre-consolidation Phase 14/15 snapshots remain in the ignored archive described by that history; they are not required in a clean clone.
+
+
+## Image navigation package provenance
+
+These historical provisionals were built from dirty trees based on `1ddbab13f354914d7951aa81ed819a1ffc051aca`; that parent commit does not contain their changes. None replaces clean A2 run `c5bee19a51c542728228225d06838a04` or its SHA-256 `2fb83a3e3adf3ee3ff9d4a6041a14d98273ab7cb92f99561e7ba3d355b1f981b`.
+
+| Run / scope | ZIP SHA-256 | Verification boundary |
+| --- | --- | --- |
+| October 22 first provisional `227a60121fed49e5a43c50448c4621ff` | `34e86d6a123e41bed7b985fd028d51d9441fdcf876bd432dfadbe3bcb0f19cd7` | Native drag exposed a routing defect; diagnostic history, not corrected acceptance. |
+| October 22 corrected toolbar `aefbca00a8b14f508cc4e263b0255ced` | `e7d38091ae68865e492fb75f032440ceef07faef74ae16352587cbeea40149ea` | 11 publish checks, 416 payloads; bounded extracted native image pan/buttons/Fit/tab/restore and basic video observations only. |
+| October 23 gesture-only/Fit-floor `f36d3fe8ab0545969ea10ad771535f48` | `73108e0222e453a5f9176dd39ac3f2ffd27d15d74f0b055c54ea4d1f45c6b459` | 11 publish checks, 416 payloads; changed bytes NOT natively accepted. Later audit reproduced swallowed ordinary wheel. |
+| October 23 routed-wheel correction `fbd50cd47e264d57b0c515ec2ae6071e` | `1124a8045b9411fc67afa1c97a6de7fbf93329c98e3265acacdfdcab62978521` | 11 publish checks, 416 payloads; independent extraction hashes/startup/normal close/session removal passed. Native Fit/no-toolbar and non-zoom ordinary wheel only; constrained outer fallback and Ctrl+wheel NOT TESTED. |
+
+The correction passed **1,212 full / 359 focused tests**, 35 separate packaging/session helper checks and Release/format/diff validation. Its package report preserves the actual dirty source status; final evidence-only documentation was completed after packaging. Package/probe/native reports stay under the local ignored `artifacts/image-navigation-correction-20261023-9e70/` and the package run directories. Historical image-navigation results and complete local archive identities are summarized in [UI history](UI_Refinement_History.md#image-navigation-october-22-23). Old package identities never imply these fixes, and their hashes were rechecked unchanged. Phase 15B remains partial/open; Phase 15C clean Windows remains NOT TESTED.

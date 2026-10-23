@@ -25,7 +25,7 @@ public sealed class Phase13UiTests
         Rect workArea = WindowWorkAreaPlacement.ConvertWorkArea(
             new Rect(1920, 0, 1920, 1152), new Matrix(1 / dpi, 0, 0, 1 / dpi, 0, 0));
         Rect main = WindowWorkAreaPlacement.CalculateBounds(workArea,
-            new Size(1280, 820), new Size(1024, 720));
+            new Size(1320, 820), new Size(1024, 720));
         Rect settings = WindowWorkAreaPlacement.CalculateBounds(workArea,
             new Size(720, 760), new Size(620, 620));
 
@@ -35,7 +35,7 @@ public sealed class Phase13UiTests
         Assert.True(settings.Width >= 620 && settings.Height >= 620);
         if (dpi == 1)
         {
-            Assert.Equal(1280, main.Width);
+            Assert.Equal(1320, main.Width);
             Assert.Equal(820, main.Height);
             Assert.Equal(720, settings.Width);
             Assert.Equal(760, settings.Height);

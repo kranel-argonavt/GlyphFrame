@@ -309,7 +309,7 @@ public sealed class ReviewSurfaceTests
                 viewport.PixelHeight = (vertical ? 800 : 100) * dpi.DpiScaleY;
                 viewport.ScaleMode = "100%";
                 window.UpdateLayout();
-                ScrollViewer scroll = Assert.IsType<ScrollViewer>(Assert.Single(viewport.Children.Cast<UIElement>()));
+                ScrollViewer scroll = Assert.IsAssignableFrom<ScrollViewer>(Assert.Single(viewport.Children.Cast<UIElement>()));
                 ScrollBar horizontalBar = Assert.IsType<ScrollBar>(scroll.Template.FindName("PART_HorizontalScrollBar", scroll));
                 ScrollBar verticalBar = Assert.IsType<ScrollBar>(scroll.Template.FindName("PART_VerticalScrollBar", scroll));
                 Assert.IsType<ScrollContentPresenter>(scroll.Template.FindName("PART_ScrollContentPresenter", scroll));
@@ -474,7 +474,7 @@ public sealed class ReviewSurfaceTests
             {
                 window.Show();
                 window.UpdateLayout();
-                ScrollViewer scroll = Assert.IsType<ScrollViewer>(Assert.Single(viewport.Children.Cast<UIElement>()));
+                ScrollViewer scroll = Assert.IsAssignableFrom<ScrollViewer>(Assert.Single(viewport.Children.Cast<UIElement>()));
                 Canvas canvas = Assert.IsType<Canvas>(scroll.Content);
                 Image media = Assert.IsType<Image>(Assert.Single(canvas.Children.Cast<UIElement>()));
                 Assert.True(viewport.ClipToBounds);
@@ -540,7 +540,7 @@ public sealed class ReviewSurfaceTests
             {
                 window.Show();
                 window.UpdateLayout();
-                ScrollViewer scroll = Assert.IsType<ScrollViewer>(Assert.Single(viewport.Children.Cast<UIElement>()));
+                ScrollViewer scroll = Assert.IsAssignableFrom<ScrollViewer>(Assert.Single(viewport.Children.Cast<UIElement>()));
                 Canvas canvas = Assert.IsType<Canvas>(scroll.Content);
                 Image image = Assert.IsType<Image>(Assert.Single(canvas.Children.Cast<UIElement>()));
                 int normalized = ((int)rotation % 360 + 360) % 360;
@@ -1004,6 +1004,12 @@ public sealed class ReviewSurfaceTests
         XElement media = Assert.Single(preview.Descendants(), e => e.Name.LocalName == "ReviewViewport");
         Assert.Equal("{Binding SelectedFitMode}", media.Attribute("ScaleMode")?.Value);
         Assert.Equal("{Binding CurrentPreviewPixelWidth}", media.Attribute("PixelWidth")?.Value);
+        Assert.Equal("{Binding CurrentImageFrame}", media.Attribute("ImageFrame")?.Value);
+        Assert.Equal("{Binding ImageNavigation}", media.Attribute("ImageNavigation")?.Value);
+        Assert.DoesNotContain(preview.Descendants(), e => e.Attributes().Any(a =>
+            a.Value.StartsWith("{Binding ImageNavigation.", StringComparison.Ordinal)));
+        Assert.DoesNotContain(preview.Descendants(), e => e.Name.LocalName == "ComboBox"
+            && e.Attributes().Any(a => a.Value == "Image review scale"));
     }
 
     [Fact]

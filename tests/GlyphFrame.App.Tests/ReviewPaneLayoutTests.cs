@@ -492,6 +492,9 @@ public sealed class ReviewPaneLayoutTests
 
     private sealed class TransitionData : Phase13UiTests.MainLayoutData, INotifyPropertyChanged
     {
+        public GlyphFrame.App.Presentation.ImageNavigationState ImageNavigation { get; } = new();
+        public GlyphFrame.App.Presentation.ImagePreviewFrame? CurrentImageFrame => !video && CurrentPreviewImageSource is { } source
+            ? new(source, CurrentPreviewPixelWidth, CurrentPreviewPixelHeight) : null;
         private readonly bool video;
         public TransitionData(bool isVideo, string scale) : base(isVideo)
         {

@@ -981,6 +981,11 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         && ResolveOutputResolution() == OutputResolution.SameAsSource
         && IsAbove1080p(ImageMetadata.DisplayWidth, ImageMetadata.DisplayHeight);
 
+    public ImageNavigationState ImageNavigation { get; } = new();
+
+    public ImagePreviewFrame? CurrentImageFrame => IsImageSelected && CurrentPreviewImageSource is { } source
+        ? new(source, CurrentPreviewPixelWidth, CurrentPreviewPixelHeight) : null;
+
     public ImageSource? OriginalImageSource => _originalImageSource;
 
     public ImageSource? SymbolizedImageSource => _symbolizedImageSource;
@@ -1254,6 +1259,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             {
                 OnPropertyChanged(nameof(IsOriginalPreviewSelected));
                 OnPropertyChanged(nameof(IsSymbolizedPreviewSelected));
+                OnPropertyChanged(nameof(CurrentImageFrame));
                 OnPropertyChanged(nameof(CurrentPreviewImageSource));
                 OnPropertyChanged(nameof(CurrentPreviewPixelWidth));
                 OnPropertyChanged(nameof(CurrentPreviewPixelHeight));
@@ -1470,6 +1476,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 return;
             }
 
+            ImageNavigation.ResetForMedia();
             _lastVideoExportPath = null;
             _lastVideoExportArtifactId = null;
             _mediaInputErrorPresentation = null;
@@ -3812,7 +3819,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
             nameof(InputStatusMessage), nameof(InputMetadataSummary), nameof(TimelineText),
             nameof(VideoFramePositionText),
             nameof(IsOriginalPreviewSelected), nameof(IsSymbolizedPreviewSelected),
-            nameof(ShowResolutionWarning), nameof(CurrentPreviewImageSource), nameof(CurrentPreviewPixelWidth), nameof(CurrentPreviewPixelHeight),
+            nameof(CurrentImageFrame), nameof(ShowResolutionWarning), nameof(CurrentPreviewImageSource), nameof(CurrentPreviewPixelWidth), nameof(CurrentPreviewPixelHeight),
             nameof(WorkflowStatus), nameof(ShowImageExportControls),
             nameof(IsProcessingResultPanelVisible), nameof(HasVideoArtifact), nameof(HasSymbolizedReview),
             nameof(VideoRenderActionLabel), nameof(ShowRenderedVideoPlayer),
@@ -3832,6 +3839,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
 
     private void NotifyImageProperties()
     {
+        OnPropertyChanged(nameof(CurrentImageFrame));
         OnPropertyChanged(nameof(ShowReadyToRender));
         OnPropertyChanged(nameof(OriginalImageSource));
         OnPropertyChanged(nameof(SymbolizedImageSource));

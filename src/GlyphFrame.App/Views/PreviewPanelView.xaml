@@ -68,7 +68,9 @@
                 </Border.Style>
 
                 <Grid Background="Transparent" ClipToBounds="True">
-                    <views:ReviewViewport Source="{Binding CurrentPreviewImageSource}"
+                    <views:ReviewViewport x:Name="ImageViewport" ImageFrame="{Binding CurrentImageFrame}"
+                                          ImageNavigation="{Binding ImageNavigation}"
+                                          Source="{Binding CurrentPreviewImageSource}"
                                           PixelWidth="{Binding CurrentPreviewPixelWidth}" PixelHeight="{Binding CurrentPreviewPixelHeight}"
                                           ScaleMode="{Binding SelectedFitMode}"
                                           Visibility="{Binding ShowImagePreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -348,11 +350,6 @@
                           ToolTip="Preview scaling" AutomationProperties.Name="Frame review scale" />
 
             </Grid>
-
-            <ComboBox Grid.Row="2" Width="90" Margin="14,6" HorizontalAlignment="Right"
-                      ItemsSource="{Binding FitModes}" SelectedItem="{Binding SelectedFitMode}"
-                      Visibility="{Binding IsImageSelected, Converter={StaticResource BooleanToVisibilityConverter}}"
-                      ToolTip="Review scale" AutomationProperties.Name="Image review scale" />
 
             <Border Grid.Row="3" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0"
                     Visibility="{Binding IsMediaSelected, Converter={StaticResource BooleanToVisibilityConverter}}">

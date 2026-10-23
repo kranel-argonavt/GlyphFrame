@@ -630,6 +630,8 @@ Warning:           #F59E0B
 
 ### 10.4 Main Window Layout
 
+The preferred startup window size is 1320×820 WPF DIPs, centered and reduced as needed by the existing monitor work-area placement policy. The supported minimum remains 1024×720 DIPs.
+
 ```text
 MainWindow
 |
@@ -706,7 +708,8 @@ Preview panel contains:
 - `Render Image` for images.
 - `Preview Frame` and `Render Video` for videos.
 - Video frame-position slider for videos only.
-- Fit / Fill / 100% selector. Continuous Original and Symbolized video players each own working fullscreen entry/exit; the static original-frame fallback does not expose a no-op fullscreen action.
+- Still images: Ctrl+wheel zoom and left-drag pan, without a scaling toolbar, percentage button, Fit button or image scaling dropdown. The removed toolbar reserves no height or margins.
+- Videos retain Fit / Fill / 100%, transport and fullscreen behavior. Continuous Original and Symbolized video players each own working fullscreen entry/exit; the static original-frame fallback does not expose a no-op fullscreen action.
 
 Preview panel behavior:
 
@@ -714,6 +717,10 @@ Preview panel behavior:
 - Original tab becomes available after media load.
 - Symbolized tab becomes available after an image render, video-frame preview, or full-video render succeeds, and is selected automatically for the new result.
 - Image mode never shows a separate preview command; `Render Image` produces the reusable full image result.
+- Still-image navigation is transient viewing state. Each successfully accepted replacement starts centered in Fit; cancelled/failed replacement preserves the accepted framing. Original/Symbolized and same-source rerenders preserve normalized center and relative-to-Fit magnification when raster dimensions change, clamping at image edges and zoom bounds. A viewport resize recomputes Fit in Fit mode; manual mode retains actual scale and a bounded center unless it falls below the new Fit, in which case the view returns to centered Fit.
+- Zoom uses multiplicative 1.25× steps. The lower bound is always the current complete-image Fit scale, including very small/extreme images; zooming out cannot make the image smaller than Fit. Reaching that bound centers both axes and re-enters Fit mode, so subsequent resizing follows Fit. The upper bound is the larger of 3200% and Fit (also retaining a larger current manual scale across resize/DPI). Internal scale remains based on physical-pixel magnification using the viewport's current per-monitor DPI.
+- Ctrl+wheel inside the image viewport zooms around the pointer. Left drag pans oversized images; each smaller axis stays centered, with offsets clamped on larger axes. Capture is released on mouse-up, Escape, lost capture, media/raster transition, hide and unload. Ordinary wheel never zooms: it pans oversized vertical content in the normal scroll direction where it can move, otherwise the same routed event bubbles to the enclosing pane. In ready-image mode the internal ScrollViewer bypasses its own wheel handling; no event is cloned or forwarded and only one scroll owner advances. Sub-micro-DIP boundary noise is not a meaningful pan. Legacy video callers retain native internal scrolling.
+- Image navigation transforms the existing visual, never decoding/resymbolizing, changing render dimensions/orientation/grid/identity/staleness, exporting, or saving preferences. State does not own raster references. Legacy video viewport callers retain their existing scaling/scroll behavior. Automated geometry/fixture checks do not establish native A3, mixed-DPI, clean-Windows or release acceptance.
 - Video mode presents `Preview Frame` as a secondary action before full-video artifact acceptance and `Render Video` as the primary action. Once an accepted full artifact has presentation priority, Preview Frame is hidden; showing a new symbolized frame would require a future explicit review-mode switch.
 - Before full-video render, Symbolized may show the latest frame preview. After full-video render, the completed video player takes priority.
 - Changing a render-affecting setting marks the relevant rendered result stale. A stale result remains reviewable, but export is disabled until Render Again succeeds.
@@ -1345,7 +1352,7 @@ Startup verification of the published folder is not interactive execution of the
 
 ### Current roadmap status — 2026-10-22
 
-This is an implementation/acceptance map for commit `75aad73`, not a claim that every target environment has passed. The detailed phases below retain their scoped historical outcomes; an earlier phase's representative pass does not certify later changes.
+The implementation baseline is commit `75aad73`; aligned revision `1ddbab1` subsequently passed A1 automation and A2 fresh portable/extracted-startup verification on October 22, as recorded in the [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist). This is not a claim that every target environment has passed. The detailed phases below retain their scoped historical outcomes; an earlier phase's representative pass does not certify later changes.
 
 | Phase | Current status | Remaining boundary |
 | --- | --- | --- |
@@ -1353,7 +1360,7 @@ This is an implementation/acceptance map for commit `75aad73`, not a claim that 
 | 2–12, including 11B | Core application, rendering/review/export, settings and error-handling workflows implemented | Historical representative checks do not replace current Phase 14/15 acceptance. |
 | 13 — UI Polish | Implemented, including October UI follow-ups | Current native resize, keyboard, theme and DPI matrix remains open. |
 | 14 — Testing | Automated coverage and selected native checks implemented; overall acceptance open | Complete the [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist). |
-| 15A — Packaging | Self-contained Windows x64 portable construction and structural verification implemented | Generate and verify a fresh candidate from the eventual clean committed revision. |
+| 15A — Packaging | Implemented; fresh A2 candidate verified from clean `1ddbab1` | Preserve that candidate's identity; regenerate and repeat affected checks if application/package bytes change. |
 | 15B — Extracted-package validation | Partial/open | Retest the fresh extracted package, including the outstanding native/audio/publication scenarios. |
 | 15C — Clean Windows | NOT TESTED | Execute without separately installed .NET/FFmpeg and record the actual OS/media environment. |
 | 16 — Portfolio Release | Not complete | Prepare public documentation, demo assets and architecture overview; resolve licensing/distribution decisions before release. |
@@ -1628,7 +1635,7 @@ The package verifier's application data now resides under unique marked `%TEMP%\
 ### Phase 15 - Packaging
 
 - **Phase 15A implemented:** reproducible self-contained Windows x64 folder publish, bundled runtime/native dependencies and FFmpeg, versioned portable ZIP/checksum, payload/archive verification and machine-readable provenance. Existing attribution preserved; public-distribution legal review remains separate.
-- **Phase 15B partial/open:** the October 7 committed-source native run found fullscreen/tab-position defects; subsequent corrective implementation and dated retests are recorded in `docs/Phase_15_Packaging.md`. Those historical outcomes do not establish acceptance of every current UI/native case. Commit `75aad73` now contains the UI changes, but a fresh package from the eventual clean committed revision and the current-candidate checklist are still required before sign-off. Do not relabel an older dirty-tree package as a package built from this commit.
+- **Phase 15B partial/open:** the October 7 committed-source native run found fullscreen/tab-position defects; subsequent corrective implementation and dated retests are recorded in `docs/Phase_15_Packaging.md`. A2 on October 22 verified a fresh portable and isolated extracted-EXE startup from clean `1ddbab1`, rather than relabeling an older dirty-tree package. That bounded automated startup does not establish interactive acceptance: A3–A7 and the current-candidate matrix remain required before sign-off.
 - **Phase 15C planned:** clean Windows execution without separately installed .NET/FFmpeg.
 
 ### Phase 16 - Portfolio Release
@@ -1809,3 +1816,8 @@ MVP is accepted when all criteria below are met.
 - `docs/design_reference/GlyphFrame_Design_Reference.png` exists.
 - Acceptance criteria are included.
 - Project name is updated to `GlyphFrame` in all project-created documentation.
+
+
+### Image navigation evidence
+
+Still-image viewing behavior is defined in section 10.6. The [UI history](UI_Refinement_History.md#image-navigation-october-22-23) distinguishes the former toolbar, gesture-only Fit floor and routed-wheel correction; [Phase 14](Phase_14_Coverage.md#image-navigation-current-coverage) tracks remaining native acceptance, and [Phase 15](Phase_15_Packaging.md#image-navigation-package-provenance) records package provenance. A1/A2 evidence remains attributable to clean revision `1ddbab1`; later feature validation does not retroactively extend that acceptance.

@@ -5718,6 +5718,7 @@ public sealed partial class MainWindowVideoPreviewTests
 
     private sealed class FakeImagePipelineService : IImagePipelineService
     {
+        public int DecodeCalls { get; private set; }
         public DecodedImage DecodeResult { get; set; } = SolidFrame(4, 5, 6);
 
         public DecodedImage? LastRenderedSource { get; private set; }
@@ -5734,7 +5735,11 @@ public sealed partial class MainWindowVideoPreviewTests
         public Task<DecodedImage> DecodeAsync(
             string inputPath,
             ImageOrientation orientation,
-            CancellationToken cancellationToken = default) => Task.FromResult(DecodeResult);
+            CancellationToken cancellationToken = default)
+        {
+            DecodeCalls++;
+            return Task.FromResult(DecodeResult);
+        }
 
         public Task<ImagePipelineResult> RenderAsync(
             DecodedImage source,

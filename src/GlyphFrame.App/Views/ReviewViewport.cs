@@ -6,7 +6,7 @@ using GlyphFrame.App.Presentation;
 namespace GlyphFrame.App.Views;
 
 /// <summary>A media-only viewport. Controls never inherit the media's scale.</summary>
-public sealed class ReviewViewport : Grid
+public sealed partial class ReviewViewport : Grid
 {
     public static readonly DependencyProperty SourceProperty = DependencyProperty.Register(nameof(Source), typeof(ImageSource), typeof(ReviewViewport), new PropertyMetadata(null, Changed));
     public static readonly DependencyProperty PixelWidthProperty = DependencyProperty.Register(nameof(PixelWidth), typeof(double), typeof(ReviewViewport), new PropertyMetadata(0d, Changed));
@@ -17,7 +17,19 @@ public sealed class ReviewViewport : Grid
     // centering at fractional device pixels from softening a natural-size image.
     private readonly Image _image = new() { Stretch = Stretch.Fill, UseLayoutRounding = true, SnapsToDevicePixels = true };
     private readonly Canvas _canvas = new();
-    private readonly ScrollViewer _scroll = new() { CanContentScroll = false, Focusable = true };
+    private readonly ReviewScrollViewer _scroll = new() { CanContentScroll = false, Focusable = true };
+
+    private sealed class ReviewScrollViewer : ScrollViewer
+    {
+        public bool UsesImageNavigation { get; set; }
+
+        protected override void OnMouseWheel(System.Windows.Input.MouseWheelEventArgs e)
+        {
+            // Keep the original route: image navigation handles this at the viewport,
+            // or lets its enclosing pane handle it. Legacy video keeps WPF scrolling.
+            if (!UsesImageNavigation) { base.OnMouseWheel(e); }
+        }
+    }
 
     public ReviewViewport()
     {
@@ -32,6 +44,7 @@ public sealed class ReviewViewport : Grid
         SizeChanged += (_, _) => Refresh();
         _scroll.ScrollChanged += (_, e) => { if (e.ViewportWidthChange != 0 || e.ViewportHeightChange != 0) Refresh(); };
         RenderOptions.SetBitmapScalingMode(_image, BitmapScalingMode.HighQuality);
+        InitializeImageNavigation();
     }
 
     public ImageSource? Source { get => (ImageSource?)GetValue(SourceProperty); set => SetValue(SourceProperty, value); }
@@ -52,6 +65,7 @@ public sealed class ReviewViewport : Grid
     private static void Changed(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((ReviewViewport)d).Refresh();
     private void Refresh()
     {
+        if (RefreshImageNavigation()) { return; }
         _image.Source = Source;
         bool natural = ScaleMode == "100%";
         _scroll.HorizontalScrollBarVisibility = natural ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
