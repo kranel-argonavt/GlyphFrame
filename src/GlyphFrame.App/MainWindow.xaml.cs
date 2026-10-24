@@ -14,6 +14,7 @@ public partial class MainWindow : Window
         {
             WindowsCaptionTheme.Apply(this);
             WindowWorkAreaPlacement.FitInitialBounds(this);
+            WindowState = WindowState.Maximized;
         };
     }
 }

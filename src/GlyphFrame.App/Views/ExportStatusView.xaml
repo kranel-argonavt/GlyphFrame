@@ -15,6 +15,13 @@
         <Style x:Key="StatusDescriptionStyle" TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
             <Setter Property="LineHeight" Value="16.8" /><Setter Property="TextTrimming" Value="None" />
         </Style>
+        <Style x:Key="OptionalStatusDescriptionStyle" TargetType="TextBlock" BasedOn="{StaticResource StatusDescriptionStyle}">
+            <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
+            <Style.Triggers>
+                <Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed" /></Trigger>
+                <Trigger Property="Text" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></Trigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="StatusLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
             <Setter Property="LineHeight" Value="15.4" /><Setter Property="TextTrimming" Value="None" /><Setter Property="TextWrapping" Value="Wrap" />
         </Style>
@@ -93,7 +100,7 @@
                         presentation:StatusContentTransition.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
                         presentation:StatusContentTransition.ContentKey="{Binding ExportOperationTitle}"
                         Visibility="{Binding IsExportStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <views:AdaptiveResultPanel Family="Working">
+                    <views:AdaptiveResultPanel x:Name="WorkingLayout" Family="Working">
 
                         <views:ExportActivityIndicator views:AdaptiveResultPanel.Role="Status" Width="54"
                                                        Height="54"
@@ -105,42 +112,31 @@
                                                        ShowPercentageText="True"
                                                        PercentageText="{Binding ExportPercentageText}" />
 
-                        <Grid views:AdaptiveResultPanel.Role="Text" VerticalAlignment="Center">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock TextWrapping="Wrap" Style="{StaticResource StatusTitleStyle}"
-                                       Text="{Binding ExportOperationTitle}" />
-                            <TextBlock Grid.Row="1"
-                                       Margin="0,3,0,0"
-                                       presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
-                                       presentation:ExportStatusAnimation.Stage="{Binding ExportStage}"
-                                       presentation:ExportStatusAnimation.StageText="{Binding ExportProgressText}"
-                                       TextWrapping="Wrap" Style="{StaticResource StatusDescriptionStyle}"
-                                       Text="" />
-                            <TextBlock Grid.Row="2"
-                                       Margin="0,12,0,0"
-                                       Style="{StaticResource StatusDescriptionStyle}"
-                                       TextWrapping="Wrap"
-                                       Text="{Binding ExportFrameText}" />
-                            <ProgressBar Grid.Row="3"
-                                         Margin="0,8,0,0"
+                        <StackPanel x:Name="WorkingBody" views:AdaptiveResultPanel.Role="Text" VerticalAlignment="Center">
+                            <views:StatusTextPairPanel x:Name="WorkingHeader">
+                                <TextBlock x:Name="WorkingTitle" TextWrapping="Wrap" Style="{StaticResource StatusTitleStyle}"
+                                           Text="{Binding ExportOperationTitle}" />
+                                <TextBlock x:Name="WorkingFrames" Style="{StaticResource OptionalStatusDescriptionStyle}"
+                                           TextWrapping="Wrap" Text="{Binding ExportFrameText}" />
+                            </views:StatusTextPairPanel>
+                            <ProgressBar x:Name="WorkingProgress"
+                                         Margin="0,5,0,0"
                                          Maximum="100"
                                          presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
                                          presentation:ExportStatusAnimation.ProgressGeneration="{Binding ExportPresentationGeneration}"
                                          presentation:ExportStatusAnimation.ProgressIsIndeterminate="{Binding IsExportProgressIndeterminate}"
                                          presentation:ExportStatusAnimation.ProgressStage="{Binding ExportStage}"
                                          presentation:ExportStatusAnimation.ProgressValue="{Binding ExportProgress}" />
-                                                        <Grid Grid.Row="4" Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
-                                <TextBlock Style="{StaticResource StatusDescriptionStyle}" TextWrapping="Wrap" Text="{Binding ElapsedText}" />
-                                <TextBlock Grid.Column="1" Margin="12,0,0,0" HorizontalAlignment="Right" Style="{StaticResource StatusDescriptionStyle}" TextWrapping="Wrap" Text="{Binding RemainingText}" />
-                            </Grid>
-                        </Grid>
+                            <views:StatusTextPairPanel x:Name="WorkingFooter" Margin="0,5,0,0" WrapLeadingText="True">
+                                <TextBlock x:Name="WorkingStage"
+                                           presentation:ExportStatusAnimation.AnimationsEnabled="{Binding AreExportAnimationsEnabled}"
+                                           presentation:ExportStatusAnimation.Stage="{Binding ExportStage}"
+                                           presentation:ExportStatusAnimation.StageText="{Binding ExportProgressText}"
+                                           TextWrapping="Wrap" Style="{StaticResource StatusDescriptionStyle}" Text="" />
+                                <TextBlock x:Name="WorkingRemaining" Style="{StaticResource OptionalStatusDescriptionStyle}"
+                                           TextWrapping="Wrap" Text="{Binding RemainingText}" />
+                            </views:StatusTextPairPanel>
+                        </StackPanel>
 
                         <Button views:AdaptiveResultPanel.Role="Actions"
                                 Width="108"
@@ -186,15 +182,8 @@
                                   StrokeThickness="3"
                                   Stretch="Fill"
                                   Visibility="{Binding IsImageResultSuccess, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <Path Width="22"
-                                  Height="20"
-                                  Stretch="Uniform"
-                                  HorizontalAlignment="Center"
-                                  VerticalAlignment="Center"
-                                  Data="{StaticResource WarningIcon}"
-                                  Stroke="{StaticResource WarningBrush}"
-                                  StrokeEndLineCap="Round"
-                                  StrokeThickness="3"
+                            <Path Data="{StaticResource WarningIcon}"
+                                  Style="{StaticResource ResultWarningIconStyle}"
                                   Visibility="{Binding IsImageResultWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             <Path Width="20"
                                   Height="20"
@@ -329,15 +318,8 @@
                                   StrokeThickness="3"
                                   Stretch="Fill"
                                   Visibility="{Binding IsVideoResultSuccess, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <Path Width="22"
-                                  Height="20"
-                                  Stretch="Uniform"
-                                  HorizontalAlignment="Center"
-                                  VerticalAlignment="Center"
-                                  Data="{StaticResource WarningIcon}"
-                                  Stroke="{StaticResource WarningBrush}"
-                                  StrokeEndLineCap="Round"
-                                  StrokeThickness="3"
+                            <Path Data="{StaticResource WarningIcon}"
+                                  Style="{StaticResource ResultWarningIconStyle}"
                                   Visibility="{Binding IsVideoResultWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             <Path Width="20"
                                   Height="20"

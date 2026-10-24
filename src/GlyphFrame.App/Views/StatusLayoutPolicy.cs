@@ -11,6 +11,9 @@ public static class StatusLayoutPolicy
 {
     public const double Badge = 42, BadgeGap = 12;
     public const double WorkingIndicator = 54, PracticalResultTextWidth = 180;
+    // A floor, not a fixed height: compact progress and spacious results share
+    // the working badge's footprint; wrapped content can still grow naturally.
+    public const double SingleRowMinimumHeight = WorkingIndicator;
     public const double GroupGap = 16, RowGap = 12, CardGap = 12;
     public const double VideoCompactWidth = 360, ImageCompactWidth = 296;
     public const double ActionWidth = 252;

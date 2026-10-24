@@ -794,7 +794,12 @@ public sealed class ReviewSurfaceTests
                 Assert.True(textBounds.Bottom <= metricsBounds.Top + 0.1);
                 if (layout.LayoutMode == StatusLayoutMode.Below) { Assert.True(metricsBounds.Bottom < actionBounds.Top); }
                 else { Assert.True(metricsBounds.Right <= actionBounds.Left + 0.1); }
-                if (!exported && layout.LayoutMode == StatusLayoutMode.CompactWide) { Assert.True(Math.Abs(CenterY(metricsBounds) - CenterY(actionBounds)) <= 0.1); }
+                if (!exported && layout.LayoutMode == StatusLayoutMode.CompactWide)
+                {
+                    FrameworkElement badge = layout.Children.Cast<FrameworkElement>().Single(e => AdaptiveResultPanel.GetRole(e) == AdaptiveResultPanelRole.Status);
+                    Rect left = BoundsWithin(badge, layout); left.Union(textBounds); left.Union(metricsBounds);
+                    Assert.True(Math.Abs(CenterY(left) - CenterY(actionBounds)) <= 0.1);
+                }
             }
 
             for (int index = 1; index < metricCards.Length; index++)

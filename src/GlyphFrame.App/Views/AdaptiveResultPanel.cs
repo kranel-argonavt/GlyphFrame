@@ -129,7 +129,6 @@ public sealed class AdaptiveResultPanel : Panel
         }
         else
         {
-            double header = Header(origin, 0, contentWidth);
             bool beside = Family == StatusLayoutFamily.Result && actions is not null && LayoutMode == StatusLayoutMode.CompactWide;
             if (beside)
             {
@@ -137,15 +136,18 @@ public sealed class AdaptiveResultPanel : Panel
                 // published result keeps its distinct paired/rail compositions.
                 actionWidth = Math.Clamp(contentWidth - metricMinimum - Gap, standaloneMinimum, actionWidth);
             }
-            Measure(metrics, beside ? contentWidth - actionWidth - Gap : contentWidth);
+            double leftWidth = beside ? contentWidth - actionWidth - Gap : contentWidth;
+            double header = Header(origin, 0, leftWidth);
+            Measure(metrics, leftWidth);
             double row = metrics is null ? header : header + RowGap;
             if (beside)
             {
                 Measure(actions, actionWidth);
-                double rowHeight = Math.Max(H(metrics), H(actions));
-                Slot(metrics, origin, row + (rowHeight - H(metrics)) / 2, W(metrics), H(metrics));
-                Slot(actions, origin + contentWidth - actionWidth, row + (rowHeight - H(actions)) / 2, actionWidth, H(actions));
-                height = row + rowHeight;
+                double leftHeight = metrics is null ? header : row + H(metrics);
+                Slot(metrics, origin, row, W(metrics), H(metrics));
+                height = Math.Max(leftHeight, H(actions));
+                OffsetContent((height - leftHeight) / 2);
+                Slot(actions, origin + contentWidth - actionWidth, (height - H(actions)) / 2, actionWidth, H(actions));
             }
             else
             {
@@ -159,6 +161,12 @@ public sealed class AdaptiveResultPanel : Panel
                     height += RowGap + H(actions);
                 }
             }
+        }
+        if (LayoutMode == StatusLayoutMode.Spacious || Family == StatusLayoutFamily.Working && LayoutMode == StatusLayoutMode.CompactWide)
+        {
+            double sharedHeight = Math.Max(height, StatusLayoutPolicy.SingleRowMinimumHeight);
+            OffsetContent((sharedHeight - height) / 2);
+            height = sharedHeight;
         }
         return new Size(width, height);
 

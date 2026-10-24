@@ -70,7 +70,7 @@ public sealed class StatusPanelLayoutTests
                         Close(CenterY(header), CenterY(m)); Close(CenterY(m), CenterY(a));
                         Close(16, m.Left - header.Right); Close(16, a.Left - m.Right);
                         Assert.True(text.ActualWidth >= 180);
-                        Close(Math.Max(header.Height, Math.Max(m.Height, a.Height)), panel.ActualHeight);
+                        Close(Math.Max(StatusLayoutPolicy.SingleRowMinimumHeight, Math.Max(header.Height, Math.Max(m.Height, a.Height))), panel.ActualHeight);
                     }
                     else { Assert.True(t.Bottom <= m.Top - 11.9); }
                     if (panel.LayoutMode == StatusLayoutMode.Narrow)
@@ -95,7 +95,8 @@ public sealed class StatusPanelLayoutTests
                         else { Assert.InRange(a.Width, 150, 252); }
                         if (panel.LayoutMode != StatusLayoutMode.Spacious && (state == "Ready" || state == "Stale"))
                         {
-                            if (panel.LayoutMode == StatusLayoutMode.CompactWide) { Close(m.Top + m.Height / 2, a.Top + a.Height / 2); }
+                            if (panel.LayoutMode == StatusLayoutMode.CompactWide)
+                            { Rect left = Bounds(badge, panel); left.Union(t); left.Union(m); Close(CenterY(left), CenterY(a)); }
                             else { Close(12, a.Top - m.Bottom); Close(panel.ActualWidth, a.Right); }
                         }
                     }
@@ -127,7 +128,7 @@ public sealed class StatusPanelLayoutTests
                         // With no format control, the text uses the whole header
                         // budget, right up to the next group or the shared edge.
                         double right = panel.LayoutMode == StatusLayoutMode.Spacious ? m.Left - 16
-                            : panel.LayoutMode == StatusLayoutMode.Intermediate || (model.CanOpenExportFolder && panel.LayoutMode == StatusLayoutMode.CompactWide) ? a.Left - 16
+                            : panel.LayoutMode is StatusLayoutMode.Intermediate or StatusLayoutMode.CompactWide ? a.Left - 16
                             : panel.LayoutMode == StatusLayoutMode.Narrow ? m.Right : panel.ActualWidth;
                         Close(right, t.Right);
                     }
@@ -365,7 +366,10 @@ public sealed class StatusPanelLayoutTests
                 {
                     Assert.Equal(StatusLayoutMode.CompactWide, panel.LayoutMode);
                     Close(Math.Min(252, width - 34 - metrics.MinimumRowWidth - 16), a.Width);
-                    Assert.InRange(a.Width, 150, 252); Close(CenterY(m), CenterY(a));
+                    Assert.InRange(a.Width, 150, 252);
+                    Rect left = Bounds(panel.Children.Cast<FrameworkElement>().Single(e => AdaptiveResultPanel.GetRole(e) == AdaptiveResultPanelRole.Status), panel);
+                    left.Union(Bounds(panel.Children.Cast<FrameworkElement>().Single(e => AdaptiveResultPanel.GetRole(e) == AdaptiveResultPanelRole.Text), panel));
+                    left.Union(m); Close(CenterY(left), CenterY(a));
                     Assert.True(a.Left - m.Right >= 15.9);
                 }
                 else { Assert.Contains(panel.LayoutMode, new[] { StatusLayoutMode.Below, StatusLayoutMode.Narrow }); Assert.True(a.Top >= m.Bottom + 11.9); }
@@ -404,6 +408,137 @@ public sealed class StatusPanelLayoutTests
             foreach (TextBlock label in Elements<TextBlock>(primary)) { Contained(label, primary); }
             string? folder = Environment.GetEnvironmentVariable("GLYPHFRAME_STATUS_LAYOUT_EVIDENCE");
             if (folder is not null) { File.WriteAllText(Path.Combine(folder, $"standalone-sizing-{video}.json"), System.Text.Json.JsonSerializer.Serialize(measurements, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })); }
+        }
+        finally { host.Close(); }
+    });
+
+    [Theory]
+    [InlineData(false, "Cancelled")]
+    [InlineData(true, "Cancelled")]
+    [InlineData(false, "Stale")]
+    [InlineData(true, "Stale")]
+    public void ResultWarning_UsesSharedOutlineStyleAndSemanticColor(bool video, string state) => Sta(() =>
+    {
+        UserControl view = ReviewSurfaceTests.LoadExportStatusViewForLayout();
+        using Model model = new(video) { State = state }; view.DataContext = model;
+        Window host = Host(view);
+        try
+        {
+            host.Show(); Layout(view, host, 612);
+            AdaptiveResultPanel panel = (AdaptiveResultPanel)view.FindName(video ? "VideoResultLayout" : "ImageResultLayout");
+            FrameworkElement badge = panel.Children.Cast<FrameworkElement>().Single(e => AdaptiveResultPanel.GetRole(e) == AdaptiveResultPanelRole.Status);
+            System.Windows.Shapes.Path warning = Elements<System.Windows.Shapes.Path>(badge).Single(p => p.IsVisible);
+            Assert.Same(view.FindResource("ResultWarningIconStyle"), warning.Style);
+            Assert.Same(view.FindResource("VectorIconStyle"), warning.Style.BasedOn);
+            Assert.Same(view.FindResource("WarningIcon"), warning.Data);
+            Assert.Same(view.FindResource("WarningBrush"), warning.Stroke);
+            Assert.Equal(DependencyProperty.UnsetValue, warning.ReadLocalValue(System.Windows.Shapes.Shape.StrokeThicknessProperty));
+            Close(1.6, warning.StrokeThickness);
+            Assert.Equal(PenLineCap.Round, warning.StrokeStartLineCap); Assert.Equal(PenLineCap.Round, warning.StrokeEndLineCap);
+            Assert.Equal(PenLineJoin.Round, warning.StrokeLineJoin); Assert.Equal(Stretch.Uniform, warning.Stretch);
+            Close(22, warning.Width); Close(20, warning.Height);
+            // Uniform stretch uses the height-limited geometry and its outline;
+            // the actual ink/control width need not fill the requested 22 DIPs.
+            double uniformWidth = warning.Data.Bounds.Width * (warning.Height - warning.StrokeThickness) / warning.Data.Bounds.Height + warning.StrokeThickness;
+            Close(uniformWidth, warning.ActualWidth); Close(20, warning.ActualHeight);
+            Close(42, badge.ActualWidth); Close(42, badge.ActualHeight);
+            Rect bounds = Bounds(warning, badge); Close(21, bounds.Left + bounds.Width / 2);
+            // A centered rectangular Path slot does not optically center a triangle.
+            // Its circumcenter is equidistant from all three vertices; map that
+            // point through the real WPF geometry and visual transforms.
+            Point top = new(12, 2), bottom = new(22, 21);
+            double circumcenterY = (bottom.X - top.X) * (bottom.X - top.X) / (2 * (bottom.Y - top.Y)) + (bottom.Y + top.Y) / 2;
+            Point opticalCenter = warning.TransformToAncestor(badge).Transform(warning.GeometryTransform.Transform(new Point(12, circumcenterY)));
+            Close(21, opticalCenter.X); Close(21, opticalCenter.Y);
+            Pen outline = new(warning.Stroke, warning.StrokeThickness) { StartLineCap = warning.StrokeStartLineCap, EndLineCap = warning.StrokeEndLineCap, LineJoin = warning.StrokeLineJoin };
+            Rect ink = warning.RenderedGeometry.GetRenderBounds(outline);
+            Rect badgeInk = warning.TransformToAncestor(badge).TransformBounds(ink);
+            Assert.True(new Rect(0, 0, 42, 42).Contains(badgeInk));
+            Assert.Equal(view.FindResource("WarningIcon").ToString(), warning.Data.ToString());
+            Contained(warning, badge);
+            // Render the populated badge at 120 DPI: offscreen 125% fixture,
+            // explicitly separate from a native per-monitor visual check.
+            string? folder = Environment.GetEnvironmentVariable("GLYPHFRAME_STATUS_LAYOUT_EVIDENCE");
+            if (folder is not null)
+            {
+                File.WriteAllText(Path.Combine(folder, $"warning-bounds-{video}-{state}.txt"), $"Control: {bounds}\nInk: {ink}\nBadge ink: {badgeInk}\nOptical center: {opticalCenter}");
+                DrawingVisual visual = new();
+                using (DrawingContext dc = visual.RenderOpen()) { dc.DrawRectangle(new VisualBrush(badge), null, new Rect(0, 0, 42, 42)); }
+                RenderTargetBitmap bitmap = new(53, 53, 120, 120, PixelFormats.Pbgra32); bitmap.Render(visual);
+                PngBitmapEncoder encoder = new(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                using FileStream stream = File.Create(Path.Combine(folder, $"warning-125-{video}-{state}.png")); encoder.Save(stream);
+            }
+            model.State = "Ready"; model.Notify(); Layout(view, host, 612); Assert.False(warning.IsVisible);
+        }
+        finally { host.Close(); }
+    });
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void StandaloneExport_CentersAgainstCompleteLeftCompositionAcrossTransitions(bool video, bool wrapped, bool tallerAction) => Sta(() =>
+    {
+        UserControl view = ReviewSurfaceTests.LoadExportStatusViewForLayout();
+        using Model model = new(video) { State = "Ready", Long = wrapped }; view.DataContext = model;
+        Window host = Host(view);
+        try
+        {
+            host.Show(); Layout(view, host, 1100);
+            MetricCardsPanel metrics = (MetricCardsPanel)view.FindName(video ? "VideoResultMetrics" : "ImageResultMetrics");
+            ExportActionsPanel actions = (ExportActionsPanel)view.FindName(video ? "VideoResultActions" : "ImageResultActions");
+            AdaptiveResultPanel panel = (AdaptiveResultPanel)actions.Parent;
+            FrameworkElement badge = panel.Children.Cast<FrameworkElement>().Single(e => AdaptiveResultPanel.GetRole(e) == AdaptiveResultPanelRole.Status);
+            FrameworkElement text = panel.Children.Cast<FrameworkElement>().Single(e => AdaptiveResultPanel.GetRole(e) == AdaptiveResultPanelRole.Text);
+            Button primary = (Button)view.FindName(video ? "VideoExportButton" : "ImageExportButton");
+            double boundary = metrics.MinimumRowWidth + 16 + actions.MinimumStandaloneWidth + 34;
+            Layout(view, host, boundary);
+            if (tallerAction) { primary.Height = Bounds(metrics, panel).Bottom + 64; Layout(view, host, boundary); }
+            // Locate the populated wide/spacious transition, rather than forcing
+            // a mode or copying a hypothetical maximum-content breakpoint.
+            double low = boundary, high = 1400;
+            Layout(view, host, high); Assert.Equal(StatusLayoutMode.Spacious, panel.LayoutMode);
+            while (high - low > 0.25)
+            {
+                double mid = (low + high) / 2; Layout(view, host, mid);
+                if (panel.LayoutMode == StatusLayoutMode.Spacious) { high = mid; } else { low = mid; }
+            }
+            double[] widths = [high + 1, high, low, boundary + 103, boundary + 1, boundary, boundary - 1, 320];
+            bool sawWrapped = false, sawTaller = false;
+            List<object> measurements = [];
+            foreach (double width in widths.Concat(widths.Reverse()))
+            {
+                Layout(view, host, width);
+                Rect header = Bounds(badge, panel); header.Union(Bounds(text, panel));
+                Rect m = Bounds(metrics, panel), a = Bounds(actions, panel), left = header; left.Union(m);
+                measurements.Add(new { Width = width, Mode = panel.LayoutMode.ToString(), Header = header.ToString(), Metrics = m.ToString(), Actions = a.ToString() });
+                foreach (FrameworkElement element in new FrameworkElement[] { badge, text, metrics, actions }) { Contained(element, panel); }
+                Assert.False(actions.HasSecondaryActions); Close(primary.ActualHeight, actions.ActualHeight);
+                foreach (TextBlock label in Elements<TextBlock>(primary)) { Contained(label, primary); }
+                if (panel.LayoutMode == StatusLayoutMode.CompactWide)
+                {
+                    Close(12, m.Top - header.Bottom);
+                    Close(CenterY(left), CenterY(a));
+                    Close(Math.Max(left.Height, a.Height), panel.ActualHeight);
+                    Assert.True(header.Right <= a.Left - 15.9 && m.Right <= a.Left - 15.9);
+                    Assert.InRange(a.Width, actions.MinimumStandaloneWidth, actions.PreferredWidth);
+                    sawWrapped |= text.ActualHeight > 42;
+                    if (a.Height > left.Height) { sawTaller = true; Assert.True(left.Top > 0); Close(0, a.Top); }
+                    else { Close(0, left.Top); }
+                }
+                else if (panel.LayoutMode == StatusLayoutMode.Spacious)
+                { Close(CenterY(header), CenterY(m)); Close(CenterY(m), CenterY(a)); Assert.True(header.Right <= m.Left - 15.9 && m.Right <= a.Left - 15.9); }
+                else { Close(12, a.Top - m.Bottom); }
+            }
+            if (wrapped) { Assert.True(sawWrapped); }
+            if (tallerAction) { Assert.True(sawTaller); }
+            string? folder = Environment.GetEnvironmentVariable("GLYPHFRAME_STATUS_LAYOUT_EVIDENCE");
+            if (folder is not null) { File.WriteAllText(Path.Combine(folder, $"whole-status-center-{video}-{wrapped}-{tallerAction}.json"), System.Text.Json.JsonSerializer.Serialize(measurements)); }
         }
         finally { host.Close(); }
     });
@@ -525,6 +660,277 @@ public sealed class StatusPanelLayoutTests
         finally { host.Close(); }
     });
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompactProgress_PutsFramesInHeaderAndStageBelowBarWithoutElapsed(bool video) => Sta(() =>
+    {
+        UserControl view = ReviewSurfaceTests.LoadExportStatusViewForLayout();
+        using Model model = new(video) { State = "Rendering" }; view.DataContext = model;
+        Window host = Host(view);
+        try
+        {
+            host.Show();
+            foreach (double width in new[] { 1100d, 900, 736, 612, 480, 320, 480, 736, 1100 })
+            {
+                Layout(view, host, width);
+                AdaptiveResultPanel panel = (AdaptiveResultPanel)view.FindName("WorkingLayout");
+                TextBlock title = (TextBlock)view.FindName("WorkingTitle"), frames = (TextBlock)view.FindName("WorkingFrames");
+                TextBlock stage = (TextBlock)view.FindName("WorkingStage"), remaining = (TextBlock)view.FindName("WorkingRemaining");
+                ProgressBar progress = (ProgressBar)view.FindName("WorkingProgress");
+                Rect t = Bounds(title, panel), f = Bounds(frames, panel), p = Bounds(progress, panel), s = Bounds(stage, panel), r = Bounds(remaining, panel);
+                Assert.Equal(model.ExportProgressText, stage.Text); Assert.Equal(model.ExportFrameText, frames.Text); Assert.Equal(model.RemainingText, remaining.Text);
+                Assert.DoesNotContain(Elements<TextBlock>(panel), field => field.Text.StartsWith("Elapsed", StringComparison.Ordinal));
+                Assert.True(t.Bottom <= p.Top && f.Bottom <= p.Top && p.Bottom < s.Top && p.Bottom < r.Top);
+                foreach (FrameworkElement field in new FrameworkElement[] { title, frames, progress, stage, remaining }) { Contained(field, panel); }
+                if (width == 1100)
+                {
+                    Close(CenterY(t), CenterY(f)); Close(CenterY(s), CenterY(r));
+                    Assert.True(t.Right + 11.9 <= f.Left && s.Right + 11.9 <= r.Left);
+                    Close(StatusLayoutPolicy.SingleRowMinimumHeight, panel.ActualHeight);
+                }
+                Capture(view, panel, video, "CompactRendering", width);
+            }
+        }
+        finally { host.Close(); }
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SpaciousRenderCommitCompletionAndReady_ShareHeightAndPreviewAllocation(bool video) => Sta(() =>
+    {
+        UserControl view = ReviewSurfaceTests.LoadExportStatusViewForLayout();
+        using Model model = new(video) { State = "Rendering" }; view.DataContext = model;
+        Border preview = new() { MinHeight = 120 };
+        ReviewPanePanel pane = new() { ViewportHeight = 600, ReserveStatusSpace = true };
+        pane.Children.Add(preview); pane.Children.Add(view);
+        Window host = new() { Content = pane, Width = 1120, SizeToContent = SizeToContent.Height, Left = -10000, ShowActivated = false };
+        try
+        {
+            host.Show();
+            foreach (double width in new[] { 1100d, 1000, 1100 })
+            {
+                pane.Width = width;
+                double? statusHeight = null, previewHeight = null;
+                foreach (string state in new[] { "Rendering", "Committing", "Completing", "Ready", "Rendering", "Ready" })
+                {
+                    model.State = state; model.Notify(); host.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle); host.UpdateLayout();
+                    statusHeight ??= view.ActualHeight; previewHeight ??= preview.ActualHeight;
+                    Close(statusHeight.Value, view.ActualHeight); Close(previewHeight.Value, preview.ActualHeight);
+                    if (state == "Ready")
+                    {
+                        AdaptiveResultPanel result = (AdaptiveResultPanel)view.FindName(video ? "VideoResultLayout" : "ImageResultLayout");
+                        Assert.Equal(StatusLayoutMode.Spacious, result.LayoutMode);
+                        Close(StatusLayoutPolicy.SingleRowMinimumHeight + 34, view.ActualHeight);
+                    }
+                    else
+                    {
+                        AdaptiveResultPanel work = (AdaptiveResultPanel)view.FindName("WorkingLayout");
+                        TextBlock stage = (TextBlock)view.FindName("WorkingStage");
+                        Assert.Equal(model.ExportProgressText, stage.Text);
+                        Button cancel = Elements<Button>(work).Single();
+                        Assert.Equal(state != "Completing", cancel.IsVisible);
+                        Assert.Equal(state == "Rendering", cancel.IsEnabled);
+                        if (state == "Committing") { Assert.Contains("cannot cancel", stage.Text); }
+                    }
+                    Capture(view, (AdaptiveResultPanel)view.FindName(state == "Ready" ? video ? "VideoResultLayout" : "ImageResultLayout" : "WorkingLayout"), video, "Transition" + state, width);
+                }
+            }
+        }
+        finally { host.Close(); }
+    });
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void CompactProgress_LongOrEnlargedGuidanceGrowsAndOptionalFieldsLeaveNoEmptyRows(bool video, bool enlarged) => Sta(() =>
+    {
+        UserControl view = ReviewSurfaceTests.LoadExportStatusViewForLayout();
+        using Model model = new(video) { State = "Committing", Long = true }; view.DataContext = model;
+        Window host = Host(view);
+        try
+        {
+            host.Show();
+            AdaptiveResultPanel panel = (AdaptiveResultPanel)view.FindName("WorkingLayout");
+            TextBlock stage = (TextBlock)view.FindName("WorkingStage"), frames = (TextBlock)view.FindName("WorkingFrames"), remaining = (TextBlock)view.FindName("WorkingRemaining");
+            if (enlarged) { stage.FontSize = 24; frames.FontSize = 24; remaining.FontSize = 24; }
+            foreach (double width in new[] { 1100d, 612, 480, 320, 612, 1100 })
+            {
+                Layout(view, host, width);
+                Assert.True(stage.ActualHeight > 16.8); Assert.True(view.ActualHeight > StatusLayoutPolicy.SingleRowMinimumHeight + 34);
+                Assert.Contains("cannot cancel", stage.Text); Assert.Equal(TextTrimming.None, stage.TextTrimming);
+                foreach (TextBlock field in Elements<TextBlock>(panel).Where(e => e.IsVisible)) { Contained(field, panel); }
+                model.EmptyFrame = true; model.Notify(); Layout(view, host, width);
+                Assert.Equal(Visibility.Collapsed, frames.Visibility); Assert.Equal(Visibility.Collapsed, remaining.Visibility);
+                StatusTextPairPanel header = (StatusTextPairPanel)view.FindName("WorkingHeader"), footer = (StatusTextPairPanel)view.FindName("WorkingFooter");
+                Close(((TextBlock)view.FindName("WorkingTitle")).ActualHeight, header.ActualHeight);
+                Close(stage.ActualHeight, footer.ActualHeight);
+                model.EmptyFrame = false; model.State = "Rendering"; model.Notify(); Layout(view, host, width);
+                Assert.True(frames.IsVisible && remaining.IsVisible);
+                model.State = "Committing"; model.Notify();
+            }
+        }
+        finally { host.Close(); }
+    });
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void WorkingFooter_WrapsStageInItsColumnAndKeepsRemainingOnFirstLine(bool video, bool enlarged) => Sta(() =>
+    {
+        UserControl view = ReviewSurfaceTests.LoadExportStatusViewForLayout();
+        using Model model = new(video) { State = "Rendering" }; view.DataContext = model;
+        Window host = Host(view);
+        try
+        {
+            host.Show(); Layout(view, host, 1400);
+            TextBlock stage = (TextBlock)view.FindName("WorkingStage"), remaining = (TextBlock)view.FindName("WorkingRemaining");
+            StatusTextPairPanel footer = (StatusTextPairPanel)view.FindName("WorkingFooter");
+            AdaptiveResultPanel panel = (AdaptiveResultPanel)view.FindName("WorkingLayout");
+            FrameworkElement body = (FrameworkElement)view.FindName("WorkingBody");
+            FrameworkElement indicator = panel.Children.Cast<FrameworkElement>().Single(e => AdaptiveResultPanel.GetRole(e) == AdaptiveResultPanelRole.Status);
+            Button cancel = Elements<Button>(panel).Single();
+            if (enlarged) { stage.FontSize = 24; remaining.FontSize = 24; }
+            stage.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            remaining.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            double naturalPair = stage.DesiredSize.Width + 12 + remaining.DesiredSize.Width;
+            double lineHeight = stage.DesiredSize.Height, timeHeight = remaining.DesiredSize.Height, timeWidth = remaining.DesiredSize.Width;
+            // Derive the component transition from its populated body and real
+            // text widths. Keep the existing Working composition/admission.
+            double chrome = 34 + StatusLayoutPolicy.WorkingIndicator + StatusLayoutPolicy.BadgeGap + StatusLayoutPolicy.GroupGap + cancel.Width;
+            double boundary = chrome + naturalPair;
+            stage.InvalidateMeasure(); remaining.InvalidateMeasure();
+            List<object> measurements = [];
+            foreach (string state in new[] { "Rendering", "Cancelling", "Exporting" })
+            {
+                model.State = state; model.Notify();
+                foreach (double width in new[] { boundary + 1, boundary - 1, boundary - 60, boundary - 1, boundary + 1, 480, 320, boundary - 60 })
+                {
+                    Layout(view, host, width);
+                    Rect s = Bounds(stage, footer), r = Bounds(remaining, footer);
+                    Close(0, s.Top); Close(footer.ActualWidth, r.Right);
+                    if (footer.ActualWidth >= footer.MinimumReadableLeadingWidth + timeWidth + 12)
+                    {
+                        Close(0, r.Top); Assert.True(s.Right + 11.9 <= r.Left);
+                        Close(timeHeight, remaining.ActualHeight);
+                        Close(Math.Max(stage.ActualHeight, remaining.ActualHeight), footer.ActualHeight);
+                    }
+                    else
+                    {
+                        // Stack before the guidance loses a readable column,
+                        // including when the estimate alone exceeds the body.
+                        Close(4, r.Top - s.Bottom); Close(r.Bottom, footer.ActualHeight);
+                    }
+                    if (width == boundary - 60) { Assert.True(stage.ActualHeight > lineHeight); }
+                    if (width == boundary + 1) { Close(lineHeight, stage.ActualHeight); }
+                    Close(CenterY(Bounds(body, panel)), CenterY(Bounds(indicator, panel)));
+                    if (panel.LayoutMode == StatusLayoutMode.CompactWide) { Close(CenterY(Bounds(body, panel)), CenterY(Bounds(cancel, panel))); }
+                    Contained(stage, footer); Contained(remaining, footer); Contained(cancel, panel);
+                    Assert.DoesNotContain(Elements<TextBlock>(panel), field => field.Text.StartsWith("Elapsed", StringComparison.Ordinal));
+                    Assert.Equal(state != "Cancelling", cancel.IsEnabled);
+                    measurements.Add(new { State = state, Width = width, Mode = panel.LayoutMode.ToString(), FooterWidth = footer.ActualWidth, Stage = s.ToString(), Remaining = r.ToString() });
+                    Capture(view, panel, video, $"StageWrap-{state}-{enlarged}", width);
+                }
+            }
+            string? directory = Environment.GetEnvironmentVariable("GLYPHFRAME_STATUS_LAYOUT_EVIDENCE");
+            if (directory is not null) { File.WriteAllText(Path.Combine(directory, $"stage-wrap-{video}-{enlarged}.json"), System.Text.Json.JsonSerializer.Serialize(measurements, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })); }
+        }
+        finally { host.Close(); }
+    });
+
+    [Theory]
+    [InlineData(false, 12)]
+    [InlineData(true, 12)]
+    [InlineData(false, 24)]
+    [InlineData(true, 24)]
+    public void WorkingFooter_ReadableFallbackPreservesWholeWorkingComposition(bool video, double fontSize) => Sta(() =>
+    {
+        UserControl view = ReviewSurfaceTests.LoadExportStatusViewForLayout();
+        using Model model = new(video) { State = "Rendering", Long = true }; view.DataContext = model;
+        Window host = Host(view);
+        try
+        {
+            host.Show(); Layout(view, host, 1600);
+            AdaptiveResultPanel panel = (AdaptiveResultPanel)view.FindName("WorkingLayout");
+            StatusTextPairPanel footer = (StatusTextPairPanel)view.FindName("WorkingFooter");
+            StatusTextPairPanel header = (StatusTextPairPanel)view.FindName("WorkingHeader");
+            TextBlock stage = (TextBlock)view.FindName("WorkingStage"), time = (TextBlock)view.FindName("WorkingRemaining");
+            FrameworkElement body = (FrameworkElement)view.FindName("WorkingBody");
+            FrameworkElement indicator = panel.Children.Cast<FrameworkElement>().Single(e => AdaptiveResultPanel.GetRole(e) == AdaptiveResultPanelRole.Status);
+            Button cancel = Elements<Button>(panel).Single();
+            Assert.True(footer.WrapLeadingText); Assert.False(header.WrapLeadingText);
+            List<object> measurements = [];
+            foreach (bool longTime in new[] { false, true })
+            {
+                model.LongRemaining = longTime; model.State = "Rendering"; model.Notify();
+                stage.FontSize = fontSize; time.FontSize = fontSize; Layout(view, host, 1600);
+                double rightWidth = time.ActualWidth;
+                double chrome = 34 + StatusLayoutPolicy.WorkingIndicator + StatusLayoutPolicy.BadgeGap + StatusLayoutPolicy.GroupGap + cancel.Width;
+                double boundary = chrome + footer.MinimumReadableLeadingWidth + 12 + rightWidth;
+                double oldBoundary = chrome + rightWidth + 12;
+                double[] widths = [boundary + 0.25, boundary, boundary - 0.25, oldBoundary + 0.25, oldBoundary - 0.25, chrome + 304, 488.25, 487.75, 320, 1100];
+                foreach (string state in new[] { "Rendering", "Cancelling", "Exporting", "Committing", "Completing" })
+                {
+                    model.State = state; model.Notify();
+                    foreach (double width in widths.OrderDescending().Concat(widths.Order()))
+                    {
+                        Layout(view, host, width);
+                        Rect left = Bounds(stage, footer), right = Bounds(time, footer);
+                        Close(0, left.Top); Contained(stage, footer); Contained(footer, body);
+                        Assert.Equal(model.ExportProgressText, stage.Text); Assert.Equal(TextTrimming.None, stage.TextTrimming);
+                        if (time.IsVisible)
+                        {
+                            bool inline = footer.ActualWidth >= footer.MinimumReadableLeadingWidth + 12 + rightWidth;
+                            Close(footer.ActualWidth, right.Right); Assert.False(left.IntersectsWith(right)); Contained(time, footer);
+                            if (inline)
+                            {
+                                Close(0, right.Top); Assert.True(left.Width >= footer.MinimumReadableLeadingWidth - 0.11);
+                                Assert.True(left.Right + 11.9 <= right.Left);
+                                Close(Math.Max(left.Height, right.Height), footer.ActualHeight);
+                            }
+                            else { Close(footer.ActualWidth, left.Width); Close(4, right.Top - left.Bottom); Close(right.Bottom, footer.ActualHeight); }
+                        }
+                        else { Close(footer.ActualWidth, left.Width); Close(left.Height, footer.ActualHeight); Assert.Contains("cannot cancel", stage.Text); }
+                        Close(CenterY(Bounds(body, panel)), CenterY(Bounds(indicator, panel)));
+                        double expectedHeight = Math.Max(body.ActualHeight, indicator.ActualHeight);
+                        if (panel.LayoutMode == StatusLayoutMode.CompactWide)
+                        {
+                            if (cancel.IsVisible) { Close(CenterY(Bounds(body, panel)), CenterY(Bounds(cancel, panel))); expectedHeight = Math.Max(expectedHeight, cancel.ActualHeight); }
+                            expectedHeight = Math.Max(expectedHeight, StatusLayoutPolicy.SingleRowMinimumHeight);
+                        }
+                        else if (cancel.IsVisible) { expectedHeight += 12 + cancel.ActualHeight; }
+                        Close(expectedHeight, panel.ActualHeight); Contained(body, panel); Contained(indicator, panel);
+                        if (cancel.IsVisible) { Contained(cancel, panel); }
+                        Assert.Equal(state is not ("Cancelling" or "Committing" or "Completing"), cancel.IsEnabled);
+                        Assert.DoesNotContain(Elements<TextBlock>(panel), field => field.Text.StartsWith("Elapsed", StringComparison.Ordinal));
+                        Assert.Empty(Elements<ScrollViewer>(panel));
+                        measurements.Add(new { State = state, Width = width, FontSize = fontSize, LongTime = longTime, Mode = panel.LayoutMode.ToString(), FooterWidth = footer.ActualWidth, Minimum = footer.MinimumReadableLeadingWidth, Leading = left.ToString(), Trailing = right.ToString(), Height = panel.ActualHeight });
+                        if (state == "Rendering" && !longTime && (width == boundary - 0.25 || width == boundary + 0.25 || width == chrome + 304))
+                        { Capture(view, panel, video, $"Readable-{fontSize}", width); }
+                    }
+                }
+            }
+            // Real hosted child typography invalidation at unchanged viewport
+            // width must refresh the policy/cache, without manual invalidation.
+            model.State = "Rendering"; model.LongRemaining = false; model.Notify();
+            double? normalMinimum = null;
+            foreach (double size in new[] { 12d, 24, 12 })
+            {
+                stage.FontSize = size; time.FontSize = size; Layout(view, host, 528);
+                if (size == 12) { normalMinimum ??= footer.MinimumReadableLeadingWidth; Close(normalMinimum.Value, footer.MinimumReadableLeadingWidth); }
+                else { Assert.True(footer.MinimumReadableLeadingWidth > normalMinimum!.Value); }
+            }
+            string? directory = Environment.GetEnvironmentVariable("GLYPHFRAME_STATUS_LAYOUT_EVIDENCE");
+            if (directory is not null) { File.WriteAllText(Path.Combine(directory, $"readable-working-{video}-{fontSize}.json"), System.Text.Json.JsonSerializer.Serialize(measurements, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })); }
+        }
+        finally { host.Close(); }
+    });
+
     private static Window Host(UserControl view) => new() { Content = view, SizeToContent = SizeToContent.WidthAndHeight, Left = -10000, ShowActivated = false };
     private static void Capture(UserControl view, AdaptiveResultPanel panel, bool video, string state, double width)
     {
@@ -533,7 +939,15 @@ public sealed class StatusPanelLayoutTests
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, $"component-{(video ? "video" : "image")}-{state}-{width:F0}");
         RenderTargetBitmap bitmap = new((int)Math.Ceiling(view.ActualWidth), (int)Math.Ceiling(view.ActualHeight), 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(view);
+        // A status hosted after the preview has a nonzero parent layout offset.
+        // Paint the explicit local viewport. Hidden, previously wider children
+        // can otherwise expand a VisualBrush's default descendant bounds.
+        DrawingVisual capture = new();
+        using (DrawingContext dc = capture.RenderOpen())
+        {
+            dc.DrawRectangle(new VisualBrush(view) { ViewboxUnits = BrushMappingMode.Absolute, Viewbox = new Rect(view.RenderSize) }, null, new Rect(view.RenderSize));
+        }
+        bitmap.Render(capture);
         PngBitmapEncoder encoder = new(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using (FileStream stream = File.Create(path + ".png")) { encoder.Save(stream); }
         File.WriteAllText(path + ".json", System.Text.Json.JsonSerializer.Serialize(new
@@ -587,13 +1001,14 @@ public sealed class StatusPanelLayoutTests
     {
         public string State = "Ready";
         public bool Long;
+        public bool EmptyFrame;
         public int Percent = 42;
         public event PropertyChangedEventHandler? PropertyChanged;
         public void Notify() { PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null)); CancelExportCommand.NotifyCanExecuteChanged(); }
         public bool HasResult => State is "Ready" or "Exported" or "Retained" or "Stale";
         public new bool ShowReadyToRender => State == "Planned";
-        public new bool IsExportStatusVisible => State is "Rendering" or "Cancelling" or "Exporting";
-        public bool IsExportActive => IsExportStatusVisible;
+        public new bool IsExportStatusVisible => State is "Rendering" or "Cancelling" or "Exporting" or "Committing" or "Completing";
+        public bool IsExportActive => IsExportStatusVisible && State != "Completing";
         public new bool ShowImageResultPanel => !IsVideoSelected && !ShowReadyToRender && !IsExportStatusVisible;
         public new bool ShowVideoResultPanel => IsVideoSelected && !ShowReadyToRender && !IsExportStatusVisible;
         public new bool ShowImageExportControls => !IsVideoSelected && HasResult;
@@ -627,18 +1042,22 @@ public sealed class StatusPanelLayoutTests
         public new string VideoExportActionLabel => CanOpenExportFolder ? "Export Again" : "Export Video";
         public new string ImageExportActionLabel => CanOpenExportFolder ? "Export Again" : "Export Image";
         public string ExportOperationTitle => State == "Cancelling" ? "Cancelling…" : $"{(State == "Exporting" ? "Exporting" : "Rendering")} {(IsVideoSelected ? "Video" : "Image")}";
-        public string ExportProgressText => Long ? "Decoding, rendering, and encoding frames. The selected output is being prepared with the current settings. Please wait while all frames are processed." : "Decoding, rendering, and encoding frames.";
-        public string ExportFrameText => $"Frame {Percent * 2} / 284";
+        public string ExportProgressText => State is "Committing" or "Completing"
+            ? "Committing the managed review result (cannot cancel)..." + (Long ? " Finalizing the prepared result and preserving the previously accepted artifact until the new result is ready. 日本語 Кириллица " + new string('Ж', 60) : string.Empty)
+            : Long ? "Decoding, rendering, and encoding frames. The selected output is being prepared with the current settings. Please wait while all frames are processed." : "Decoding, rendering, and encoding frames.";
+        public string ExportFrameText => EmptyFrame ? string.Empty : $"Frame {Percent * 2} / 284";
         public string ElapsedText => $"Elapsed 00:00:{Percent % 60:00}";
-        public string RemainingText => $"Remaining about 00:00:{Percent % 60:00}";
+        public bool LongRemaining { get; set; }
+        public string RemainingText => State is "Committing" or "Completing" ? string.Empty
+            : LongRemaining ? "Remaining about 123456:59:59" : $"Remaining about 00:00:{Percent % 60:00}";
         public string ExportPercentageText => $"{Percent}%";
         public double ExportProgress => Percent;
         public long ExportPresentationGeneration => 1;
-        public bool IsExportCompletionVisible => false;
+        public bool IsExportCompletionVisible => State == "Completing";
         public bool IsExportProgressIndeterminate => State == "Cancelling";
-        public VideoExportStage ExportStage => State == "Cancelling" ? VideoExportStage.Cancelling : VideoExportStage.ProcessingFrames;
+        public VideoExportStage ExportStage => State == "Cancelling" ? VideoExportStage.Cancelling : State == "Completing" ? VideoExportStage.Completed : VideoExportStage.ProcessingFrames;
         private IRelayCommand? _cancel, _export;
-        public IRelayCommand CancelExportCommand => _cancel ??= new RelayCommand(() => { }, () => State != "Cancelling");
+        public IRelayCommand CancelExportCommand => _cancel ??= new RelayCommand(() => { }, () => State is not ("Cancelling" or "Committing" or "Completing"));
         public IRelayCommand ExportVideoCommand => _export ??= new RelayCommand(() => { }, () => State != "Stale");
         public IRelayCommand ExportImageCommand => ExportVideoCommand;
         public IRelayCommand OpenExportFolderCommand { get; } = new RelayCommand(() => { });

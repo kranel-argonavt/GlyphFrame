@@ -608,7 +608,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         && _videoReviewUnavailable;
 
     public bool ShowPreviewStatusBadge => IsSymbolizedPreviewSelected
-        && (IsImageSelected || !HasVideoArtifact || _renderWorkflowState.IsVideoArtifactStale);
+        && IsSymbolizedPreviewStale;
 
     public bool HasImageRender => IsImageSelected
         && _renderWorkflowState.HasImageRender
@@ -1133,7 +1133,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
                 ? "Render settings or audio mode changed - the previous video remains playable."
                 : "Frame position or settings changed - generate a new symbolized frame."
             : "Render settings changed - review the previous result or render again before export."
-        : _lastGridSummary;
+        : string.Empty;
 
     public CharacterPresetOption SelectedPreset
     {
@@ -3851,6 +3851,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(HasSymbolizedPreview));
         OnPropertyChanged(nameof(HasSymbolizedReview));
         OnPropertyChanged(nameof(IsSymbolizedPreviewStale));
+        OnPropertyChanged(nameof(ShowPreviewStatusBadge));
         OnPropertyChanged(nameof(HasImageRender));
         OnPropertyChanged(nameof(IsImageRenderStale));
         OnPropertyChanged(nameof(WorkflowStatus));
@@ -3885,7 +3886,7 @@ public sealed class MainWindowViewModel : ObservableObject, IDisposable
     {
         string[] propertyNames =
         [
-            nameof(HasVideoArtifact), nameof(HasSymbolizedReview), nameof(IsSymbolizedPreviewStale),
+            nameof(HasVideoArtifact), nameof(HasSymbolizedReview), nameof(IsSymbolizedPreviewStale), nameof(ShowPreviewStatusBadge),
             nameof(ShowReadyToRender),
             nameof(WorkflowStatus), nameof(ShowVideoResultPanel), nameof(IsVideoResultSuccess),
             nameof(IsVideoResultWarning), nameof(IsVideoResultFailure), nameof(VideoRenderActionLabel),

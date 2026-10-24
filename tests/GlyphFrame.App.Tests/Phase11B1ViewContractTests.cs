@@ -186,12 +186,24 @@ public sealed class Phase11B1ViewContractTests
         Assert.Equal("{Binding ExportPercentageText}", detailedIndicator.Attribute("PercentageText")?.Value);
         foreach (string binding in new[]
         {
-            "ExportOperationTitle", "ExportProgressText", "ExportProgress", "ExportFrameText", "ElapsedText", "RemainingText"
+            "ExportOperationTitle", "ExportProgressText", "ExportProgress", "ExportFrameText", "RemainingText"
         })
         {
             Assert.Contains(progressPanel.Descendants().SelectMany(element => element.Attributes()), attribute =>
                 attribute.Value.Contains(binding, StringComparison.Ordinal));
         }
+        Assert.DoesNotContain(progressPanel.Descendants().SelectMany(element => element.Attributes()), attribute =>
+            attribute.Value.Contains("ElapsedText", StringComparison.Ordinal));
+        System.Xml.Linq.XElement frames = Assert.Single(progressPanel.Descendants(), element => element.Attribute("Text")?.Value == "{Binding ExportFrameText}");
+        Assert.Equal("StatusTextPairPanel", frames.Parent!.Name.LocalName);
+        Assert.Contains(frames.Parent.Elements(), element => element.Attribute("Text")?.Value == "{Binding ExportOperationTitle}");
+        System.Xml.Linq.XElement stage = Assert.Single(progressPanel.Descendants(), element => element.Attributes().Any(attribute =>
+            attribute.Name.LocalName == "ExportStatusAnimation.StageText" && attribute.Value == "{Binding ExportProgressText}"));
+        Assert.Equal("StatusTextPairPanel", stage.Parent!.Name.LocalName);
+        Assert.Contains(stage.Parent.Elements(), element => element.Attribute("Text")?.Value == "{Binding RemainingText}");
+        System.Xml.Linq.XElement body = stage.Parent.Parent!;
+        Assert.Equal("ProgressBar", body.Elements().ElementAt(1).Name.LocalName);
+        Assert.Same(stage.Parent, body.Elements().ElementAt(2));
         Assert.Contains(progressPanel.Descendants(), element => element.Attribute("Command")?.Value == "{Binding CancelExportCommand}");
     }
 

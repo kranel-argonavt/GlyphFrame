@@ -1,7 +1,7 @@
 # GlyphFrame Technical Specification v1.0
 
 Version: 1.0  
-Status: Implementation contracts reviewed against commit `75aad73` on 2026-10-22, including responsive status layouts, image Save format selection, About/notices and draft-only Settings actions. This documentation update is not a new test run, package or release sign-off.
+Status (2026-10-24): Current contracts include the readable progress-footer correction and the later preview/navigation/status/Settings refinements. The latest automated verification and provisional package were recorded from a dirty working tree based on `803ab97`; they do not establish a new clean-source or native acceptance pass. The October 22 `75aad73`/`1ddbab1` reviews are historical baselines, not verification of all later changes. See the current summaries in Phase 14 and Phase 15 for exact counts, candidate identity and outstanding native checks.
 Acceptance: Phase 14 remains open; Phase 15A packaging is implemented, Phase 15B acceptance remains partial/open, and Phase 15C clean-machine execution is NOT TESTED. Dated native outcomes and remaining checks are tracked in Phase_14_Coverage.md and Phase_15_Packaging.md; historical evidence is preserved.
 The [current release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist) consolidates outstanding work; the roadmap below distinguishes implementation from acceptance.
 Project name: GlyphFrame  
@@ -630,7 +630,7 @@ Warning:           #F59E0B
 
 ### 10.4 Main Window Layout
 
-The preferred startup window size is 1320×820 WPF DIPs, centered and reduced as needed by the existing monitor work-area placement policy. The supported minimum remains 1024×720 DIPs.
+The main window starts maximized within the monitor work area. Its restored size is 1320×820 WPF DIPs, centered and reduced as needed by the existing monitor work-area placement policy. The supported minimum remains 1024×720 DIPs.
 
 ```text
 MainWindow
@@ -798,14 +798,18 @@ The panel is the canonical presentation for long-running work and completed resu
 
 During full rendering the processing/result panel shows:
 
-- Status text.
-- Progress bar.
-- Current frame and total frame count for video.
-- Elapsed time.
-- Estimated remaining time when available.
-- Cancel button.
+- Operation title with the current/total video frame count trailing in the same header row when space permits.
+- Progress bar below the header.
+- Current stage description below the bar, with estimated remaining time trailing when available.
+- Cancel button, disabled when cancellation is no longer allowed and absent during the completion-only presentation.
+
+Frame count reflows below the title when that header pair cannot fit. Only WorkingFooter opts into leading-description wrapping: reserve the remaining-time field's measured width and the existing 12-DIP gap, provided the description retains a readable column. That minimum is the greater of its widest measured text-element advance/ink plus text chrome and a practical 10-em reading budget capped at the complete description's natural width. Em units follow the effective font size; glyph measurement uses the actual typeface and DPI, with padding/margins included. Short complete text need not occupy 10 em. Typography/content measurements are cached and refreshed when their inputs change; no window-width breakpoint is involved.
+
+When that minimum no longer fits, the description receives the full available width and Remaining moves to its own right-aligned row with the established 4-DIP vertical gap. Ordinary wrapping in a usable column does not move Remaining down; inline fields align at their first line. Absent/empty metadata returns the full width without an empty row or reserved gap. Header/frame admission is unchanged. Elapsed time is not displayed; internal timing/estimation and full commit/cancellation guidance are unchanged. Heights remain content-driven, retaining the shared minimum footprint only for ordinary side-by-side working/spacious result transitions. Header, bar and footer retain their 5-DIP vertical gaps and the bar its 5-DIP height.
 
 The preview busy overlay is limited to the media viewport and exists only while an operation is active. It contains one compact segmented activity ring without a numeric percentage; the ring serves as a neutral activity indication for determinate and indeterminate work alike. The lower processing/result panel alone presents percentage, operation title, stage description, linear bar, frame/timing details, and Cancel. The overlay disappears immediately when processing and cleanup finish; the brief completion animation occurs only in this lower panel and does not cover the completed preview.
+
+Normal image/video previews do not overlay symbol-grid/output-dimension captions on the media. Existing result metrics remain in the lower status cards. The preview status badge is reserved for a stale Symbolized result; it disappears on Original and after a fresh render, with no empty badge. Loading, playback-opening/fallback, unavailable-review and error/Details overlays retain their existing behavior.
 
 After a render succeeds, the panel remains visible and settles into `Image Ready` or `Video Ready`. It shows the completion mark and concise `Ready for review and export.` summary; after export the summary is `Ready for review and another export.`. Stale, failure, cancellation, suspension, opening and review-unavailable guidance remains state-specific.
 
@@ -817,12 +821,13 @@ Measured responsive composition:
 
 - `AdaptiveResultPanel` chooses modes from actual inner width, populated controls, measured minimums and practical text allowances. The current selector has no previous-mode hysteresis band or global Window.Width breakpoint.
 - When all groups fit, spacious mode puts badge/text, metrics and actions on one vertically centered row.
-- A standalone Export uses a normal 150–252-DIP allocation, with a larger readable minimum when measured text requires it. Below spacious mode it stays beside the lower metric row while the minimum layout fits, then moves below. It does not reserve space for future secondary actions.
+- A standalone Export uses a normal 150–252-DIP allocation, with a larger readable minimum when measured text requires it. Below spacious mode it stays beside the combined left header/metrics composition while the minimum layout fits, shrinking before moving below. Both sides share a vertical center; height is the larger of the measured left group (including its 12-DIP row gap) and the action. A taller action centers the left group as one unit. It does not reserve space for future secondary actions.
 - An exported action group normally uses a 252-DIP wide composition: Export Again above paired Open Folder/Copy path, spanning exactly their combined widths and 8-DIP gap. It does not continuously shrink like a standalone Export. When that composition no longer fits, all three actions use an equal-width rail (normally 150 DIPs); when the rail cannot fit beside the information, actions move below.
 - Compact result content is centered inside a maximum 360-DIP video or 296-DIP image envelope. Export sits above the secondary pair; the pair can fall back to a column if its own readable minimum cannot fit. Metric groups are centered, use equal columns per row and center a shorter last row.
 - Metric cards share nominal 88–112-DIP budgets in regular and compact modes. Explicit content/minimum exceptions and wrapping preserve readability; unused width is not automatically assigned to cards.
-- Height follows visible content without future-action reservation. The shell has a 1-DIP border, 16-DIP padding and 10-DIP radius; row/group/card/action gaps are 12/16/8/8 DIPs. Static badges use 42 DIPs; the working indicator uses 54 DIPs with a 12-DIP text gap, 3-DIP rings, 2-DIP colored-ring inset and fixed 14-DIP percentage text.
+- Height follows visible content without future-action reservation. Side-by-side working and spacious-result compositions share a 54-DIP minimum inner height, derived from the working indicator footprint; ordinary unwrapped Rendering/commit/completion/Ready transitions therefore use an 88-DIP shell without reallocating preview height. This is not a fixed or maximum height: wrapped/enlarged text, long metadata, exported groups and narrower multi-row layouts grow as required; equal heights are not forced across those compositions. The shell has a 1-DIP border, 16-DIP padding and 10-DIP radius; result row/group/card/action gaps are 12/16/8/8 DIPs. Static badges use 42 DIPs; the working indicator uses 54 DIPs with a 12-DIP text gap, 3-DIP rings, 2-DIP colored-ring inset and fixed 14-DIP percentage text.
 - The working circle is centered against the full information/progress body, sharing Cancel's vertical center when side-by-side. A stacked Cancel has its own row and is excluded from the circle's centering. Exported groups are centered against the adjacent information group.
+- Image/video result-warning triangle/exclamation paths use `ResultWarningIconStyle`, based on `VectorIconStyle` (1.6-DIP stroke, rounded caps/joins), retaining semantic WarningBrush and the 22×20-DIP artwork in the existing 42-DIP badge. Optical alignment centers the triangle's circumcircle: at this size its center lies 2.5485 DIPs below the rectangular artwork center, corrected by a shared -2.55-DIP visual translation. Geometry, layout footprint, success/error artwork and warning-state semantics are unchanged.
 - Accepted image symbol-grid/output metrics, retained font warnings and Show Details preserve their bindings and semantics. Long guidance increases natural height or uses the established outer overflow path.
 
 Dated outcomes, superseded layout decisions and native limitations are consolidated in [UI refinement history](UI_Refinement_History.md). Complete iteration records are retained locally outside Git as described there; historical measurements are not current requirements or acceptance of later builds.
@@ -1350,18 +1355,20 @@ Startup verification of the published folder is not interactive execution of the
 
 ## 21. Roadmap
 
-### Current roadmap status — 2026-10-22
+### Current roadmap status — 2026-10-24
 
-The implementation baseline is commit `75aad73`; aligned revision `1ddbab1` subsequently passed A1 automation and A2 fresh portable/extracted-startup verification on October 22, as recorded in the [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist). This is not a claim that every target environment has passed. The detailed phases below retain their scoped historical outcomes; an earlier phase's representative pass does not certify later changes.
+Current precommit work is based on `803ab97` and includes the later progress/result, warning, preview-caption and startup refinements. Its latest recorded automation passed **1,257 Release tests (488 core + 769 App)**; the latest verified portable remains a dirty-source provisional, not a new clean-source A1/A2 pass. The user subsequently reported a positive [focused progress-footer retest](Phase_14_Coverage.md#user-reported-progress-footer-retest--october-24), with the environment and case-level limits recorded there. After the implementation commit, refresh clean-source A1/A2 before continuing the remaining acceptance checklist.
+
+The earlier implementation baseline `75aad73` and clean `1ddbab1` October 22 A1/A2 results remain historical evidence for their own revisions. The detailed phases below retain their scoped dated outcomes; neither those passes nor the focused user retest certifies every later change or target environment.
 
 | Phase | Current status | Remaining boundary |
 | --- | --- | --- |
 | 1 — Documentation | Maintained specification and reference exist; this update aligns contracts with code | Public-facing documentation and evidence presentation are part of Phase 16. |
 | 2–12, including 11B | Core application, rendering/review/export, settings and error-handling workflows implemented | Historical representative checks do not replace current Phase 14/15 acceptance. |
-| 13 — UI Polish | Implemented, including October UI follow-ups | Current native resize, keyboard, theme and DPI matrix remains open. |
-| 14 — Testing | Automated coverage and selected native checks implemented; overall acceptance open | Complete the [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist). |
-| 15A — Packaging | Implemented; fresh A2 candidate verified from clean `1ddbab1` | Preserve that candidate's identity; regenerate and repeat affected checks if application/package bytes change. |
-| 15B — Extracted-package validation | Partial/open | Retest the fresh extracted package, including the outstanding native/audio/publication scenarios. |
+| 13 — UI Polish | Implemented; the latest footer correction has passing automation and a positive user-reported focused retest | Broader native resize, keyboard, theme and DPI acceptance remains scoped/open. |
+| 14 — Testing | Latest recorded dirty-tree Release suite: 1,257 passed; overall acceptance open | Refresh clean-source A1 after commit and complete the remaining [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist). |
+| 15A — Packaging | Implemented; latest provisional passed 11 publish/startup/session checks and verified 416 payloads | Preserve all historical identities; build and independently verify a fresh clean committed-source A2 candidate after commit. |
+| 15B — Extracted-package validation | Partial/open; focused user footer retest recorded separately | Finish outstanding current-candidate native/settings/theme/audio/publication cases without expanding historical or focused observations into blanket passes. |
 | 15C — Clean Windows | NOT TESTED | Execute without separately installed .NET/FFmpeg and record the actual OS/media environment. |
 | 16 — Portfolio Release | Not complete | Prepare public documentation, demo assets and architecture overview; resolve licensing/distribution decisions before release. |
 

@@ -35,6 +35,18 @@
         <Setter Property="Focusable" Value="False" />
         <Setter Property="IsHitTestVisible" Value="False" />
     </Style>
+    <Style x:Key="ResultWarningIconStyle" TargetType="Path" BasedOn="{StaticResource VectorIconStyle}">
+        <Setter Property="Width" Value="22" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Stroke" Value="{DynamicResource WarningBrush}" />
+        <!-- Center the triangle's circumcircle, rather than its rectangular bounds.
+             At this size its circumcenter is 2.5485 DIPs below the bounds center.
+             Keep the original geometry, outline thickness and layout footprint. -->
+        <Setter Property="RenderTransform">
+            <Setter.Value><TranslateTransform Y="-2.55" /></Setter.Value>
+        </Setter>
+    </Style>
     <Style x:Key="HeadingIconStyle" TargetType="Path" BasedOn="{StaticResource VectorIconStyle}">
         <Setter Property="Width" Value="20" />
         <Setter Property="Height" Value="20" />
