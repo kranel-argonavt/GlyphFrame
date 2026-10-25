@@ -1,16 +1,50 @@
 # Phase 15 — Windows x64 portable packaging and validation
 
-Current record (2026-10-24): Phase 15A packaging is implemented, and the latest readable-footer provisional below was built/verified from a dirty tree based on `803ab97`. Its automation is distinct from historical October 22 clean-source A1/A2 and later user-reported checks of clean `803ab97`. A subsequent positive [user-reported focused footer retest](Phase_14_Coverage.md#user-reported-progress-footer-retest--october-24) is recorded with its own provenance/environment limits. Phase 15B remains partial/open; agent-native progress resize at 125%/enlarged text and Phase 15C clean-machine execution are **NOT TESTED** for the latest changes. Earlier dated outcomes remain in [UI history](UI_Refinement_History.md) and below; outstanding work is in the [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist).
-
-The pre-image-navigation UI implementation is committed in `75aad73`, with aligned documentation in `1ddbab1`. The fresh A2 package below was actually built and independently extracted/launched from clean `1ddbab1` before recording these results. No native visual/media-workflow or clean-machine pass is inferred; the older candidate remains a separate historical identity.
+Current follow-up (2026-10-25): native title-bar icons now have a private live vector resource context per window. The latest package is provisional **`2ef20d96b92948cba82bf296fb569cbc`**, built from parent `e5e743f47719c3cf348dbd06f58708c2221cfaf4` with **WorkingTreeDirty=true**. It does not supersede the clean-source acceptance scope of `8399abc6` with a clean-source claim. Phase 15B remains partial/open and 15C remains NOT TESTED; [current verification](Phase_14_Coverage.md#native-title-bar-icon-follow-up--october-25) distinguishes automated native-handle pixels from interactive inspection.
 
 ## Latest recorded candidate
 
-The latest provisional fixes readable progress-footer admission and retains preceding preview/progress/warning/startup changes: run **`30447accba854fc695bb8bad2daf51b7`**, Release/win-x64/self-contained 1.0.0, recorded under [readable-footer provenance](#readable-progress-footer-package). Its source parent is `803ab97a69781ec06e0b5b609e086c6c9e1fdf2a` with **WorkingTreeDirty=true**; that commit does not contain these follow-up changes. It is separate from clean-source `803ab97` run `430d0fcbddc44d42b69c6175e7fcd06a`, prior provisionals and the earlier clean A2 package below. Startup/payload verification, user-attributed observations and agent-native acceptance have different scopes. Final committed-source packaging/retest remains necessary before release acceptance.
+| Field | Provisional value |
+| --- | --- |
+| Run / target | `2ef20d96b92948cba82bf296fb569cbc`; 1.0.0 / Release / win-x64 / self-contained |
+| Source | Parent `e5e743f47719c3cf348dbd06f58708c2221cfaf4`; WorkingTreeDirty=true; parent alone does not contain the correction |
+| ZIP | `GlyphFrame-1.0.0-win-x64-portable.zip`, 148,744,180 bytes |
+| ZIP SHA-256 | `7c73fd863666b8b5c0c0017e935b7e2c2b00a7a16ec02e7ac2d3325aee2d1362` |
+| Automation | 1,258 full Release tests (488 core + 770 App), no failures/skips; 40 focused tests; Release build zero warnings/errors; formatting/diff checks; 20 portable + 15 session helper checks |
+| Package verification | 11 publish/tool/startup/session checks; all 416 staged/archive paths, lengths and payload hashes verified |
+| Agent-native boundary | Default-Violet main/Settings screenshot only; changed-accent preview/rollback/Save/application restart NOT TESTED by the agent due unreliable modal targeting. Staged portable used, not an independently extracted ZIP. The separate interactive probe required exact-owned-process termination; automated package startup had already closed normally with session cleanup. |
+
+The later [A5 user report](Phase_14_Coverage.md#user-reported-a5-retest--october-25) records a manual PASS after the user repeated checks on the newest local version, including independent text sizing; it does not identify an exact executable/ZIP hash and is not automatically assigned to this provisional. A subsequent precommit review repeated the 1,258-test full suite, forced build and formatting/diff checks successfully, without building another package or rerunning helper/native acceptance. These evidence scopes remain distinct.
+
+The prior clean `8399abc6` ZIP/checksum and dated acceptance below are preserved. Full diagnostics, failing attempts, pixel readbacks and native baseline captures remain in ignored local artifacts. After implementation is committed, final clean-source A1/A2 and candidate binding remain necessary; no release is declared.
+
+Historical clean-source record (recorded 2026-10-25; verification on October 24): Phase 15A is implemented and **fresh A1/A2 passed for clean `e5e743f47719c3cf348dbd06f58708c2221cfaf4`**, producing run `8399abc62be8469397acae939e7ba52d`. That clean package superseded the earlier dirty-source provisionals at that recording, without changing their historical provenance. Phase 15B remains partial/open; [current A4 results and remaining limits](Phase_14_Coverage.md#current-candidate-a4-verification--october-24) distinguish user, real-storage integration and agent-native evidence. Broader native progress/DPI/enlarged-text checks and Phase 15C clean-machine execution are not certified. Outstanding work is maintained in the [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist).
+
+Commit `803ab97` contains gesture-only image navigation; `e5e743f` contains the reviewed progress/result/preview refinements and corresponding tests/documentation. The pre-image-navigation `75aad73`/`1ddbab1` implementation/documentation baseline and its October 22 A2 package remain separate historical identities. That documentation-only acceptance recording is not part of the already-built clean candidate's source revision. The native-icon correction above creates a separate provisional package.
+
+## Recorded October 24 clean-source candidate
+
+The October 24 candidate was built from the clean committed source, independently extracted into a fresh outside-repository directory and launched with its own marked profile. No `bin/`, publish-folder executable or older run was substituted for the extracted verification.
+
+| Field | Historical October 24 value |
+| --- | --- |
+| Version / target | 1.0.0 / Release / win-x64 / self-contained / untrimmed folder publish |
+| Run | `8399abc62be8469397acae939e7ba52d` |
+| Source | `e5e743f47719c3cf348dbd06f58708c2221cfaf4`; **WorkingTreeDirty=false**, clean source/index before and after A1/A2 |
+| ZIP | `GlyphFrame-1.0.0-win-x64-portable.zip`, 148,743,629 bytes |
+| ZIP SHA-256 | `d2d1c791a56e91d19bb9a8e2dcb43b2baece6b351dd6b72c41061d831835dee5` |
+| A1 | 1,257 full Release tests (488 core + 769 App), zero failures/skips; forced build zero warnings/errors; formatting/diff and 35 separate helpers passed |
+| A2 | 11 publish checks; all 416 ZIP payload paths/lengths/hashes; 9 independent extracted checks including exact EXE identity, bounded responsive startup, positive PID-bound exclusive lease, normal exit 0, exact session removal and unchanged hashes/source |
+| Attempts / retention | A1/A2 first-attempt passes; earlier packages and detailed local evidence retained unchanged |
+| Acceptance | Clean-source A1/A2 PASS; interactive A3–A7 partial/open, A8 clean Windows NOT TESTED; no public release or licensing sign-off |
+
+The independent A2 launch was bounded startup verification, not a native media/dialog acceptance run. Subsequent A4 evidence belongs to its own scope: user ordinary-use checks, hash-matched real-storage Save integration and native notices/log-directory failure/recovery. The native fault checks used a separate extraction that matched all 416 payloads before fault injection and after restoration; original ZIP/extraction hashes were unchanged. [Phase 14](Phase_14_Coverage.md#current-candidate-a4-verification--october-24) owns the outcome and unresolved native Save/shell/copy-after-error limits. A failed earlier modal-targeting attempt is not replaced by later successful cleanup.
+
+The former latest provisional, **`30447accba854fc695bb8bad2daf51b7`**, remains under [readable-footer provenance](#readable-progress-footer-package), with parent `803ab97` and WorkingTreeDirty=true. Clean-source `803ab97` run `430d0fcbddc44d42b69c6175e7fcd06a` and the October 22 A2 package below also remain historical. Their source/hash identities are not relabelled as this candidate. Detailed reports, absolute paths, PIDs, TRX and captures stay local/ignored, not new public-clone dependencies.
 
 ## Recorded A2 committed-source candidate
 
-This identifies the October 22 A2 package, not a public release. Detailed local run IDs, absolute paths, process/session evidence and logs remain in ignored artifacts and are not dependencies of a public clone.
+Historical October 22 A2 package, superseded as the current candidate by the clean October 24 package above; not a public release. Detailed local run IDs, absolute paths, process/session evidence and logs remain in ignored artifacts and are not dependencies of a public clone.
 
 | Field | Recorded value |
 | --- | --- |
@@ -43,7 +77,7 @@ The previous latest-candidate record is retained below with its original source 
 
 The later independent repository audit reran all 1,177 tests successfully, but did not regenerate this package or certify its native UI. Earlier About/footer/action-bar native evidence belongs to the preceding candidate, not automatically to these latest bytes. Detailed local provenance remains under `artifacts/notices-button-20261021/` and the run's package/publish reports. No release acceptance is declared.
 
-Phase 15A implements distribution construction and structural verification only. It does not publish a release, prove extracted-ZIP interaction (15B), prove clean-machine compatibility (15C), or close broader Phase 14 testing. The initial repository was clean at `540ae20` (`test: expand verification and fix review UI regressions`). Implementation packages are explicitly dirty-tree builds; that commit does not cover their uncommitted changes.
+Phase 15A implements distribution construction and structural verification only. It does not publish a release, prove all extracted-ZIP interaction (15B), prove clean-machine compatibility (15C), or close broader Phase 14 testing. The initial October 6 implementation started from clean `540ae20` (`test: expand verification and fix review UI regressions`); its implementation packages were explicitly dirty-tree builds, unlike the later clean A2 candidates. That original commit does not cover those then-uncommitted changes.
 
 ## Command and prerequisites
 
@@ -273,7 +307,7 @@ The [consolidated UI history](UI_Refinement_History.md) replaces repeated per-it
 
 ## Image navigation package provenance
 
-These historical provisionals were built from dirty trees based on `1ddbab13f354914d7951aa81ed819a1ffc051aca`; that parent commit does not contain their changes. None replaces clean A2 run `c5bee19a51c542728228225d06838a04` or its SHA-256 `2fb83a3e3adf3ee3ff9d4a6041a14d98273ab7cb92f99561e7ba3d355b1f981b`.
+These historical provisionals were built from dirty trees based on `1ddbab13f354914d7951aa81ed819a1ffc051aca`; that parent commit does not contain their changes. At that stage, none replaced then-current clean A2 run `c5bee19a51c542728228225d06838a04` or its SHA-256 `2fb83a3e3adf3ee3ff9d4a6041a14d98273ab7cb92f99561e7ba3d355b1f981b`. The [October 24 clean-source record](#recorded-october-24-clean-source-candidate) owns the later `8399abc6` identity; the [latest-candidate section](#latest-recorded-candidate) now identifies native-icon provisional `2ef20d96`, not another clean package.
 
 | Run / scope | ZIP SHA-256 | Verification boundary |
 | --- | --- | --- |
@@ -330,6 +364,6 @@ Final October 24 provisional **`30447accba854fc695bb8bad2daf51b7`**, 1.0.0/win-x
 
 The final source passed **1,257 full Release tests (488 core + 769 App), 22 targeted tests**, a zero-warning/error Release build, formatting/diff and documentation-link checks. An earlier broader 186-test status/animation run and 35 packaging/session helper checks also passed. The expected pre-fix pathology failure, initial 13/16 targeted run and corrected 16/16/22/22 retries are summarized in UI history; full reports remain ignored under `artifacts/progress-footer-readable-20261024/`.
 
-An isolated native attempt on the intermediate run was limited to startup/Browse/cancel/normal close because file-chooser focus and cached-element input were unreliable. No source was accepted; the owned process exited and zero sessions remained. Native rendering/resize at 125% and enlarged OS text are **NOT TESTED**, also for the final package. The startup harness and offscreen fixtures provide no native visual acceptance. Clean committed-source packaging/retest, Phase 15B and Phase 15C remain open.
+An isolated native attempt on the intermediate run was limited to startup/Browse/cancel/normal close because file-chooser focus and cached-element input were unreliable. No source was accepted; the owned process exited and zero sessions remained. Native rendering/resize at 125% and enlarged OS text were **NOT TESTED**, also for this final provisional. The startup harness and offscreen fixtures provide no native visual acceptance. Clean committed-source packaging/retest was still pending at that handoff; the later `e5e743f` A1/A2 pass above does not alter this provisional's provenance or close Phase 15B/15C.
 
 The user subsequently reported a positive focused manual retest after this final package handoff; [Phase 14](Phase_14_Coverage.md#user-reported-progress-footer-retest--october-24) owns the concise outcome and its limits. This later user observation is separate from the earlier unsuccessful agent-native attempt and does not change this ZIP's dirty-source provenance or certify specific unreported DPI/environment cases. No new package was built for this documentation-only recording.

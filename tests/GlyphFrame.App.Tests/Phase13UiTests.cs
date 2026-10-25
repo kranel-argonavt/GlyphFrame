@@ -406,6 +406,13 @@ public sealed class Phase13UiTests
         root.Attribute("Icon")?.Remove(); // Root resources are not available until after loose-XAML construction.
         root.Attribute("Background")?.Remove();
         root.SetAttributeValue(XNamespace.Xmlns + "views", "clr-namespace:GlyphFrame.App.Views;assembly=GlyphFrame.App");
+        foreach (XAttribute attribute in root.DescendantsAndSelf().SelectMany(element => element.Attributes())
+                     .Where(attribute => attribute.Name.NamespaceName == "clr-namespace:GlyphFrame.App.Views").ToArray())
+        {
+            XName name = XNamespace.Get("clr-namespace:GlyphFrame.App.Views;assembly=GlyphFrame.App") + attribute.Name.LocalName;
+            string value = attribute.Value; XElement owner = attribute.Parent!;
+            attribute.Remove(); owner.SetAttributeValue(name, value);
+        }
         foreach (XElement element in root.Descendants().Where(e => e.Name.NamespaceName == "clr-namespace:GlyphFrame.App.Views").ToArray())
         { element.Name = XNamespace.Get("clr-namespace:GlyphFrame.App.Views;assembly=GlyphFrame.App") + element.Name.LocalName; }
         foreach (XAttribute handler in root.DescendantsAndSelf().SelectMany(element => element.Attributes())

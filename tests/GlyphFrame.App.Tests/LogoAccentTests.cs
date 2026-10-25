@@ -2,6 +2,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Interop;
+using System.Runtime.InteropServices;
+using System.IO;
+using System.Diagnostics;
+using System.Text;
 using GlyphFrame.App.Services;
 using GlyphFrame.App.ViewModels;
 using GlyphFrame.App.Views;
@@ -115,6 +120,151 @@ public sealed class LogoAccentTests
         }
         finally { foreach (Window dialog in dialogs) { dialog.Close(); } main.Close(); }
     });
+
+    [Fact]
+    public void NativeWindowIcons_RenderAllAccentsAndPreviewRollbackSaveWithoutRestart()
+    {
+        // Application resources reproduce the actual icon lookup lifecycle.
+        // WPF permits only one Application per process, so isolate this test
+        // from other STA layout fixtures rather than leaving global state.
+        if (Environment.GetEnvironmentVariable("GLYPHFRAME_ICON_TEST_CHILD") != "1")
+        { RunIconTestInOwnProcess(); return; }
+        InputSettingsPolishTests.Sta(() =>
+        {
+            Application application = new() { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            Window main = Phase13UiTests.LoadLooseMainWindow();
+            main.DataContext = new Phase13UiTests.MainLayoutData(false);
+            main.Left = -10000; main.ShowActivated = false;
+            ResourceDictionary resources = main.Resources;
+            application.Resources = resources; main.Resources = new ResourceDictionary();
+            DrawingImage factory = (DrawingImage)resources["GlyphFrameWindowIcon"];
+            // The loose-XAML helper strips the old root Icon attribute. Reproduce
+            // that production assignment until the window owns its own source.
+            main.Icon ??= factory;
+            Window settings = Phase13UiTests.LoadLooseWindow("SettingsWindow.xaml");
+            settings.Resources = new ResourceDictionary(); settings.Left = -10000; settings.ShowActivated = false;
+            settings.Icon ??= factory;
+            Window reference = new() { Left = -10000, Top = -10000, Width = 200, Height = 100, ShowActivated = false, ShowInTaskbar = false };
+            AccentThemeService theme = new();
+            SettingsDraftTests.Store store = new(); ApplicationSettingsManager manager = new(store, theme);
+            manager.InitializeAsync().GetAwaiter().GetResult();
+            SettingsViewModel vm = new(manager, new SettingsDraftTests.Paths(), theme, new SettingsDraftTests.Folders(),
+                new SettingsDraftTests.Dialogs(), new Validation(), new ErrorPresentationService(), new Details());
+            List<object> measurements = []; int check = 0;
+            List<Window> iconWindows = [main, settings];
+            ImageSource mainIcon = main.Icon, settingsIcon = settings.Icon;
+            try
+            {
+                main.Show(); settings.Owner = main; settings.Show(); reference.Show();
+                Assert.Same(factory, ThemedWindowIcon.GetSource(main)); Assert.Same(factory, ThemedWindowIcon.GetSource(settings));
+                Assert.NotSame(factory, mainIcon); Assert.NotSame(factory, settingsIcon); Assert.NotSame(mainIcon, settingsIcon);
+                Check("initial", SettingsDraftTests.Harness.Persisted.AccentPreset);
+                vm.BeginEdit();
+                foreach (AccentPreset preset in Enum.GetValues<AccentPreset>().Concat(Enum.GetValues<AccentPreset>().Reverse()))
+                {
+                    vm.SelectedAccentPreset = preset; Check("preview", preset);
+                    Assert.Equal(SettingsDraftTests.Harness.Persisted, manager.Current); Assert.Equal(0, store.Saves);
+                }
+                vm.CancelCommand.Execute(null); Check("cancel", SettingsDraftTests.Harness.Persisted.AccentPreset);
+                vm.BeginEdit(); vm.SelectedAccentPreset = AccentPreset.Cyan; Check("preview-before-dismiss", AccentPreset.Cyan);
+                vm.EndEdit(); Check("end-edit", SettingsDraftTests.Harness.Persisted.AccentPreset);
+                vm.BeginEdit(); vm.SelectedAccentPreset = AccentPreset.Blue;
+                vm.SaveCommand.ExecuteAsync(null).GetAwaiter().GetResult(); Check("save", AccentPreset.Blue);
+                Assert.Equal(AccentPreset.Blue, store.Saved.AccentPreset); Assert.Equal(1, store.Saves);
+                vm.BeginEdit(); Assert.Equal(AccentPreset.Blue, vm.SelectedAccentPreset);
+                vm.SelectedAccentPreset = AccentPreset.Rose; Check("reopened-preview", AccentPreset.Rose);
+                vm.CancelCommand.Execute(null); Check("reopened-cancel", AccentPreset.Blue);
+                ApplicationSettingsManager reloaded = new(store, theme);
+                reloaded.InitializeAsync().GetAwaiter().GetResult(); Check("reload", AccentPreset.Blue);
+                Assert.Equal(AccentPreset.Blue, reloaded.Current.AccentPreset);
+                Window reopened = Phase13UiTests.LoadLooseWindow("SettingsWindow.xaml");
+                reopened.Resources = new ResourceDictionary(); reopened.Owner = main; reopened.Left = -10000; reopened.ShowActivated = false;
+                iconWindows.Add(reopened); reopened.Show();
+                Assert.NotSame(factory, reopened.Icon); Assert.NotSame(mainIcon, reopened.Icon);
+                Check("new-window-after-save", AccentPreset.Blue);
+            }
+            finally
+            {
+                foreach (Window window in iconWindows.Skip(1)) { window.Close(); }
+                reference.Close(); main.Close();
+                theme.Apply(AccentPreset.Violet); // No stale window/native-handle callbacks after closure.
+                application.Shutdown();
+            }
+
+            void Check(string phase, AccentPreset preset)
+            {
+                InputSettingsPolishTests.Settle(main); InputSettingsPolishTests.Settle(settings);
+                Assert.Same(mainIcon, main.Icon); Assert.Same(settingsIcon, settings.Icon);
+                DrawingImage expected = factory.CloneCurrentValue();
+                DrawingGroup group = (DrawingGroup)expected.Drawing;
+                ((GeometryDrawing)group.Children[0]).Brush = ((Brush)resources["AccentSubtleBrush"]).CloneCurrentValue();
+                ((GeometryDrawing)group.Children[1]).Pen.Brush = ((Brush)resources["AccentBrush"]).CloneCurrentValue();
+                ((GeometryDrawing)group.Children[2]).Brush = ((Brush)resources["PrimaryTextBrush"]).CloneCurrentValue();
+                expected.Freeze(); reference.Icon = expected; InputSettingsPolishTests.Settle(reference);
+                string? folder = Environment.GetEnvironmentVariable("GLYPHFRAME_NATIVE_ICON_EVIDENCE");
+                foreach (Window window in iconWindows)
+                {
+                    foreach (int kind in new[] { 0, 1 }) // Both actual small and large WM_GETICON images.
+                    {
+                        BitmapSource actual = NativeIconPixels(window, kind), wanted = NativeIconPixels(reference, kind);
+                        bool same = actual.PixelWidth == wanted.PixelWidth && actual.PixelHeight == wanted.PixelHeight
+                            && PixelBytes(actual).SequenceEqual(PixelBytes(wanted));
+                        string name = ReferenceEquals(window, main) ? "main" : ReferenceEquals(window, settings) ? "settings" : "reopened-settings";
+                        Color drawingColor = ((SolidColorBrush)((GeometryDrawing)((DrawingGroup)((DrawingImage)window.Icon).Drawing).Children[1]).Pen.Brush).Color;
+                        measurements.Add(new { Phase = phase, Preset = preset.ToString(), Window = name, Kind = kind, DrawingFrame = drawingColor.ToString(), ExpectedFrame = theme.GetPrimaryColorHex(preset), actual.PixelWidth, actual.PixelHeight, Match = same });
+                        if (folder is not null)
+                        {
+                            Save(actual, Path.Combine(folder, $"{check}-{phase}-{preset}-{name}-{kind}-actual.png"));
+                            Save(wanted, Path.Combine(folder, $"{check}-{phase}-{preset}-{name}-{kind}-expected.png"));
+                            File.WriteAllText(Path.Combine(folder, "native-icon-readback.json"), System.Text.Json.JsonSerializer.Serialize(measurements, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                        }
+                        Assert.True(same, $"{phase}/{preset}/{name}/icon-{kind}: native pixels differ; drawing={drawingColor}");
+                    }
+                }
+                check++;
+            }
+        });
+    }
+
+    private static void RunIconTestInOwnProcess()
+    {
+        string folder = Environment.GetEnvironmentVariable("GLYPHFRAME_NATIVE_ICON_EVIDENCE")
+            ?? Path.Combine(Path.GetTempPath(), "GlyphFrame.NativeIconTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        ProcessStartInfo start = new(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
+        { UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
+        start.ArgumentList.Add("vstest"); start.ArgumentList.Add(typeof(LogoAccentTests).Assembly.Location);
+        start.ArgumentList.Add("/TestCaseFilter:FullyQualifiedName=GlyphFrame.App.Tests.LogoAccentTests.NativeWindowIcons_RenderAllAccentsAndPreviewRollbackSaveWithoutRestart");
+        start.ArgumentList.Add("/Logger:trx;LogFileName=isolated-icon-" + Guid.NewGuid().ToString("N") + ".trx");
+        start.ArgumentList.Add("/ResultsDirectory:" + folder);
+        start.Environment["GLYPHFRAME_ICON_TEST_CHILD"] = "1";
+        using Process process = Process.Start(start)!;
+        Task<string> output = process.StandardOutput.ReadToEndAsync(), errors = process.StandardError.ReadToEndAsync();
+        try
+        {
+            Assert.True(process.WaitForExit(45000), "Isolated application/icon test did not finish.");
+            string log = output.GetAwaiter().GetResult() + errors.GetAwaiter().GetResult();
+            File.WriteAllText(Path.Combine(folder, "isolated-icon.log"), log);
+            Assert.True(process.ExitCode == 0, log);
+        }
+        finally { if (!process.HasExited) { process.Kill(entireProcessTree: true); } }
+    }
+
+    private static BitmapSource NativeIconPixels(Window window, int kind)
+    {
+        // Read WPF-owned HICONs, never destroy them. Copy pixels before the next
+        // accent update, which may legitimately dispose/replace those handles.
+        IntPtr handle = SendMessage(new WindowInteropHelper(window).Handle, 0x007F, new IntPtr(kind), IntPtr.Zero);
+        Assert.NotEqual(IntPtr.Zero, handle);
+        BitmapSource bitmap = Imaging.CreateBitmapSourceFromHIcon(handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+        return new FormatConvertedBitmap(bitmap, PixelFormats.Pbgra32, null, 0);
+    }
+    private static byte[] PixelBytes(BitmapSource bitmap)
+    { byte[] pixels = new byte[bitmap.PixelWidth * bitmap.PixelHeight * 4]; bitmap.CopyPixels(pixels, bitmap.PixelWidth * 4, 0); return pixels; }
+    private static void Save(BitmapSource bitmap, string path)
+    { PngBitmapEncoder encoder = new(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); using FileStream file = File.Create(path); encoder.Save(file); }
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 
     private static BitmapSource Pixels(Image artwork)
     {
