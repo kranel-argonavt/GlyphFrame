@@ -1,8 +1,25 @@
 # Phase 15 — Windows x64 portable packaging and validation
 
-Current follow-up (2026-10-25): native title-bar icons now have a private live vector resource context per window. The latest package is provisional **`2ef20d96b92948cba82bf296fb569cbc`**, built from parent `e5e743f47719c3cf348dbd06f58708c2221cfaf4` with **WorkingTreeDirty=true**. It does not supersede the clean-source acceptance scope of `8399abc6` with a clean-source claim. Phase 15B remains partial/open and 15C remains NOT TESTED; [current verification](Phase_14_Coverage.md#native-title-bar-icon-follow-up--october-25) distinguishes automated native-handle pixels from interactive inspection.
+Current record (2026-10-25): native-icon correction is committed in `d2851e10a13c57c8e6e4adfcc5ec6dd56c235829`. The latest package is clean-source **`c168d65e421c469a97207c714ef6338d`**, independently extracted/verified after A1 passed on an unchanged retry. The original Dispatcher-host abort and subsequent focused reproduction remain recorded in [Phase 14](Phase_14_Coverage.md#wpf-fixture-isolation--october-25). The later working-tree change is test-collection isolation only; no application source or package bytes changed and no new package was built for it. Phase 15B remains partial/open, 15C NOT TESTED, and no release is declared.
 
 ## Latest recorded candidate
+
+| Field | Clean October 25 value |
+| --- | --- |
+| Run / target | `c168d65e421c469a97207c714ef6338d`; 1.0.0 / Release / win-x64 / self-contained / untrimmed folder publish |
+| Source | `d2851e10a13c57c8e6e4adfcc5ec6dd56c235829`; WorkingTreeDirty=false at build and independent A2 |
+| ZIP | `GlyphFrame-1.0.0-win-x64-portable.zip`, 148,743,809 bytes |
+| ZIP SHA-256 | `733699c2bbed5d8d98987f57a786387a1bd9c6aae6b2d9adb150c0f614ee4d46` |
+| A1 | Unchanged retry passed 1,258 tests (488 core + 770 App), build zero warnings/errors, formatting/diff and 35 helpers; first App-host abort retained, not a first-attempt pass |
+| Publish/archive | 11 publish checks and all 416 payload paths/lengths/hashes verified; required runtime/native/tools/attribution/version and forbidden-content policy passed |
+| Independent extracted A2 | 9 checks passed: actual ZIP/checksum, fresh outside-repository extraction, all 416 files, version/README, exact responsive EXE, positive PID-bound lease, normal exit 0 and exact session cleanup, unchanged hashes/clean source |
+| Acceptance | A2 PASS; bounded startup only, no new native media/visual acceptance or clean-Windows certification; no forced process termination |
+
+The extracted payload, marked isolated profile, failed/successful A1 evidence and independent A2 report remain local/ignored. The separate user A5 PASS retains its supplied local-version scope, not an independently established hash of this ZIP. Current test-only isolation changes address the reproduced test-host scenario as recorded in Phase 14; their validation is not a new package run or retroactive proof of every historical crash's cause. Earlier clean/provisional identities below remain unchanged.
+
+## Native-icon provisional — October 25
+
+Historical provisional, superseded as latest package by clean `c168d65e` above. Its original dirty-source and native-inspection limits remain intact.
 
 | Field | Provisional value |
 | --- | --- |
@@ -16,11 +33,11 @@ Current follow-up (2026-10-25): native title-bar icons now have a private live v
 
 The later [A5 user report](Phase_14_Coverage.md#user-reported-a5-retest--october-25) records a manual PASS after the user repeated checks on the newest local version, including independent text sizing; it does not identify an exact executable/ZIP hash and is not automatically assigned to this provisional. A subsequent precommit review repeated the 1,258-test full suite, forced build and formatting/diff checks successfully, without building another package or rerunning helper/native acceptance. These evidence scopes remain distinct.
 
-The prior clean `8399abc6` ZIP/checksum and dated acceptance below are preserved. Full diagnostics, failing attempts, pixel readbacks and native baseline captures remain in ignored local artifacts. After implementation is committed, final clean-source A1/A2 and candidate binding remain necessary; no release is declared.
+The prior clean `8399abc6` ZIP/checksum and dated acceptance below are preserved. Full diagnostics, failing attempts, pixel readbacks and native baseline captures remain in ignored local artifacts. Clean-source A1/A2 was still pending at this provisional's handoff; the later `d2851e1`/`c168d65e` result above does not alter these older bytes or their failed attempts.
 
 Historical clean-source record (recorded 2026-10-25; verification on October 24): Phase 15A is implemented and **fresh A1/A2 passed for clean `e5e743f47719c3cf348dbd06f58708c2221cfaf4`**, producing run `8399abc62be8469397acae939e7ba52d`. That clean package superseded the earlier dirty-source provisionals at that recording, without changing their historical provenance. Phase 15B remains partial/open; [current A4 results and remaining limits](Phase_14_Coverage.md#current-candidate-a4-verification--october-24) distinguish user, real-storage integration and agent-native evidence. Broader native progress/DPI/enlarged-text checks and Phase 15C clean-machine execution are not certified. Outstanding work is maintained in the [release acceptance checklist](Phase_14_Coverage.md#release-acceptance-checklist).
 
-Commit `803ab97` contains gesture-only image navigation; `e5e743f` contains the reviewed progress/result/preview refinements and corresponding tests/documentation. The pre-image-navigation `75aad73`/`1ddbab1` implementation/documentation baseline and its October 22 A2 package remain separate historical identities. That documentation-only acceptance recording is not part of the already-built clean candidate's source revision. The native-icon correction above creates a separate provisional package.
+Commit `803ab97` contains gesture-only image navigation; `e5e743f` the reviewed progress/result/preview refinements; `d2851e1` adds the native-icon correction. The pre-image-navigation `75aad73`/`1ddbab1` baseline and its October 22 A2 package remain separate historical identities. Later documentation recording is not part of an already-built package's source revision; native-icon provisional `2ef20d96` and clean `c168d65e` remain distinct.
 
 ## Recorded October 24 clean-source candidate
 
@@ -307,7 +324,7 @@ The [consolidated UI history](UI_Refinement_History.md) replaces repeated per-it
 
 ## Image navigation package provenance
 
-These historical provisionals were built from dirty trees based on `1ddbab13f354914d7951aa81ed819a1ffc051aca`; that parent commit does not contain their changes. At that stage, none replaced then-current clean A2 run `c5bee19a51c542728228225d06838a04` or its SHA-256 `2fb83a3e3adf3ee3ff9d4a6041a14d98273ab7cb92f99561e7ba3d355b1f981b`. The [October 24 clean-source record](#recorded-october-24-clean-source-candidate) owns the later `8399abc6` identity; the [latest-candidate section](#latest-recorded-candidate) now identifies native-icon provisional `2ef20d96`, not another clean package.
+These historical provisionals were built from dirty trees based on `1ddbab13f354914d7951aa81ed819a1ffc051aca`; that parent commit does not contain their changes. At that stage, none replaced then-current clean A2 run `c5bee19a51c542728228225d06838a04` or its SHA-256 `2fb83a3e3adf3ee3ff9d4a6041a14d98273ab7cb92f99561e7ba3d355b1f981b`. The [October 24 record](#recorded-october-24-clean-source-candidate) owns `8399abc6`; the [native-icon provisional](#native-icon-provisional--october-25) owns `2ef20d96`; the [latest-candidate section](#latest-recorded-candidate) now identifies clean `d2851e1` package `c168d65e`.
 
 | Run / scope | ZIP SHA-256 | Verification boundary |
 | --- | --- | --- |

@@ -11,6 +11,7 @@ using GlyphFrame.App.Views;
 
 namespace GlyphFrame.App.Tests;
 
+[Collection("WPF layout")]
 public sealed class PlaybackPositionSynchronizationTests
 {
     [Theory]

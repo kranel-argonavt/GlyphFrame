@@ -12,6 +12,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace GlyphFrame.App.Tests;
 
+[Collection("WPF layout")]
 public sealed class WpfRenderedVideoLifetimeTests
 {
     [Fact]
