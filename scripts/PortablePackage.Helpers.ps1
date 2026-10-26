@@ -1,4 +1,5 @@
 # Shared structural checks. No publishing, application launch, extraction or recursive deletion.
+. (Join-Path $PSScriptRoot 'PackageLegal.Helpers.ps1')
 function Get-RequiredPackagePaths {
     return @(
         'GlyphFrame.App.exe', 'GlyphFrame.App.dll', 'GlyphFrame.App.deps.json', 'GlyphFrame.App.runtimeconfig.json',
@@ -7,7 +8,7 @@ function Get-RequiredPackagePaths {
         'PresentationFramework.dll', 'PresentationCore.dll', 'WindowsBase.dll',
         'PresentationNative_cor3.dll', 'wpfgfx_cor3.dll', 'vcruntime140_cor3.dll',
         'D3DCompiler_47_cor3.dll', 'PenImc_cor3.dll', 'libSkiaSharp.dll', 'SkiaSharp.dll',
-        'THIRD_PARTY_NOTICES.md', 'Tools/ffmpeg/ffmpeg.exe', 'Tools/ffmpeg/ffprobe.exe',
+        'LICENSE', 'licenses/manifest.json', 'THIRD_PARTY_NOTICES.md', 'Tools/ffmpeg/ffmpeg.exe', 'Tools/ffmpeg/ffprobe.exe',
         'Tools/ffmpeg/SHA256SUMS.txt', 'Tools/ffmpeg/LICENSE.txt', 'Tools/ffmpeg/DISTRIBUTION_README.txt'
     )
 }
@@ -93,9 +94,9 @@ function Assert-PortableContentPath([string]$Path, [switch]$AllowSymbols) {
 
 function Assert-PortableFilePath([string]$Path, [switch]$AllowSymbols) {
     Assert-PortableContentPath $Path -AllowSymbols:$AllowSymbols
-    if ($Path -notmatch '\.(?i:dll|exe|json|txt|dat|config|md)$' -and
+    if ($Path -cne 'LICENSE' -and $Path -notmatch '\.(?i:dll|exe|json|txt|dat|config|md)$' -and
         -not ($AllowSymbols -and $Path -match '\.(?i:pdb)$')) { throw "Unexpected distributed file type: $Path" }
-    if ($Path -match '\.(?i:json)$' -and $Path -cnotin @('GlyphFrame.App.deps.json', 'GlyphFrame.App.runtimeconfig.json')) {
+    if ($Path -match '\.(?i:json)$' -and $Path -cnotin @('GlyphFrame.App.deps.json', 'GlyphFrame.App.runtimeconfig.json', 'licenses/manifest.json')) {
         throw "Unexpected JSON (potential user or verification data): $Path"
     }
 }

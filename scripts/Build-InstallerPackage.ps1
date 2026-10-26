@@ -33,7 +33,7 @@ try {
     $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($setup)
     # Inno pads string version resources; compare trimmed Publisher and numeric version.
     $numericVersion = '{0}.{1}.{2}.{3}' -f $version.FileMajorPart, $version.FileMinorPart, $version.FileBuildPart, $version.FilePrivatePart
-    if ($version.CompanyName.Trim() -cne 'kranel-argonavt' -or $numericVersion -cne "$($payload.Report.PackageVersion).0") { throw 'Setup Publisher/version mismatch.' }
+    if ($version.CompanyName.Trim() -cne 'Nazar Khozin (kranel-argonavt)' -or $numericVersion -cne "$($payload.Report.PackageVersion).0") { throw 'Setup Publisher/version mismatch.' }
     Assert-InstallerPayloadMatchesManifest @(Get-PortablePayload $payload.Root) $payload.Files
     $hash = Write-PortableChecksum $setup ($setup + '.sha256')
     $success = $true
@@ -42,11 +42,12 @@ catch { $failure = $_.Exception.ToString() }
 finally {
     @{ Success=$success; Failure=$failure; SourceCommit=$initialHead; WorkingTreeDirty=($initialStatus.Count -ne 0); WorkingTreeStatus=$initialStatus;
        Compiler=$compiler; CompilerVersion=(& $compiler '--version' | Out-String).Trim();
-       Publisher='kranel-argonavt'; PublisherUrl='https://github.com/kranel-argonavt'; AppId='9A07BED0-6720-4A06-8C95-317B14C580A0';
+       Publisher='Nazar Khozin (kranel-argonavt)'; PublisherUrl='https://github.com/kranel-argonavt'; AppId='9A07BED0-6720-4A06-8C95-317B14C580A0';
        Architecture='x64 Windows only'; Language='English'; InstallMode='Per-user, no elevation requested'; Signed=$false;
        PortablePackageDirectory=$PortablePackageDirectory; PortableReport=if($payload){$payload.Report}else{$null};
        PayloadFileCount=if($payload){@($payload.Files).Count}else{0}; SetupPath=$setup; SetupSha256=$hash;
        NativeInstallUpgradeUninstallAcceptance='NOT TESTED by compilation'; PublicRelease='NOT CREATED';
+       Licensing=if($payload){$payload.Licensing}else{$null};
        Retention='Run-owned build outputs and failures retained; no automatic compiler download/install or cleanup';
        FinalSourceCommit=(& git -C $repo rev-parse HEAD); FinalWorkingTreeStatus=@(& git -C $repo status --porcelain=v1 --untracked-files=all) } |
         ConvertTo-Json -Depth 13 | Set-Content -LiteralPath (Join-Path $runRoot 'report.json')

@@ -77,6 +77,15 @@
                                        Text="{Binding VersionText}" TextWrapping="Wrap" />
                         </StackPanel>
                     </Grid>
+                    <TextBlock Margin="0,14,0,0" Text="Created by Nazar Khozin" TextWrapping="Wrap" />
+                    <Button x:Name="AuthorProfileButton" Margin="0,2,0,0" HorizontalAlignment="Left"
+                            Height="Auto" MinHeight="30" Padding="0,4"
+                            Content="GitHub: kranel-argonavt" Click="AuthorProfile_Click"
+                            automation:AutomationProperties.Name="Open Nazar Khozin's GitHub profile in your browser"
+                            ToolTip="https://github.com/kranel-argonavt"
+                            Style="{StaticResource TextButtonStyle}" />
+                    <TextBlock Margin="0,4,0,0" Text="GlyphFrame code: MIT License. Third-party components retain their own licenses."
+                               Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap" />
                     <TextBlock Margin="0,20,0,0" Text="Turn videos and images into symbol art." TextWrapping="Wrap" />
                     <TextBlock Margin="0,4,0,0" Foreground="{StaticResource SecondaryTextBrush}"
                                Text="Render, preview, and export your results in one workspace." TextWrapping="Wrap" />

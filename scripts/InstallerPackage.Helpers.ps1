@@ -44,13 +44,14 @@ function Get-VerifiedInstallerPayload([string]$PackageDirectory) {
     $actual = @(Get-PortablePayload $payloadRoot)
     Assert-InstallerPayloadMatchesManifest $actual $manifest
     Assert-PackageRequiredFiles $payloadRoot
+    $legal = Assert-LegalPackage $payloadRoot
     Assert-ExecutableShellIcon (Join-Path $payloadRoot 'GlyphFrame.App.exe') (Join-Path $PSScriptRoot '../src/GlyphFrame.App/Assets/GlyphFrame.ico')
     if ((Get-PortablePackageVersion (Join-Path $payloadRoot 'GlyphFrame.App.dll')) -cne $report.PackageVersion) { throw 'Assembly/package version mismatch.' }
     # Reject pre-installer application builds: their running-process guard is absent.
     if (-not [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes((Join-Path $payloadRoot 'GlyphFrame.App.dll'))).Contains('InstallationLifetimeMarker')) {
         throw 'This application predates the installation lifetime protocol; build a fresh portable candidate.'
     }
-    return [pscustomobject]@{ Root=$payloadRoot; Files=$actual; Report=$report; PackageDirectory=$root }
+    return [pscustomobject]@{ Root=$payloadRoot; Files=$actual; Report=$report; PackageDirectory=$root; Licensing=$legal }
 }
 
 function Assert-InstallerPayloadMatchesManifest($Actual, $Manifest) {

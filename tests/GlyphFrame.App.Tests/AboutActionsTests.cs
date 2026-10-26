@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Text.Json;
 using GlyphFrame.App.Services;
 using GlyphFrame.App.Views;
 
@@ -28,12 +29,16 @@ public sealed class AboutActionsTests
             InputSettingsPolishTests.Settle(window);
             string[] contents = InputSettingsPolishTests.Descendants(window).OfType<TextBlock>().Select(t => t.Text).ToArray();
             foreach (string expected in new[] { "GlyphFrame", version, "Turn videos and images into symbol art.",
-                "Render, preview, and export your results in one workspace.", "Privacy",
+                "Render, preview, and export your results in one workspace.", "Created by Nazar Khozin", "Privacy",
+                "GlyphFrame code: MIT License. Third-party components retain their own licenses.",
                 "Processing runs locally on your computer. GlyphFrame does not upload your media or send telemetry.",
                 "Third-party software", "Includes FFmpeg and SkiaSharp. See the third-party notices for details." })
             { Assert.Contains(expected, contents); }
             Button close = InputSettingsPolishTests.Descendants(window).OfType<Button>().Single(b => b.Content as string == "Close");
             Button notices = InputSettingsPolishTests.Descendants(window).OfType<Button>().Single(b => b.Content as string == "Third-party notices");
+            Button author = InputSettingsPolishTests.Descendants(window).OfType<Button>().Single(b => b.Content as string == "GitHub: kranel-argonavt");
+            Assert.Equal("https://github.com/kranel-argonavt", author.ToolTip);
+            Assert.Equal("Open Nazar Khozin's GitHub profile in your browser", AutomationProperties.GetName(author));
             ScrollViewer scroll = InputSettingsPolishTests.Descendants(window).OfType<ScrollViewer>().Single();
             Assert.True(close.IsCancel); Assert.True(close.Focus()); Assert.Same(close, System.Windows.Input.Keyboard.FocusedElement);
             Assert.Equal(ScrollBarVisibility.Disabled, scroll.HorizontalScrollBarVisibility);
@@ -62,12 +67,18 @@ public sealed class AboutActionsTests
         string shipped = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "THIRD_PARTY_NOTICES.md"));
         int opens = 0; Window owner = new();
         ThirdPartyNoticesService service = new(directory, (actualOwner, text) =>
-        { Assert.Same(owner, actualOwner); Assert.Equal(shipped, text); opens++; });
+        {
+            Assert.Same(owner, actualOwner); Assert.StartsWith(shipped, text);
+            Assert.Contains("Copyright (c) 2026 Nazar Khozin (kranel-argonavt)", text);
+            Assert.Contains("===== licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt =====", text);
+            Assert.Contains("XmpCore 6.1.10.1 - unresolved historical license-text verification", text);
+            opens++;
+        });
         try
         {
             Assert.Equal(0, opens);
             Assert.Contains("could not be read", service.Show(owner)); Assert.Equal(0, opens);
-            File.WriteAllText(path, shipped);
+            CopyLegalDocuments(directory);
             Assert.Null(service.Show(owner)); Assert.Equal(1, opens);
             using (FileStream locked = new(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
             { Assert.Contains("present and readable beside GlyphFrame", service.Show(owner)); Assert.Equal(1, opens); }
@@ -76,10 +87,58 @@ public sealed class AboutActionsTests
         finally { owner.Close(); Directory.Delete(directory, recursive: true); }
     });
 
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("changed")]
+    [InlineData("invalid-json")]
+    [InlineData("traversal")]
+    public void Notices_RejectIncompleteAlteredOrUnsafeLegalCollection(string fault) => InputSettingsPolishTests.Sta(() =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "GlyphFrame-notices-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        Window owner = new();
+        int opens = 0;
+        ThirdPartyNoticesService service = new(directory, (_, _) => opens++);
+        try
+        {
+            CopyLegalDocuments(directory);
+            string license = Path.Combine(directory, "licenses", "SkiaSharp", "LICENSE.txt");
+            string manifest = Path.Combine(directory, "licenses", "manifest.json");
+            switch (fault)
+            {
+                case "missing": File.Delete(license); break;
+                case "changed": File.AppendAllText(license, "changed license"); break;
+                case "invalid-json": File.WriteAllText(manifest, "invalid"); break;
+                case "traversal":
+                    File.WriteAllText(manifest, File.ReadAllText(manifest)
+                        .Replace("licenses/SkiaSharp/LICENSE.txt", "licenses/../LICENSE", StringComparison.Ordinal)); break;
+            }
+            Assert.Contains("could not be read", service.Show(owner));
+            Assert.Equal(0, opens);
+        }
+        finally { owner.Close(); Directory.Delete(directory, recursive: true); }
+    });
+
+    private static void CopyLegalDocuments(string directory)
+    {
+        string root = AppContext.BaseDirectory;
+        using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "licenses", "manifest.json")));
+        foreach (string relative in manifest.RootElement.GetProperty("Files").EnumerateArray()
+            .Select(file => file.GetProperty("Path").GetString()!).Append("licenses/manifest.json"))
+        {
+            string target = Path.Combine(directory, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(Path.Combine(root, relative), target, overwrite: true);
+        }
+    }
+
     [Fact]
     public void Notices_ViewerIsReadOnlyCompleteSelectableWrappedAndScrollable() => InputSettingsPolishTests.Sta(() =>
     {
-        string content = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "THIRD_PARTY_NOTICES.md"));
+        string content = string.Empty;
+        Window owner = new();
+        try { Assert.Null(new ThirdPartyNoticesService(AppContext.BaseDirectory, (_, text) => content = text).Show(owner)); }
+        finally { owner.Close(); }
         Window window = Phase13UiTests.LoadLooseWindow("NoticesWindow.xaml");
         window.DataContext = new { Text = content }; window.Width = 420; window.Height = 350; window.Left = -10000; window.ShowActivated = false;
         try

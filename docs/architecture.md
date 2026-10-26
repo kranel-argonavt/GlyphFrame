@@ -2,6 +2,8 @@
 
 GlyphFrame is a .NET 10 / WPF application organized around a shared symbol-rendering core and explicit media ownership. The UI coordinates workflows; it does not implement a codec or encode video in the player.
 
+The source repository contains no FFmpeg executables. An explicit developer acquisition step populates ignored `artifacts/local-runtime/`; MSBuild copies available tools into the existing application-relative `Tools/ffmpeg/` runtime layout. Production tool discovery is unchanged. Fresh source builds without tools support image workflows and report video tools unavailable; full media tests/local packages require initialization. See [tool setup](../Tools/ffmpeg/README.md).
+
 ## Project boundaries
 
 | Project | Responsibility | Project dependencies |

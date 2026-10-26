@@ -8,6 +8,7 @@
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\GlyphFrame.ico</ApplicationIcon>
+    <GlyphFrameFfmpegDirectory Condition="'$(GlyphFrameFfmpegDirectory)' == ''">$(MSBuildProjectDirectory)\..\..\artifacts\local-runtime\Tools\ffmpeg</GlyphFrameFfmpegDirectory>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,11 +23,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\Tools\ffmpeg\ffmpeg.exe"
+    <Content Include="..\..\LICENSE" Link="LICENSE"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(GlyphFrameFfmpegDirectory)\ffmpeg.exe" Condition="Exists('$(GlyphFrameFfmpegDirectory)\ffmpeg.exe')"
              Link="Tools\ffmpeg\ffmpeg.exe"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="..\..\Tools\ffmpeg\ffprobe.exe"
+    <Content Include="$(GlyphFrameFfmpegDirectory)\ffprobe.exe" Condition="Exists('$(GlyphFrameFfmpegDirectory)\ffprobe.exe')"
              Link="Tools\ffmpeg\ffprobe.exe"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
@@ -47,5 +52,10 @@
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <Target Name="ExplainMissingLocalVideoTools" BeforeTargets="Build"
+          Condition="!Exists('$(GlyphFrameFfmpegDirectory)\ffmpeg.exe') Or !Exists('$(GlyphFrameFfmpegDirectory)\ffprobe.exe')">
+    <Message Importance="high" Text="Local FFmpeg tools are absent: image workflows remain available; initialize video tools with scripts/Initialize-LocalTools.ps1, then rebuild. See Tools/ffmpeg/README.md." />
+  </Target>
 
 </Project>

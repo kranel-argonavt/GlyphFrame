@@ -1,5 +1,7 @@
 # Phase 5 media fixtures
 
+FFmpeg references below describe fixture generation and the runtime tool layout, not executables included in the portfolio source. Reproduction requires the explicit [local tool setup](../../../Tools/ffmpeg/README.md); do not regenerate fixtures during ordinary tests.
+
 The Phase 5 `sample.*`, `silent.mkv`, `rotated.jpeg`, landscape/portrait, and broken files under `Fixtures/` are tiny, deterministic, copyright-free container headers. They contain only the minimum structures required to exercise PNG, JPEG/EXIF, WebP, BMP, MP4, MOV, AVI, and MKV metadata readers; those Phase 5 video fixtures contain no playable frames or user media.
 
 Tests copy the committed fixtures into an isolated `%TEMP%\GlyphFrame.Tests` directory and delete that test-owned directory afterward. They do not generate or download media, do not require FFmpeg, and never access the user's media or `%LocalAppData%\GlyphFrame` directories.
@@ -23,7 +25,7 @@ Phase 10 adds five locally generated audio fixtures and reuses `video-preview.mp
 The compatible fixture is reproducible from the repository root with the bundled tools using this command shape (change the tone frequency and audio duration for the other AAC cases):
 
 ```powershell
-Tools/ffmpeg/ffmpeg.exe -f lavfi -i "testsrc2=size=64x48:rate=10:duration=1.2" -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=1.2" -map 0:v:0 -map 1:a:0 -c:v libx264 -crf 18 -preset veryfast -pix_fmt yuv420p -c:a aac -b:a 96k -ac 1 -f mp4 -y tests/GlyphFrame.Tests/Fixtures/video-audio-aac.mp4
+artifacts/local-runtime/Tools/ffmpeg/ffmpeg.exe -f lavfi -i "testsrc2=size=64x48:rate=10:duration=1.2" -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=1.2" -map 0:v:0 -map 1:a:0 -c:v libx264 -crf 18 -preset veryfast -pix_fmt yuv420p -c:a aac -b:a 96k -ac 1 -f mp4 -y tests/GlyphFrame.Tests/Fixtures/video-audio-aac.mp4
 ```
 
 The incompatible fixture uses the same video source with a 44.1 kHz sine tone and `-c:a pcm_s16le -ac 1 -f mov`. The committed files were verified with bundled ffprobe for codec, sample rate, channel count, duration, and frame count.

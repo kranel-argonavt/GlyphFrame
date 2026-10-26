@@ -67,6 +67,11 @@ function Verify-Tool([string]$RelativePath) {
 }
 
 try {
+    . (Join-Path $PSScriptRoot 'LocalTools.Helpers.ps1')
+    $toolPins = Get-LocalToolPins (Join-Path $repositoryRoot 'Tools/ffmpeg/SHA256SUMS.txt')
+    if (-not (Test-LocalTools (Join-Path $repositoryRoot 'artifacts/local-runtime/Tools/ffmpeg') $toolPins)) {
+        throw 'Local video tools are required for package verification. Run scripts/Initialize-LocalTools.ps1 -Download (or -ArchivePath), then retry.'
+    }
     [IO.Directory]::CreateDirectory($publishRoot) | Out-Null
     $pathPlan = Get-PackageVerificationPathPlan ([IO.Path]::GetTempPath()) $runId
     $dataRoot = $pathPlan.DataRoot
@@ -89,6 +94,12 @@ try {
     $checks.Add('Actual application project published as self-contained Windows x64 Release')
 
     Assert-PackageRequiredFiles $publishRoot
+    if ((Get-FileHash -LiteralPath (Join-Path $repositoryRoot 'licenses/manifest.json')).Hash -ne
+        (Get-FileHash -LiteralPath (Require-File 'licenses/manifest.json')).Hash) {
+        throw 'Published legal manifest differs from repository manifest.'
+    }
+    $legal = Assert-LegalPackage $publishRoot
+    $checks.Add("Legal text hashes and exact dependency versions verified; $($legal.Status)")
     $runtime = Get-Content -LiteralPath (Join-Path $publishRoot 'GlyphFrame.App.runtimeconfig.json') -Raw | ConvertFrom-Json
     if (-not $runtime.runtimeOptions.PSObject.Properties['includedFrameworks']) {
         throw 'Runtime configuration does not describe included self-contained frameworks.'

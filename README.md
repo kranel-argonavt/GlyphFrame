@@ -4,6 +4,8 @@ A Windows desktop application that turns local images and videos into colored sy
 
 **Render → Review → Export.** Inspect the generated result before saving it; repeat an export without rerendering. Processing stays on your computer, with no uploads or telemetry.
 
+This is a **source-only portfolio project**. Original application code, tests, design assets and local installer/build scripts are included; FFmpeg executables, restored packages and ready-to-run Setup/ZIP downloads are not. Binary-release licensing review remains open; see [licensing](docs/licensing.md).
+
 ## Features
 
 - PNG, JPG/JPEG, WebP and BMP image input; MP4, MOV, MKV and AVI video input.
@@ -26,10 +28,17 @@ From the repository root:
 dotnet restore GlyphFrame.sln
 dotnet build GlyphFrame.sln -c Release --no-restore
 dotnet run --project src/GlyphFrame.App/GlyphFrame.App.csproj -c Release --no-build
+```
+
+A fresh source checkout builds without FFmpeg: image workflows are available, while video tooling is reported unavailable. To enable video and the full integration suite, explicitly prepare the pinned local tools with **PowerShell 7**, then rebuild:
+
+```powershell
+pwsh -NoProfile -File scripts/Initialize-LocalTools.ps1 -Download
+dotnet build GlyphFrame.sln -c Release --no-restore
 dotnet test GlyphFrame.sln -c Release --no-build --no-restore
 ```
 
-PowerShell 7 is additionally required for the packaging/helper scripts. The self-contained portable includes .NET/WPF, Skia dependencies and FFmpeg/ffprobe; these developer prerequisites do not need to be installed separately just to run that package.
+The acquisition command downloads the fixed vendor archive, verifies archive/executable SHA-256 and extracts only FFmpeg/ffprobe into ignored `artifacts/local-runtime/`. It does not run an installer or modify PATH. Builds never download these tools automatically. An offline `-ArchivePath` option and verification-only mode are documented in [Tools/ffmpeg/README.md](Tools/ffmpeg/README.md). NuGet restore separately obtains the declared .NET package dependencies; source-only does not mean dependency-free.
 
 ## Using the application
 
@@ -56,7 +65,7 @@ C# / .NET 10, WPF, MVVM with CommunityToolkit.Mvvm, dependency injection, SkiaSh
 
 ## Verification and compatibility
 
-The recorded implementation passed **1,274 Release tests**, a zero-warning/error build, formatting/diff checks and **62 separate installer/packaging/session helper checks**. Package integrity, native installer workflows and user-reported application checks have separately scoped evidence; tests do not declare a public release.
+The recorded implementation passed **1,278 Release tests**, a zero-warning/error build, formatting/diff checks and **92 separate installer/packaging/session/legal/source-preparation helper checks**. A fresh history-free source copy also built successfully without FFmpeg; explicit acquisition and tool-enabled output hashes were verified separately. Package integrity, native installer workflows and user-reported application checks have separately scoped evidence; tests do not declare a public release.
 
 Manual clean-PC feedback was positive on the user's reported Windows 11 build and last supplied ZIP. This is not an independent runtime inventory, an exhaustive size/DPI/race matrix or a separate Windows 10 pass. Exact candidate identity, commands, evidence methods and remaining limits are in [testing](docs/testing.md) and [packaging](docs/packaging.md#recorded-candidate).
 
@@ -69,7 +78,7 @@ Important limits:
 
 ## Packaging
 
-On Windows with PowerShell 7 and the build prerequisites:
+Local binary packaging is retained for development, **not offered as a cleared public download**. On Windows with PowerShell 7, initialized local tools and the build prerequisites:
 
 ```powershell
 pwsh -NoProfile -File scripts/Build-PortablePackage.ps1
@@ -85,7 +94,7 @@ An unsigned English **per-user x64 installer** is also available as a local buil
 
 Source media is opened read-only and never renamed, modified or deleted. Frames are processed through bounded memory; the application owns a generated review-video cache, not a source-media copy. Media paths/content are not saved in preferences or diagnostic logs. There is no telemetry, analytics or upload.
 
-Application licensing and public-distribution review have not been finalized. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the bundled [FFmpeg distribution information](Tools/ffmpeg/DISTRIBUTION_README.txt), [license](Tools/ffmpeg/LICENSE.txt) and [checksums](Tools/ffmpeg/SHA256SUMS.txt) record dependency attribution/provenance; they are not a release approval.
+Original GlyphFrame code is [MIT-licensed](LICENSE), Copyright (c) 2026 Nazar Khozin (kranel-argonavt). Third-party components retain their own licenses. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) indexes the retained texts and dependency references; [licensing](docs/licensing.md) separates source publication from the unresolved FFmpeg, XmpCore and Windows-native **binary-distribution** review. No Setup/ZIP release is declared. Attribution and passing integrity checks are not a legal-compliance sign-off.
 
 ## Documentation
 
@@ -93,6 +102,8 @@ Application licensing and public-distribution review have not been finalized. [T
 - [Architecture](docs/architecture.md) — project boundaries, processing flow and ownership.
 - [Testing](docs/testing.md) — commands, coverage, recorded results and limitations.
 - [Packaging](docs/packaging.md) — self-contained builds, extracted validation and candidate identity.
+- [Licensing](docs/licensing.md) — code license, dependency texts, version binding and open distribution gates.
+- [Portfolio source preparation](docs/portfolio.md) — history-free source snapshot, local-only artifacts and publication boundaries.
 - [ADR 0001: native video playback](docs/decisions/0001-native-video-playback.md) — decision, alternatives and compatibility evidence.
 - [Changelog](CHANGELOG.md) — concise user-visible work, not iteration journals.
 - [Test media fixtures](tests/GlyphFrame.Tests/TestInfrastructure/MediaFixtures.md) — synthetic fixture provenance and reproduction.

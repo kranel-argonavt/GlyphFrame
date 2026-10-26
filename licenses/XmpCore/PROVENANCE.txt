@@ -1,0 +1,41 @@
+XmpCore 6.1.10.1 - unresolved historical license-text verification
+
+This is a provenance note, NOT a replacement license or a permission grant.
+The published package's README declares the same BSD license as Adobe's XMP SDK.
+Its legacy Adobe license URL currently returns 404, and neither the package nor
+the exact source tag supplies a standalone LICENSE/COPYING/NOTICE file.
+
+Project: https://github.com/drewnoakes/xmp-core-dotnet
+Tag: 6.1.10.1
+Tag commit: 66b975558d9199cd3eb49093261a61deb30f8c06
+README: https://github.com/drewnoakes/xmp-core-dotnet/blob/66b975558d9199cd3eb49093261a61deb30f8c06/README.md
+Legacy URL: https://www.adobe.com/devnet/xmp/library/eula-xmp-library-java.html
+
+Package copyright metadata: Copyright 2015-2021
+Package author/maintainer: Drew Noakes
+The README credits initial porting by Yakov Danila and Nathanael Jones.
+The source retains Adobe Systems Incorporated copyright (2006-2007), among
+other per-file notices; these references are not a complete attribution set.
+
+Do not classify this component as Apache-2.0 based on MetadataExtractor's license,
+and do not substitute a modern Adobe BSD template with guessed names or dates.
+Public distribution remains pending recovery/verification of the historical
+license and relevant attribution for this release, or an approved alternative.
+
+Follow-up verification (2026-10-26):
+The original Adobe XMPCore 6.1.10 Maven artifact's POM declares "The BSD License"
+and references that same unavailable Adobe URL. However, META-INF/LICENSE inside
+the published JAR contains an Adobe confidential/proprietary notice restricting
+reproduction without prior permission, not a BSD redistribution text. The same
+text appears in maintainer Drew Noakes' reconstructed 6.1.10 Java source tag.
+This is conflicting historical evidence, not a recovered BSD license grant.
+
+Artifact: https://repo.maven.apache.org/maven2/com/adobe/xmp/xmpcore/6.1.10/xmpcore-6.1.10.jar
+SHA-256: 5165d0912036b0bbe9513d58b4849baa6d68c49de50eb858bc481ebf36f15aea
+POM: https://repo.maven.apache.org/maven2/com/adobe/xmp/xmpcore/6.1.10/xmpcore-6.1.10.pom
+Historical source: https://github.com/drewnoakes/adobe-xmp-core/blob/1428bd60ed4ba7558f6511e4eca1dd18c23804c9/META-INF/LICENSE
+
+Do not interpret this as a determination that BSD permission is absent or that
+Adobe's label is necessarily controlling; the conflict needs authoritative
+clarification or an approved dependency alternative. No upstream contact was
+made on the project author's behalf during this investigation.

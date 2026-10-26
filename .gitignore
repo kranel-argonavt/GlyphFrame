@@ -16,6 +16,9 @@ publish/
 dist/
 releases/
 
+# Third-party executables are acquired locally, never part of source publication.
+Tools/ffmpeg/*.exe
+
 # Tests and coverage
 [Tt]est[Rr]esults/
 *.trx

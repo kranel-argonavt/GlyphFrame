@@ -29,7 +29,7 @@ public sealed class StreamingVideoExportIntegrationTests
         using TemporaryMediaDirectory media = new("керований кеш 日本語");
         string input = media.CopyFixture(fixture, "джерело артефакту 日本語" + Path.GetExtension(fixture));
         byte[] sourceBytes = await File.ReadAllBytesAsync(input);
-        BundledFfmpegLocator locator = new(RepositoryRoot);
+        BundledFfmpegLocator locator = new(Path.Combine(RepositoryRoot, "artifacts", "local-runtime"));
         ProcessRunner processRunner = new();
         using FfmpegValidationService validation = new(locator, processRunner);
         FfprobeVideoMetadataReader metadataReader = new(
@@ -162,7 +162,7 @@ public sealed class StreamingVideoExportIntegrationTests
         using TemporaryMediaDirectory media = new("експорт 日本語 测试");
         string input = media.CopyFixture("video-preview-rotated.mov", "обернене джерело 日本語.MOV");
         string output = Path.Combine(media.RootPath, "символізоване відео 测试.mp4");
-        BundledFfmpegLocator locator = new(RepositoryRoot);
+        BundledFfmpegLocator locator = new(Path.Combine(RepositoryRoot, "artifacts", "local-runtime"));
         ProcessRunner processRunner = new();
         using FfmpegValidationService validation = new(locator, processRunner);
         FfprobeVideoMetadataReader metadataReader = new(
@@ -273,7 +273,7 @@ public sealed class StreamingVideoExportIntegrationTests
         using TemporaryMediaDirectory media = new("скасування 日本語 测试");
         string input = media.CopyFixture("video-preview-rotated.mov", "джерело скасування 日本語.MOV");
         string output = Path.Combine(media.RootPath, "скасований результат 测试.mp4");
-        BundledFfmpegLocator locator = new(RepositoryRoot);
+        BundledFfmpegLocator locator = new(Path.Combine(RepositoryRoot, "artifacts", "local-runtime"));
         ProcessRunner processRunner = new();
         using FfmpegValidationService validation = new(locator, processRunner);
         FfprobeVideoMetadataReader metadataReader = new(

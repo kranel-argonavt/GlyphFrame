@@ -1,14 +1,15 @@
 # Packaging
 
-GlyphFrame uses a self-contained Windows x64 payload, distributed as a portable ZIP or per-user Setup. The build and verification scripts create local candidates; they do not sign, tag, upload or publish a release.
+GlyphFrame retains local self-contained Windows x64 portable ZIP and per-user Setup workflows. The portfolio repository is source-only: these outputs are not included or offered as cleared public downloads. The build and verification scripts create local candidates; they do not sign, tag, upload or publish a release. For a history-free source snapshot instead, see [portfolio preparation](portfolio.md).
 
 ## Build a candidate
 
-Build prerequisites: Windows x64, PowerShell 7, .NET 10 SDK, Git, committed bundled tools and access to configured NuGet sources/runtime packs. These are developer requirements, not separate runtime prerequisites for the self-contained package.
+Build prerequisites: Windows x64, PowerShell 7, .NET 10 SDK, Git, explicitly initialized local FFmpeg tools and access to configured NuGet sources/runtime packs. These are developer requirements, not separate runtime prerequisites for the self-contained package. Executables are not tracked in the source snapshot; [local acquisition](../Tools/ffmpeg/README.md) verifies the fixed archive and executable hashes. Packaging refuses missing/altered tools rather than silently producing an image-only ZIP or downloading them itself.
 
 From the repository root:
 
 ```powershell
+pwsh -NoProfile -File scripts/Initialize-LocalTools.ps1 -Download
 pwsh -NoProfile -File scripts/Build-PortablePackage.ps1
 ```
 
@@ -20,6 +21,8 @@ artifacts/portable-packages/<run-id>/
 │   ├── GlyphFrame.App.exe
 │   ├── README.md
 │   ├── THIRD_PARTY_NOTICES.md
+│   ├── LICENSE
+│   ├── licenses/[versioned manifest, texts and provenance]
 │   ├── [application, runtime and native files]
 │   └── Tools/ffmpeg/[tools, checksums and attribution]
 ├── GlyphFrame-<version>-win-x64-portable.zip
@@ -32,7 +35,7 @@ The version comes from the published assembly's Major.Minor.Build, matching Abou
 
 ## What verification establishes
 
-The publish verifier checks required application/CLR/WPF/Skia assets, bundled FFmpeg/ffprobe, committed tool checksums, attribution, tool execution and outside-repository startup. It positively observes the launched PID's exclusive production-session lease and verifies removal of that exact session after normal close; an absent cache alone is not cleanup proof.
+The publish verifier checks required application/CLR/WPF/Skia assets, bundled FFmpeg/ffprobe, committed tool checksums, attribution, tool execution and outside-repository startup. It verifies canonical legal-text hashes and exact non-project dependency versions against `licenses/manifest.json`; changed dependencies or missing/altered texts fail. This confirms collection integrity, **not legal completeness**: reports explicitly retain the [open licensing gates](licensing.md). It positively observes the launched PID's exclusive production-session lease and verifies removal of that exact session after normal close; an absent cache alone is not cleanup proof.
 
 Archive validation compares every payload path, byte length and SHA-256 against the staging manifest. Duplicate/conflicting/unsafe paths and forbidden development/user-data content are rejected; PDBs are excluded. Staging is rechecked before completion. The ZIP checksum identifies that particular archive; reproducible steps do not promise byte-identical ZIPs across separate builds.
 
@@ -63,21 +66,22 @@ Helper-only regressions are documented in [testing.md](testing.md#run-the-automa
 
 ## Recorded candidate
 
-Current paired local candidate, not a downloadable/public release. Record date: 2026-10-26.
+Last built paired local candidate, not a downloadable/public release. Record date: 2026-10-26. Its 16-document legal inventory predates the follow-up Windows-native terms and historical XMP conflict findings; it is superseded for licensing review and is not a current legally cleared distribution.
 
 | Field | Recorded value |
 | --- | --- |
 | Version / target | 1.0.0 / Release / win-x64 / self-contained folder |
-| Build source | `9e9a8b3e104adca6d4bff7aaa64edd16517d4846` plus uncommitted installer/icon changes; dirty at build |
-| Run identity | `d7e5c68fceb14da7951ee98240fd6bb7` for both formats |
+| Build source | `c07025993bc81544be1403acca92f18de1b1cb9d` plus uncommitted licensing/About changes; dirty at build |
+| Run identity | `d32c941154ba41c6a467ca3c7fa98e66` for both formats |
 | ZIP | `GlyphFrame-1.0.0-win-x64-portable.zip` |
-| ZIP SHA-256 | `45d9d0b6890ace57c6a386f4d5d826cc8dff22df68c6d6045825519c76287ea1` |
+| ZIP SHA-256 | `05a7afd489f1267f3bd0a595446a212563a6ce502fc57d2eae5ec26168448e7b` |
 | Setup | `GlyphFrame-1.0.0-win-x64-Setup.exe`, unsigned |
-| Setup SHA-256 | `cfd06f3a45bc0548ed71dbe54c27acdcf974e2f69afe81f6b489aaed79129a17` |
-| Artifact checks | All 416 payload paths/lengths/hashes, published startup/session cleanup and embedded EXE/Setup icon frames passed |
-| Installed-copy checks | Same-version update matched all 416 hashes and preserved settings/exports; native Rose startup passed |
+| Setup SHA-256 | `3b29405e01e586750732877a2dfcce9adc69446aae7113e7d72a12332c99bde7` |
+| Artifact checks | All 430 payload paths/lengths/hashes, 16 legal texts/9 exact dependency bindings, published startup/session cleanup and embedded EXE/Setup icon frames passed |
+| Licensing | Original code MIT; third-party public-distribution gates explicitly incomplete |
+| Installed-copy checks | Not repeated for these bytes; existing installed copy was not replaced |
 
-Earlier extracted-ZIP and clean-PC feedback applies to retained earlier candidates, not automatically to this Setup. Native/user observations retain their separate [testing scope](testing.md#manual-observations-and-attribution). Superseded identities, full reports, failures and retries remain in local archives; the public docs do not depend on them.
+Earlier extracted-ZIP and clean-PC feedback applies to retained earlier candidates, not automatically to this Setup. The previous `d7e5c68fceb14da7951ee98240fd6bb7` candidate passed same-version installed update, all 416 installed payload hashes, preserved settings/exports and native Rose startup; those observations are not relabeled for this licensing candidate. Native/user observations retain their separate [testing scope](testing.md#manual-observations-and-attribution). Superseded identities, full reports, failures and retries remain in local archives; the public docs do not depend on them.
 
 Later helper/documentation cleanup does not change or relabel these immutable bytes. Final clean-source packaging after commit needs its own manifest/checksums and explicit evidence binding; do not silently transfer every previous observation to a new artifact.
 
@@ -104,7 +108,7 @@ By default the command first creates a fresh verified portable candidate. `-Comp
 The installation contract is:
 
 - English; Windows x64 only; per-user without requesting administrator elevation. Installer OS floor is Windows 10 build 19041, not certification of every Windows edition/runtime-support combination. Existing Windows codec/compatibility limits still apply; current human evidence is Windows 11-specific.
-- Publisher `kranel-argonavt`, with the author's GitHub profile URL. This display metadata is **not a verified signing identity**: Setup is unsigned. Windows may show an unknown-publisher or reputation warning; no certificate, security-setting change or bypass is part of this workflow.
+- Publisher `Nazar Khozin (kranel-argonavt)`, with the author's GitHub profile URL. This display metadata is **not a verified signing identity**: Setup is unsigned. The display-name change preserves the stable AppId and installation/update path. Windows may show an unknown-publisher or reputation warning; no certificate, security-setting change or bypass is part of this workflow.
 - Default program directory `%LocalAppData%\Programs\GlyphFrame`; stable AppId `9A07BED0-6720-4A06-8C95-317B14C580A0`. Later versions must retain this identity. Start Menu shortcut; desktop shortcut unchecked by default and its choice retained on update. Optional launch after install is unchecked.
 - Shell branding is a checked-in white/transparent ICO with 16/20/24/32/40/48/64/128/256-pixel frames, embedded through `ApplicationIcon` and `SetupIconFile`. Both shortcuts explicitly use the installed EXE's icon index zero. `pwsh -NoProfile -STA -File scripts/Build-ShellIcon.ps1` regenerates it from the existing WPF frame/GF geometry without changing the in-app theme. The builder checks every expected PNG frame in both EXE and Setup native resources and rejects an older payload without them. No global Windows icon-cache deletion or Explorer restart is performed.
 - Install over the existing copy while closed. The application holds a path-specific lifetime marker until process termination; Setup/uninstall check it and do not forcibly close/restart the application. Other portable paths and multiple running app instances remain supported. Setup rejects installing a lower application version over a higher one.
@@ -114,9 +118,9 @@ Compiler signature/version validation and payload checks do not establish native
 
 ### Verification status
 
-Installer checks cover first install, non-admin HKCU registration, shortcut defaults/opt-in, running-app update/uninstall refusal, same-version repair, native uninstall/data retention and reinstall. Native application smoke checks cover image/PNG and silent-video/MP4 rendering/export. Those initial lifecycle checks used an earlier installer candidate; the [current candidate](#recorded-candidate) separately passed same-version installed update, complete installed payload comparison, retained settings/exports and native Rose startup. Neither check proves a different-version upgrade.
+Earlier installer checks cover first install, non-admin HKCU registration, shortcut defaults/opt-in, running-app update/uninstall refusal, same-version repair, native uninstall/data retention and reinstall. Native application smoke checks cover image/PNG and silent-video/MP4 rendering/export. The previous installed icon candidate separately passed same-version update, complete installed payload comparison, retained settings/exports and native Rose startup. The [current licensing candidate](#recorded-candidate) has not been installed; its new About/notices checks are automated WPF fixtures, not native acceptance. None of these checks proves a different-version upgrade.
 
-The user reported **1.0.0 / Rose** colors/logos, Save & Close, full restart and About all OK, then explicitly confirmed the corrected desktop icon after the current Setup was applied. Record these as **USER-REPORTED PASS**, distinct from agent-native inspection and read-only Shell icon extraction; no new measured DPI matrix is implied.
+The user reported **1.0.0 / Rose** colors/logos, Save & Close, full restart and About all OK, then explicitly confirmed the corrected desktop icon after the earlier icon Setup was applied. Record these as **USER-REPORTED PASS**, distinct from agent-native inspection and read-only Shell icon extraction; no new measured DPI matrix is implied.
 
 True version-changing upgrade/downgrade, clean-PC Setup, reputation prompts on downloaded unsigned bytes and the optional post-install launch action remain unverified. No security warning was bypassed. Complete attempt logs and prior candidate identities are retained locally, not repeated in this public guide.
 
@@ -124,6 +128,6 @@ True version-changing upgrade/downgrade, clean-PC Setup, reputation prompts on d
 
 - Select final source/artifact identity and carry forward or repeat affected verification honestly.
 - Keep [third-party notices](../THIRD_PARTY_NOTICES.md), bundled [FFmpeg license](../Tools/ffmpeg/LICENSE.txt), [distribution provenance](../Tools/ffmpeg/DISTRIBUTION_README.txt) and [checksums](../Tools/ffmpeg/SHA256SUMS.txt).
-- Resolve the application's license and bundled FFmpeg corresponding-source/distribution obligations with the release owner. Attribution/checksum verification is not a legal compliance sign-off.
+- Original GlyphFrame code is MIT-licensed. Resolve [FFmpeg complete Corresponding Source, conflicting historical XmpCore terms and Windows-native end-user/distributor requirements](licensing.md) before public binary distribution. Original private Git history still contains executable payloads; use the separate history-free [source snapshot](portfolio.md), not that history, for source-only publication. Current project visual provenance is owner-confirmed; future imported media needs separate review. Attribution/checksum verification is not a legal compliance sign-off.
 - Prepare portfolio screenshots, owned/generated sample media and a demo; no personal media or local evidence dumps belong in the package.
 - Publish/tag/upload only with explicit authorization. No public release or license choice is created by this document or the packaging command.

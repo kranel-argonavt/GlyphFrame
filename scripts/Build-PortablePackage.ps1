@@ -23,6 +23,7 @@ $sourceCommit = $null
 $sourceStatus = @()
 $sdkVersion = $null
 $excludedSymbols = @()
+$legal = $null
 try {
     $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD | Out-String).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source commit.' }
@@ -59,6 +60,7 @@ try {
     $readme = Get-Content -LiteralPath (Join-Path $repositoryRoot 'docs/Portable_README.md') -Raw
     [IO.File]::WriteAllText((Join-Path $payloadRoot 'README.md'), $readme.Replace('{{VERSION}}', $version), [Text.UTF8Encoding]::new($false))
     Assert-PackageRequiredFiles $payloadRoot
+    $legal = Assert-LegalPackage $payloadRoot
     $payload = @(Get-PortablePayload $payloadRoot)
     $payload | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $runRoot 'payload-manifest.json') -Encoding utf8
     $checks.Add('Version matches published assembly/About; required staged files and forbidden-content policy passed; PDBs excluded')
@@ -107,6 +109,7 @@ finally {
     $report['ZipBytes'] = if ($completed) { [IO.FileInfo]::new($archivePath).Length } else { $null }
     $report['PayloadManifest'] = Join-Path $runRoot 'payload-manifest.json'
     $report['ExcludedDebugSymbols'] = $excludedSymbols
+    $report['Licensing'] = $legal
     $report['ArchiveValidation'] = $archiveEvidence
     $report['PublishVerificationReport'] = $verificationReport
     $report['PublishVerification'] = $verification

@@ -70,7 +70,7 @@ try {
     }
     $policy=[IO.File]::ReadAllText((Join-Path $repo 'installer/GlyphFrame.iss'))
     Run-Check 'Stable non-versioned identity and exact Publisher' {
-        Assert-Check ($policy.Contains('9A07BED0-6720-4A06-8C95-317B14C580A0') -and $policy.Contains('AppPublisher=kranel-argonavt') -and $policy.Contains('https://github.com/kranel-argonavt')) 'Publisher/identity policy missing.'
+        Assert-Check ($policy.Contains('9A07BED0-6720-4A06-8C95-317B14C580A0') -and $policy.Contains('AppPublisher=Nazar Khozin (kranel-argonavt)') -and $policy.Contains('https://github.com/kranel-argonavt')) 'Publisher/identity policy missing.'
     }
     Run-Check 'Per-user x64 installation, no elevation override' {
         Assert-Check ($policy.Contains('PrivilegesRequired=lowest') -and $policy.Contains('ArchitecturesAllowed=x64os') -and $policy.Contains('DefaultDirName={localappdata}\Programs\GlyphFrame') -and -not $policy.Contains('PrivilegesRequiredOverridesAllowed=')) 'Install scope mismatch.'

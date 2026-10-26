@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using GlyphFrame.App.Services;
@@ -25,6 +27,22 @@ public partial class AboutWindow : Window
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void AuthorProfile_Click(object sender, RoutedEventArgs e)
+    {
+        // Fixed destination; no media, settings, paths or document content is transmitted.
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://github.com/kranel-argonavt") { UseShellExecute = true });
+            NoticesFeedback.Text = string.Empty;
+            NoticesFeedback.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
+        {
+            NoticesFeedback.Text = "The browser could not be opened. Visit https://github.com/kranel-argonavt.";
+            NoticesFeedback.Visibility = Visibility.Visible;
+        }
+    }
 
     private void ThirdPartyNotices_Click(object sender, RoutedEventArgs e)
     {

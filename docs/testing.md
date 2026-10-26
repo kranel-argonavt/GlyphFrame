@@ -4,9 +4,10 @@ GlyphFrame separates deterministic logic/component tests, real media/file integr
 
 ## Run the automated checks
 
-Use Windows x64 with the .NET 10 SDK and access to the configured NuGet sources. From the repository root:
+Use Windows x64 with the .NET 10 SDK and access to the configured NuGet sources. The full suite includes real FFmpeg integration: initialize [pinned local tools](../Tools/ffmpeg/README.md) explicitly first. These tests are not silently skipped when tools are absent. A fresh image-only source build is a separate check, not a full-suite pass. From the repository root:
 
 ```powershell
+pwsh -NoProfile -File scripts/Initialize-LocalTools.ps1 -Download
 dotnet restore GlyphFrame.sln
 dotnet build GlyphFrame.sln -c Release --no-restore
 dotnet test GlyphFrame.sln -c Release --no-build --no-restore
@@ -27,9 +28,11 @@ PowerShell 7 helper regressions are separate from xUnit and do not publish or la
 pwsh -NoProfile -File scripts/Test-PortablePackage.ps1
 pwsh -NoProfile -File scripts/Test-PackageVerificationSession.ps1
 pwsh -NoProfile -File scripts/Test-InstallerPackage.ps1
+pwsh -NoProfile -File scripts/Test-PackageLegal.ps1
+pwsh -NoProfile -File scripts/Test-SourcePreparation.ps1
 ```
 
-Publishing/startup validation is an explicit separate operation; see [packaging](packaging.md).
+Publishing/startup validation is an explicit separate operation; see [packaging](packaging.md). Source-preparation helpers use inert synthetic ZIP entries, check pinned hashes/path policy and refuse overwrite; they do not download or execute FFmpeg. Source snapshot verification excludes Git history and runtime payloads; it does not certify secret absence or binary-release licensing.
 
 ## Coverage that matters
 
@@ -52,12 +55,16 @@ Current summary as of 2026-10-26; opening this document does not execute tests. 
 
 | Check | Recorded result | Boundary |
 | --- | --- | --- |
-| Automated implementation | **1,274 Release tests**, 488 core/infrastructure/rendering + 786 App; zero failures/skips; build zero warnings/errors; format/diff passed | Implementation based on `9e9a8b3` plus uncommitted changes, not final clean-source release acceptance. Includes 6 lifetime-marker and 10 icon cases. |
-| PowerShell helpers | **27 installer + 20 portable + 15 session checks** passed | 62 separate checks, not additions to xUnit. Includes trailing-separator package identity and invalid/failed-run rejection; no app launch or installation. |
-| Package integrity | Current paired candidate: all **416 payloads**, published startup/session cleanup and embedded shell icons passed | [Current artifact identity](packaging.md#recorded-candidate). Earlier independent extracted-ZIP checks are retained locally and are not silently transferred to new bytes. |
+| Automated implementation | **1,278 Release tests**, 488 core/infrastructure/rendering + 790 App; zero failures/skips; format/diff passed | Rerun with source-only tool-path changes and licensing/About work on parent `c070259`; dirty source, not clean-source release acceptance. Includes incomplete/altered/unsafe local legal-collection regressions. |
+| PowerShell helpers | **27 installer + 20 portable + 15 session + 17 legal + 13 source checks** passed | 92 separate checks, not additions to xUnit. Source checks cover inert extraction, altered archive/tool bytes, traversal/duplicates, missing pairs and no-overwrite/path policy; no helper-test app launch/installation. |
+| Source-only preparation | Fresh history-free snapshot restored/built with no FFmpeg tools or stale output; 0 warnings/errors. Explicit fixed-archive acquisition, repeat verification and rebuilt output tool hashes passed | Local working-source snapshot, not a new Git commit/public repository or native clean-machine test. Original private Git history remains unchanged and contains older executables. |
+| Local publish after tool relocation | Self-contained Windows x64 output preserved pinned tools and verified **19 legal documents / 9 dependency bindings** | Fresh local publish only; no Setup/ZIP release, native application launch or legal approval inferred. |
+| Package integrity | Current paired candidate: all **430 payloads**, 16 legal documents/9 dependency bindings, published startup/session cleanup and embedded shell icons passed | [Current artifact identity](packaging.md#recorded-candidate). Public licensing remains incomplete; earlier extracted-ZIP/installed-copy checks are not silently transferred to new bytes. |
 | Installer lifecycle | First install, English wizard/task defaults, registration, running-app refusals, same-version repair, native uninstall/data retention and reinstall passed | Initial native/CLI checks used an earlier Setup. Current Setup separately passed installed update, all payload hashes, retained settings/exports and native Rose startup; [scope](packaging.md#verification-status). Not a different-version upgrade or clean-PC Setup pass. |
 | Installed branding | Nine EXE/Setup frames checked; installed Shell index zero returned white 20/40-pixel icons. User confirmed Rose Save/restart/About and the visible desktop icon | **USER-REPORTED PASS** for the human observations, not an agent-observed desktop screenshot or a new DPI matrix. |
 | Recovery, publication and cleanup | Real storage/publication failures and retries, render cancellation/retention, playback-error separation and owned-session cleanup exercised | Focused tests overlap the full suite; probes/native observations are separate methods. Some timing-dependent branches remained inconclusive for the agent and have scoped later user feedback, not exhaustive OS-fault certification. |
+
+The licensing follow-up adds Windows-native vendor terms/mapping and records the owner's visual-provenance confirmation. The source collection verifies **19 documents / 9 dependency bindings**. The full suite was subsequently rerun for source-only preparation, as recorded above. The 430-file/16-document candidate predates these corrections and is superseded for legal review; no new install/public-distribution acceptance is inferred.
 
 ## Manual observations and attribution
 

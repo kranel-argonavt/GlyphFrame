@@ -16,7 +16,7 @@ public sealed class BundledFfmpegIntegrationTests
             "..",
             ".."));
         using FfmpegValidationService validator = new(
-            new BundledFfmpegLocator(repositoryRoot),
+            new BundledFfmpegLocator(Path.Combine(repositoryRoot, "artifacts", "local-runtime")),
             new ProcessRunner());
 
         FfmpegValidationResult result = await validator.ValidateAsync();

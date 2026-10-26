@@ -1,0 +1,215 @@
+{
+  "SchemaVersion": 1,
+  "PublicDistributionApproved": false,
+  "HashNormalization": "UTF-8 without BOM; CRLF normalized to LF",
+  "OpenIssues": [
+    "FFmpeg 9.0 complete Corresponding Source/build material and binary distribution route are unverified. Original private Git history retains binaries; the history-free portfolio source snapshot excludes them.",
+    "XmpCore 6.1.10.1: the declared BSD terms conflict with the confidential/proprietary notice inside Adobe's original 6.1.10 artifact. Authoritative clarification or an approved alternative is required.",
+    "Windows-native .NET Library / Windows SDK end-user and distributor protective-term requirements need a reviewed fulfillment mechanism for Setup and portable; retaining vendor texts alone is not fulfillment."
+  ],
+  "Components": [
+    {
+      "Dependency": "CommunityToolkit.Mvvm/8.4.2",
+      "Documents": [
+        "licenses/CommunityToolkit.Mvvm/LICENSE.txt",
+        "licenses/CommunityToolkit.Mvvm/THIRD-PARTY-NOTICES.txt"
+      ],
+      "Status": "Recorded texts; not a legal certification"
+    },
+    {
+      "Dependency": "MetadataExtractor/2.9.3",
+      "Documents": [
+        "licenses/MetadataExtractor/LICENSE.txt"
+      ],
+      "Status": "Recorded texts; not a legal certification"
+    },
+    {
+      "Dependency": "Microsoft.Extensions.DependencyInjection/10.0.10",
+      "Documents": [
+        "licenses/dotnet/LICENSE.txt",
+        "licenses/dotnet/THIRD-PARTY-NOTICES.txt",
+        "THIRD_PARTY_NOTICES.md"
+      ],
+      "Status": "Recorded texts; not a legal certification"
+    },
+    {
+      "Dependency": "Microsoft.Extensions.DependencyInjection.Abstractions/10.0.10",
+      "Documents": [
+        "licenses/dotnet/LICENSE.txt",
+        "licenses/dotnet/THIRD-PARTY-NOTICES.txt",
+        "THIRD_PARTY_NOTICES.md"
+      ],
+      "Status": "Recorded texts; not a legal certification"
+    },
+    {
+      "Dependency": "SkiaSharp/4.150.1",
+      "Documents": [
+        "licenses/SkiaSharp/LICENSE.txt"
+      ],
+      "Status": "Recorded texts; not a legal certification"
+    },
+    {
+      "Dependency": "SkiaSharp.NativeAssets.Win32/4.150.1",
+      "Documents": [
+        "licenses/SkiaSharp/LICENSE.txt",
+        "licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt"
+      ],
+      "Status": "Recorded texts; not a legal certification"
+    },
+    {
+      "Dependency": "runtimepack.Microsoft.NETCore.App.Runtime.win-x64/10.0.12",
+      "Documents": [
+        "licenses/dotnet/LICENSE.txt",
+        "licenses/dotnet/THIRD-PARTY-NOTICES.txt",
+        "licenses/dotnet/NET-LIBRARY-LICENSE.txt",
+        "licenses/dotnet/WINDOWS-LICENSE-MAPPING.txt"
+      ],
+      "Status": "Windows-native exceptions under .NET Library License; distribution-terms fulfillment pending"
+    },
+    {
+      "Dependency": "runtimepack.Microsoft.WindowsDesktop.App.Runtime.win-x64/10.0.12",
+      "Documents": [
+        "licenses/WPF/LICENSE.txt",
+        "licenses/WPF/THIRD-PARTY-NOTICES.txt",
+        "licenses/dotnet/THIRD-PARTY-NOTICES.txt",
+        "licenses/dotnet/NET-LIBRARY-LICENSE.txt",
+        "licenses/dotnet/WINDOWS-LICENSE-MAPPING.txt",
+        "licenses/WPF/WINDOWS-SDK-LICENSE.txt"
+      ],
+      "Status": "Named native exceptions under .NET Library / Windows SDK License; distribution-terms fulfillment pending"
+    },
+    {
+      "Dependency": "XmpCore/6.1.10.1",
+      "Documents": [
+        "licenses/XmpCore/PROVENANCE.txt"
+      ],
+      "Status": "Historical BSD declaration conflicts with Adobe artifact notice; clarification/alternative pending"
+    }
+  ],
+  "Files": [
+    {
+      "Path": "licenses/CommunityToolkit.Mvvm/LICENSE.txt",
+      "TextSha256": "1e1101b893f295b4526da2c167e4234610f1078e2fe43a0e814c1a883656877b",
+      "UpstreamByteSha256": "651997ef19dbb9ecb8dd660dbc86444a65af21f18cfe08daa69bf201cd5cfdfc",
+      "Source": "https://www.nuget.org/packages/CommunityToolkit.Mvvm/8.4.2 (License.md)"
+    },
+    {
+      "Path": "licenses/CommunityToolkit.Mvvm/THIRD-PARTY-NOTICES.txt",
+      "TextSha256": "1d7f5694814d662434fe52226d7cb0135f1d50428b4be6fee7a98b76d36d6331",
+      "UpstreamByteSha256": "7774f8b0ab66bfb47ec154ce24a2d6d574febc44a74d940b8a037d1c56756163",
+      "Source": "https://www.nuget.org/packages/CommunityToolkit.Mvvm/8.4.2 (ThirdPartyNotices.txt)"
+    },
+    {
+      "Path": "licenses/SkiaSharp/LICENSE.txt",
+      "TextSha256": "bc2eb4f37d574f9b1b67da2b17e14d151618850527d78f7323239e7518df5b77",
+      "UpstreamByteSha256": "89101e35a8c66fd4d6dffc1763259161d35cb564c169714ec227a768c89f2938",
+      "Source": "https://www.nuget.org/packages/SkiaSharp/4.150.1 (LICENSE.txt; also shipped by NativeAssets.Win32)"
+    },
+    {
+      "Path": "licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt",
+      "TextSha256": "98acf9d4d6083959988c884f630cdff760f94bfeb9acf57774653e08c23d1e45",
+      "UpstreamByteSha256": "21504c46c4c58aa64c1055bd2dcbc5f9a136b4b8c412ed3cc6740e22c5b127f5",
+      "Source": "https://www.nuget.org/packages/SkiaSharp.NativeAssets.Win32/4.150.1 (THIRD-PARTY-NOTICES.txt)"
+    },
+    {
+      "Path": "licenses/dotnet/LICENSE.txt",
+      "TextSha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310",
+      "UpstreamByteSha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b",
+      "Source": "https://www.nuget.org/packages/Microsoft.NETCore.App.Runtime.win-x64/10.0.12 (LICENSE.TXT)"
+    },
+    {
+      "Path": "licenses/dotnet/THIRD-PARTY-NOTICES.txt",
+      "TextSha256": "c6926930d0181fa515076603e1305461b1bce5275a8b35337d75d2eef3acad4a",
+      "UpstreamByteSha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21",
+      "Source": "https://www.nuget.org/packages/Microsoft.NETCore.App.Runtime.win-x64/10.0.12 (THIRD-PARTY-NOTICES.TXT; identical text in DI/Abstractions 10.0.10)"
+    },
+    {
+      "Path": "licenses/WPF/LICENSE.txt",
+      "TextSha256": "cfc21f5e8bd655ae997eec916138b707b1d290b83272c02a95c9f821b8c87310",
+      "UpstreamByteSha256": "a89886665765362eb77e0f8e26602c924520041d1711b2eedc136434fe4d01ab",
+      "Source": "https://www.nuget.org/packages/Microsoft.WindowsDesktop.App.Runtime.win-x64/10.0.12 (LICENSE)"
+    },
+    {
+      "Path": "licenses/WPF/THIRD-PARTY-NOTICES.txt",
+      "TextSha256": "d23dba2fee20c6b59d8f7088ee9ed372459c952a319b7ca90f3eec370cc76eb9",
+      "UpstreamByteSha256": "d23dba2fee20c6b59d8f7088ee9ed372459c952a319b7ca90f3eec370cc76eb9",
+      "Source": "https://raw.githubusercontent.com/dotnet/wpf/v10.0.12/THIRD-PARTY-NOTICES.TXT"
+    },
+    {
+      "Path": "licenses/MetadataExtractor/LICENSE.txt",
+      "TextSha256": "fa8ee9b6d608a5d996a974840c87357a7853e8b2d142f937e43218ba5ab50fb3",
+      "UpstreamByteSha256": "fa8ee9b6d608a5d996a974840c87357a7853e8b2d142f937e43218ba5ab50fb3",
+      "Source": "https://raw.githubusercontent.com/drewnoakes/metadata-extractor-dotnet/15be36f1f918e6cdba0bfa8feb7af7f8ac13b69f/LICENSE"
+    },
+    {
+      "Path": "licenses/InnoSetup/LICENSE.txt",
+      "TextSha256": "0c81595601bce47eeef8d865d5da7f9ca2c6a12235b7482b29f5ab23ed02ee5a",
+      "UpstreamByteSha256": "2e5346868c2a18434489824e11d65c3031620f792fefc415d05f19cd441abf5c",
+      "Source": "Inno Setup 7.1.0 installed compiler license.txt; https://jrsoftware.org/files/is/license.txt"
+    },
+    {
+      "Path": "LICENSE",
+      "TextSha256": "a43ed4021aecdba873f26d97cff8b4c07a624c82f54cd887444f63be61f5f4b1",
+      "UpstreamByteSha256": null,
+      "Source": "Original GlyphFrame code; approved by Nazar Khozin"
+    },
+    {
+      "Path": "THIRD_PARTY_NOTICES.md",
+      "TextSha256": "48e57aa4617674d09d86bc14f359517f8be97b82a0d89d554398d813a9d1187f",
+      "UpstreamByteSha256": null,
+      "Source": "GlyphFrame dependency attribution index"
+    },
+    {
+      "Path": "Tools/ffmpeg/LICENSE.txt",
+      "TextSha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "UpstreamByteSha256": null,
+      "Source": "Gyan ffmpeg-9.0-essentials_build.zip, LICENSE; original archive/file digests in Tools/ffmpeg/SHA256SUMS.txt"
+    },
+    {
+      "Path": "Tools/ffmpeg/DISTRIBUTION_README.txt",
+      "TextSha256": "eb44a453c699b7bc089dddf6b1d39b08beb8eb56180929d59218a90f7023e8dd",
+      "UpstreamByteSha256": null,
+      "Source": "Gyan ffmpeg-9.0-essentials_build.zip, README; original archive/file digests in Tools/ffmpeg/SHA256SUMS.txt"
+    },
+    {
+      "Path": "licenses/README.md",
+      "TextSha256": "ee000ae593bc595a3d763333038db627affc6383624bd8cae28deeef6208c816",
+      "UpstreamByteSha256": null,
+      "Source": "GlyphFrame license inventory policy"
+    },
+    {
+      "Path": "licenses/XmpCore/PROVENANCE.txt",
+      "TextSha256": "6f2fc99a0182cb49881986ab663a9b406007039df994a4b54c35dab928faac1e",
+      "UpstreamByteSha256": null,
+      "Source": "https://github.com/drewnoakes/xmp-core-dotnet/tree/66b975558d9199cd3eb49093261a61deb30f8c06; evidence only, not a license"
+    },
+    {
+      "Path": "licenses/dotnet/NET-LIBRARY-LICENSE.txt",
+      "TextSha256": "88d7ebd0935cc71b685323974add2759139b2afbe97081081eeb5f913d0b769f",
+      "UpstreamByteSha256": "0f69be2c8ac44c3980047664c3347ff22cba5842dc9d8b0a88a4f0914645a780",
+      "Source": "https://dotnet.microsoft.com/en-us/dotnet_library_license.htm",
+      "Extraction": "Official HTML decoded using its declared windows-1252 charset; visible legal body to plain text, paragraph whitespace normalized, hyperlink destinations retained. Original HTML hash is the upstream byte digest."
+    },
+    {
+      "Path": "licenses/WPF/WINDOWS-SDK-LICENSE.txt",
+      "TextSha256": "375140d46a2d826ed19c54c0f0a22a50043f8cff772566fc764345339b95c6d2",
+      "UpstreamByteSha256": "9515a0f1ab29ed521e5960d1c76376c8c15544c7681e5cf11a76138e55d53470",
+      "Source": "https://learn.microsoft.com/en-us/legal/windows-sdk/license",
+      "Extraction": "Official HTML visible legal body to plain text; paragraph whitespace normalized and hyperlink destinations retained. Original HTML hash is the upstream byte digest."
+    },
+    {
+      "Path": "licenses/dotnet/WINDOWS-LICENSE-MAPPING.txt",
+      "TextSha256": "3bdf7142d570f11780d1a5fcb6cbe47f5cf4a15bc634acf8db93fe3be8837119",
+      "UpstreamByteSha256": "3bdf7142d570f11780d1a5fcb6cbe47f5cf4a15bc634acf8db93fe3be8837119",
+      "Source": "https://raw.githubusercontent.com/dotnet/core/6c25b9da384e8d8a16fd12c79da8a8aa6bdfc6a1/license-information-windows.md",
+      "Extraction": "Upstream Markdown retained as inert plain text; relative references are resolved at the recorded upstream source URL, not repository-local links."
+    }
+  ],
+  "OwnershipEvidence": {
+    "Status": "USER-REPORTED confirmed for current project-specific visuals; not independently investigated",
+    "Date": "2026-10-26",
+    "Author": "Nazar Khozin",
+    "Scope": "Current GlyphFrame GF/logo/icon design and historical design reference; excludes unrelated/future media",
+    "Documents": "docs/design_reference/README.md"
+  }
+}
