@@ -13,6 +13,8 @@ This file summarizes user-visible work. It is not a release/tag history or a rep
 - Responsive processing/result layouts, gesture-only image zoom/pan, live-accent branding and reduced-motion behavior.
 - Draft-based settings with explicit Save/Cancel/Reset, local notices, recovery guidance and optional technical error details.
 - Privacy-safe local diagnostics, synthetic media/integration tests and verified self-contained portable packaging.
+- English per-user x64 Setup built from the verified portable payload, with optional desktop shortcut, stable upgrade identity, running-installation protection and data-preserving uninstall.
+- Static white, transparent multi-resolution Windows shell branding embedded in the application and Setup; themed in-app logos remain accent-aware.
 
 ### Refined
 

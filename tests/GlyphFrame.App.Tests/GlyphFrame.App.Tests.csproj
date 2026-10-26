@@ -18,6 +18,8 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Include="..\..\src\GlyphFrame.App\Assets\GlyphFrame.ico"
+          Link="Fixtures\GlyphFrame.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

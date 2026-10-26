@@ -26,6 +26,7 @@ PowerShell 7 helper regressions are separate from xUnit and do not publish or la
 ```powershell
 pwsh -NoProfile -File scripts/Test-PortablePackage.ps1
 pwsh -NoProfile -File scripts/Test-PackageVerificationSession.ps1
+pwsh -NoProfile -File scripts/Test-InstallerPackage.ps1
 ```
 
 Publishing/startup validation is an explicit separate operation; see [packaging](packaging.md).
@@ -47,21 +48,22 @@ Tests use locally generated synthetic media, not personal downloads. [MediaFixtu
 
 ## Recorded verification snapshot
 
-Recorded on 2026-10-25; this is evidence for the listed revisions/conditions, not an execution triggered by opening this document.
+Current summary as of 2026-10-26; opening this document does not execute tests. Full attempts, previous baselines and superseded package identities remain in local archives.
 
 | Check | Recorded result | Boundary |
 | --- | --- | --- |
-| Clean automated baseline | `f3004e7`: **1,258 Release tests**, 488 core/infrastructure/rendering + 770 App; zero failures/skips; forced rebuild zero warnings/errors; format/diff passed | First-invocation post-commit pass. Earlier failed attempts and test-isolation investigation are retained locally. |
-| Packaging helpers | **20 portable + 15 session checks** passed | Separate helper cases, not additions to the xUnit count. |
-| Portable construction/extraction | 11 publish checks, all **416 payloads**, 9 independent extracted checks | Exact retained candidate/source/hash are in [packaging](packaging.md#recorded-candidate). Startup is not complete interactive acceptance. |
-| Settings/native recovery | Real Save failure/retry, notices/log-directory recovery and normal session cleanup passed; separate candidate-assembly probe passed **21 assertions**, with 25 focused regressions | Native Save used an unchanged draft. Edited-draft preservation/controlled Win32 branch have separate integration and later user evidence; actual shell-launch failure after directory creation was not natively induced. |
-| Operation/publication boundaries | **499 focused tests** (372 App + 127 core) and **21 actual-publisher assertions** passed; native real file failures/retries, rerender cancellation/retention and playback-error/publication separation passed | These overlap the full suite or are separate probe assertions, not 520 new unit tests. Native sustained image-busy/live-copy timing was inconclusive in the agent run; the user subsequently reported the discussed manual remainder working. |
-| Integrity/cleanup | Native operation checks preserved input hashes, all extracted payload hashes and the ZIP; observed sessions removed on normal close | Scoped isolated checks, not proof of every external storage/process condition. |
+| Automated implementation | **1,274 Release tests**, 488 core/infrastructure/rendering + 786 App; zero failures/skips; build zero warnings/errors; format/diff passed | Implementation based on `9e9a8b3` plus uncommitted changes, not final clean-source release acceptance. Includes 6 lifetime-marker and 10 icon cases. |
+| PowerShell helpers | **27 installer + 20 portable + 15 session checks** passed | 62 separate checks, not additions to xUnit. Includes trailing-separator package identity and invalid/failed-run rejection; no app launch or installation. |
+| Package integrity | Current paired candidate: all **416 payloads**, published startup/session cleanup and embedded shell icons passed | [Current artifact identity](packaging.md#recorded-candidate). Earlier independent extracted-ZIP checks are retained locally and are not silently transferred to new bytes. |
+| Installer lifecycle | First install, English wizard/task defaults, registration, running-app refusals, same-version repair, native uninstall/data retention and reinstall passed | Initial native/CLI checks used an earlier Setup. Current Setup separately passed installed update, all payload hashes, retained settings/exports and native Rose startup; [scope](packaging.md#verification-status). Not a different-version upgrade or clean-PC Setup pass. |
+| Installed branding | Nine EXE/Setup frames checked; installed Shell index zero returned white 20/40-pixel icons. User confirmed Rose Save/restart/About and the visible desktop icon | **USER-REPORTED PASS** for the human observations, not an agent-observed desktop screenshot or a new DPI matrix. |
+| Recovery, publication and cleanup | Real storage/publication failures and retries, render cancellation/retention, playback-error separation and owned-session cleanup exercised | Focused tests overlap the full suite; probes/native observations are separate methods. Some timing-dependent branches remained inconclusive for the agent and have scoped later user feedback, not exhaustive OS-fault certification. |
 
 ## Manual observations and attribution
 
 - **Responsive UI:** user reported the supplied minimum/smooth-resize, working/cancelling/Ready/Exported, centering/actions/long-text/scroll checklist working. Exact dimensions, per-state/media results and executed bytes were not restated; this is not a complete measured DPI matrix.
 - **Settings/appearance:** ordinary and recovery checks were reported working, including all six accents, Header/About, Cancel/Escape/title-close, Reset, Save/restart and paths/notices. Reported display scales were 100/125/150%, with positive independent accessibility text-size feedback and second-monitor/fullscreen use. Exact text percentage and immutable local-build identity were not supplied for every report.
+- **Installed branding (2026-10-26):** user explicitly reported About 1.0.0, new Rose colors/logos, Save & Close, full restart and About all OK, then confirmed the visible desktop icon after the corrected Setup was applied. Record **USER-REPORTED PASS** for both cases; no package checksum was restated by the user and no broader DPI claim is implied.
 - **Playback/audio:** all seven supplied items were reported passed on the latest committed local build: both players, roughly ten completion/seek/fullscreen repetitions in total, paused/playing comparison, audible Keep Audio/volume/mute/single ownership, Remove Audio/external exports and rapid transitions/replacement. Test clip: 10 seconds, 30 FPS, audio. The user clarified local-build provenance, not an independently identified portable hash.
 - **Clean PC:** user reported successful startup/general functionality on a clean computer, confirmed the last supplied ZIP and the same Windows build as their main PC, previously reported as Windows 11 26H2 / 26300.9711. No prerequisite installation was reported. Record **USER-REPORTED PASS** for those conditions; a target checksum, pre-existing runtime/tool inventory, Windows edition/media inventory and per-feature logs were not supplied. This is not a separate Windows 10 or all-edition pass.
 

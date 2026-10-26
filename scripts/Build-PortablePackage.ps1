@@ -1,12 +1,11 @@
 # Phase 15A: one fresh verified publish, then a verified portable ZIP. No release/upload.
 [CmdletBinding()]
-param()
+param([ValidatePattern('^[0-9a-f]{32}$')][string]$RunId = [Guid]::NewGuid().ToString('N'))
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows -or $PSVersionTable.PSVersion.Major -lt 7) { throw 'PowerShell 7 on Windows is required.' }
 . (Join-Path $PSScriptRoot 'PortablePackage.Helpers.ps1')
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$runId = [Guid]::NewGuid().ToString('N')
 $runRoot = New-PortableRunDirectory (Join-Path $repositoryRoot 'artifacts/portable-packages') $runId
 $checks = [Collections.Generic.List[string]]::new()
 $failure = $null

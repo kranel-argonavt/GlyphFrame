@@ -56,7 +56,7 @@ C# / .NET 10, WPF, MVVM with CommunityToolkit.Mvvm, dependency injection, SkiaSh
 
 ## Verification and compatibility
 
-The recorded clean `f3004e7` baseline passed **1,258 Release tests**, a zero-warning/error rebuild, formatting/diff checks and **35 separate packaging/session helper checks**. The retained portable passed archive/extraction/startup/session verification. Later native recovery/publication checks and user-reported playback/audio and clean-PC checks have separate, bounded attribution.
+The recorded implementation passed **1,274 Release tests**, a zero-warning/error build, formatting/diff checks and **62 separate installer/packaging/session helper checks**. Package integrity, native installer workflows and user-reported application checks have separately scoped evidence; tests do not declare a public release.
 
 Manual clean-PC feedback was positive on the user's reported Windows 11 build and last supplied ZIP. This is not an independent runtime inventory, an exhaustive size/DPI/race matrix or a separate Windows 10 pass. Exact candidate identity, commands, evidence methods and remaining limits are in [testing](docs/testing.md) and [packaging](docs/packaging.md#recorded-candidate).
 
@@ -64,10 +64,10 @@ Important limits:
 
 - Windows media components/codecs determine continuous WPF playback; import/FFmpeg support does not guarantee playback of every codec. Original has a frame-preview fallback.
 - Long media/cache paths can prevent WPF review even when the MP4 is valid. A valid accepted artifact remains retained/exportable if review cannot open it.
-- No batch conversion, realtime symbolized playback, GPU/hardware-encoder UI, custom ramp editor, GIF/WebM export or installer is provided.
+- No batch conversion, realtime symbolized playback, GPU/hardware-encoder UI, custom ramp editor or GIF/WebM export is provided.
 - Portfolio screenshots/demo/sample assets and final distribution/licensing decisions are not yet complete. No public release is declared.
 
-## Portable packaging
+## Packaging
 
 On Windows with PowerShell 7 and the build prerequisites:
 
@@ -78,6 +78,8 @@ pwsh -NoProfile -File scripts/Build-PortablePackage.ps1
 The command creates a fresh local self-contained ZIP, checksum, manifest and report under ignored `artifacts/`; it does not upload, sign or tag a release. Extract the **whole ZIP** and keep its files and `Tools/ffmpeg/` together.
 
 Portable means installer-free deployment, not beside-EXE data: normal settings, privacy-safe logs and managed review cache stay under `%LocalAppData%\GlyphFrame`. See [packaging](docs/packaging.md) for verification, isolation and release boundaries.
+
+An unsigned English **per-user x64 installer** is also available as a local build workflow. With Inno Setup 7 installed explicitly, run `pwsh -NoProfile -File scripts/Build-InstallerPackage.ps1`. It packages the verified portable payload, requests no elevation, adds a Start Menu shortcut and offers an unchecked desktop shortcut. Updates reuse the installation identity; uninstall preserves settings and user exports. This does not declare a public release or signed/trusted download. See [installer policy and validation](docs/packaging.md#installer).
 
 ## Privacy and third-party software
 

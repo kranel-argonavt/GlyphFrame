@@ -32,6 +32,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        InstallationLifetimeMarker.RegisterForCurrentProcess();
+
         var services = new ServiceCollection();
         ConfigureServices(services);
         string? verificationDataRoot = PackageVerificationDataRoot.Resolve(e.Args);

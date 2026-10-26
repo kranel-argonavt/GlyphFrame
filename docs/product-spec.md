@@ -84,6 +84,8 @@ Settings supports six accent presets and reduced-motion behavior. Its persistent
 
 Header and About share live-accent vector branding. About explains local processing/privacy and opens the installed third-party notices as selectable read-only text. Technical error details are explicit actions, not automatic clipboard operations or external uploads.
 
+Windows Explorer/Start Menu/desktop shortcuts and Setup use a static white mark with transparency, derived from the same frame/GF geometry. This shell icon is embedded in the EXE; it does not follow the accent preset. The white mark has no added dark tile, so contrast depends on the shell background.
+
 The [design reference](design_reference/GlyphFrame_Design_Reference.png) is a historical visual concept, not a current application screenshot or an exact geometry contract.
 
 ## Data, errors and cleanup
@@ -98,6 +100,8 @@ Each managed-video session holds an exclusive lease. Cleanup only targets owned 
 
 ## Deliberate limits
 
-There is no batch conversion, realtime symbolized video playback, GPU/hardware-encoder UI, arbitrary/custom ramp editor, GIF/WebM/image-sequence export, render pause, light theme, installer or telemetry. These are scope limits, not unfinished controls to expose in the current UI.
+There is no batch conversion, realtime symbolized video playback, GPU/hardware-encoder UI, arbitrary/custom ramp editor, GIF/WebM/image-sequence export, render pause, light theme or telemetry. These are scope limits, not unfinished controls to expose in the current UI.
+
+Deployment supports the self-contained portable ZIP and an English per-user x64 Setup. Setup requests no elevation, defaults to `%LocalAppData%\Programs\GlyphFrame`, creates a Start Menu shortcut and makes the desktop shortcut optional. It keeps a stable installation identity for updates, blocks replacement/removal while that installed executable is running and rejects a version downgrade. Uninstall removes owned program files/shortcuts, not settings or user exports. Neither distribution provides automatic updates or file associations. See [packaging](packaging.md#installer) for build and acceptance boundaries.
 
 See [architecture](architecture.md) for ownership boundaries, [testing](testing.md) for evidence and remaining limits, and [packaging](packaging.md) for deployment requirements.
