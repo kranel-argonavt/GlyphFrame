@@ -3,8 +3,7 @@
   "PublicDistributionApproved": false,
   "HashNormalization": "UTF-8 without BOM; CRLF normalized to LF",
   "OpenIssues": [
-    "FFmpeg 9.0 complete Corresponding Source/build material and binary distribution route are unverified. Original private Git history retains binaries; the history-free portfolio source snapshot excludes them.",
-    "XmpCore 6.1.10.1: the declared BSD terms conflict with the confidential/proprietary notice inside Adobe's original 6.1.10 artifact. Authoritative clarification or an approved alternative is required.",
+    "FFmpeg 9.0 complete Corresponding Source/build material and binary distribution route are unverified. A controlled replacement and separately sanitized history-preserving publication copy are planned, not completed. Original private history retains binaries; the history-free source snapshot remains a fallback.",
     "Windows-native .NET Library / Windows SDK end-user and distributor protective-term requirements need a reviewed fulfillment mechanism for Setup and portable; retaining vendor texts alone is not fulfillment."
   ],
   "Components": [
@@ -81,9 +80,11 @@
     {
       "Dependency": "XmpCore/6.1.10.1",
       "Documents": [
+        "licenses/XmpCore/LICENSE.txt",
+        "licenses/XmpCore/ATTRIBUTIONS.txt",
         "licenses/XmpCore/PROVENANCE.txt"
       ],
-      "Status": "Historical BSD declaration conflicts with Adobe artifact notice; clarification/alternative pending"
+      "Status": "BSD-3-Clause text recovered with upstream clarification and retained attributions; dependency unchanged"
     }
   ],
   "Files": [
@@ -155,7 +156,7 @@
     },
     {
       "Path": "THIRD_PARTY_NOTICES.md",
-      "TextSha256": "48e57aa4617674d09d86bc14f359517f8be97b82a0d89d554398d813a9d1187f",
+      "TextSha256": "fc63cece85a72168f838550c8db0ab1ccfdfbf2115a7c6f6edf2d0142e163920",
       "UpstreamByteSha256": null,
       "Source": "GlyphFrame dependency attribution index"
     },
@@ -173,15 +174,28 @@
     },
     {
       "Path": "licenses/README.md",
-      "TextSha256": "ee000ae593bc595a3d763333038db627affc6383624bd8cae28deeef6208c816",
+      "TextSha256": "ee56058cce2d637d571ea8d90f4aa941c48260d7c2fa8dbf0a5ae29e5da3518f",
       "UpstreamByteSha256": null,
       "Source": "GlyphFrame license inventory policy"
     },
     {
-      "Path": "licenses/XmpCore/PROVENANCE.txt",
-      "TextSha256": "6f2fc99a0182cb49881986ab663a9b406007039df994a4b54c35dab928faac1e",
+      "Path": "licenses/XmpCore/LICENSE.txt",
+      "TextSha256": "55ab3adedcb36c8a170961c734bb669c0fa13438aba70cf9b1fe825dea014816",
+      "UpstreamByteSha256": "8e8d9f55c6a61ca28de3e194386a1399a64bd0558369642eff8c0b15d3ccfa25",
+      "Source": "https://web.archive.org/web/20210616112605id_/https://www.adobe.com/devnet/xmp/library/eula-xmp-library-java.html",
+      "Extraction": "Archived Adobe heading and six legal paragraphs HTML-decoded to plain text; nonbreaking spaces converted to spaces and paragraph spacing normalized. Original 2009 copyright and wording retained. Original HTML hash is the upstream byte digest; .NET maintainer clarification and exact port identity are recorded in PROVENANCE.txt."
+    },
+    {
+      "Path": "licenses/XmpCore/ATTRIBUTIONS.txt",
+      "TextSha256": "d40ee043e97ec5a3503d3a88e51fcb3da04d97b7ba6068dcae22ab44e67ddd06",
       "UpstreamByteSha256": null,
-      "Source": "https://github.com/drewnoakes/xmp-core-dotnet/tree/66b975558d9199cd3eb49093261a61deb30f8c06; evidence only, not a license"
+      "Source": "Adobe file-header notices and port README/XmpCore.csproj credits at https://github.com/drewnoakes/xmp-core-dotnet/tree/66b975558d9199cd3eb49093261a61deb30f8c06; evidence/attributions, not a replacement license"
+    },
+    {
+      "Path": "licenses/XmpCore/PROVENANCE.txt",
+      "TextSha256": "aff8829f14fd07118237161579d7becc2ff5f71a1ec07d39860b2d0fc10202c5",
+      "UpstreamByteSha256": null,
+      "Source": "https://github.com/drewnoakes/xmp-core-dotnet/tree/66b975558d9199cd3eb49093261a61deb30f8c06; resolved BSD provenance and maintainer clarification, not a replacement license"
     },
     {
       "Path": "licenses/dotnet/NET-LIBRARY-LICENSE.txt",

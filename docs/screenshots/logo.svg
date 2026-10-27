@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 40 40" role="img" aria-labelledby="title">
+  <title id="title">GlyphFrame white GF logo</title>
+  <rect width="40" height="40" rx="8" fill="#0d1117"/>
+  <g transform="translate(4 4)">
+    <path d="M2,9 L2,2 9,2 M23,2 L30,2 30,9 M30,23 L30,30 23,30 M9,30 L2,30 2,23" fill="none" stroke="#fff" stroke-width="2"/>
+    <path d="M7,8 L15,8 15,11 10,11 10,21 13,21 13,17 11,17 11,14 16,14 16,24 7,24 Z M18,8 L26,8 26,11 21,11 21,14 25,14 25,17 21,17 21,24 18,24 Z" fill="#fff"/>
+  </g>
+</svg>

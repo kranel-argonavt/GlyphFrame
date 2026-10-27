@@ -1,0 +1,39 @@
+XmpCore 6.1.10.1 - upstream attributions
+
+This record accompanies LICENSE.txt; it does not replace the BSD-3-Clause terms
+or claim that GlyphFrame authored the XMP library. The library is unchanged.
+
+The exact .NET source tag retains these Adobe file-header notices:
+
+// =================================================================================================
+// ADOBE SYSTEMS INCORPORATED
+// Copyright 2006 Adobe Systems Incorporated
+// All Rights Reserved
+//
+// NOTICE:  Adobe permits you to use, modify, and distribute this file in accordance with the terms
+// of the Adobe license agreement accompanying it.
+// =================================================================================================
+
+//=================================================================================================
+//ADOBE SYSTEMS INCORPORATED
+//Copyright 2006-2007 Adobe Systems Incorporated
+//All Rights Reserved
+//
+//NOTICE:  Adobe permits you to use, modify, and distribute this file in accordance with the terms
+//of the Adobe license agreement accompanying it.
+//=================================================================================================
+
+Examples: XmpCore/Impl/XmpMetaParser.cs and XmpCore/XmpMetaFactory.cs.
+Source: https://github.com/drewnoakes/xmp-core-dotnet/tree/66b975558d9199cd3eb49093261a61deb30f8c06
+
+.NET port credits retained from that tag's README:
+Initially ported by Yakov Danila and Nathanael Jones, the project is now maintained
+by Drew Noakes and contributors on GitHub.
+
+Exact XmpCore.csproj package metadata:
+Copyright 2015-2021
+Authors: Drew Noakes
+
+The recovered Adobe license has its own 2009 copyright line, retained verbatim
+in LICENSE.txt. These source-header and package dates are not replacements for
+that line and are not a new copyright or license grant by GlyphFrame.

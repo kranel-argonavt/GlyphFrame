@@ -71,7 +71,12 @@ public sealed class AboutActionsTests
             Assert.Same(owner, actualOwner); Assert.StartsWith(shipped, text);
             Assert.Contains("Copyright (c) 2026 Nazar Khozin (kranel-argonavt)", text);
             Assert.Contains("===== licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt =====", text);
-            Assert.Contains("XmpCore 6.1.10.1 - unresolved historical license-text verification", text);
+            Assert.Contains("===== licenses/XmpCore/LICENSE.txt =====", text);
+            Assert.Contains("Copyright (c) 2009, Adobe Systems Incorporated  All rights reserved.", text);
+            Assert.Contains("Neither the name of Adobe Systems Incorporated", text);
+            Assert.Contains("===== licenses/XmpCore/ATTRIBUTIONS.txt =====", text);
+            Assert.Contains("Initially ported by Yakov Danila and Nathanael Jones", text);
+            Assert.Contains("XmpCore 6.1.10.1 - BSD-3-Clause license provenance", text);
             opens++;
         });
         try
@@ -92,6 +97,10 @@ public sealed class AboutActionsTests
     [InlineData("changed")]
     [InlineData("invalid-json")]
     [InlineData("traversal")]
+    [InlineData("missing-xmp-license")]
+    [InlineData("changed-xmp-license")]
+    [InlineData("missing-xmp-attributions")]
+    [InlineData("changed-xmp-attributions")]
     public void Notices_RejectIncompleteAlteredOrUnsafeLegalCollection(string fault) => InputSettingsPolishTests.Sta(() =>
     {
         string directory = Path.Combine(Path.GetTempPath(), "GlyphFrame-notices-" + Guid.NewGuid().ToString("N"));
@@ -103,11 +112,20 @@ public sealed class AboutActionsTests
         {
             CopyLegalDocuments(directory);
             string license = Path.Combine(directory, "licenses", "SkiaSharp", "LICENSE.txt");
+            if (fault.Contains("xmp", StringComparison.Ordinal))
+            {
+                license = Path.Combine(directory, "licenses", "XmpCore",
+                    fault.EndsWith("attributions", StringComparison.Ordinal) ? "ATTRIBUTIONS.txt" : "LICENSE.txt");
+            }
             string manifest = Path.Combine(directory, "licenses", "manifest.json");
             switch (fault)
             {
-                case "missing": File.Delete(license); break;
-                case "changed": File.AppendAllText(license, "changed license"); break;
+                case "missing":
+                case "missing-xmp-license":
+                case "missing-xmp-attributions": File.Delete(license); break;
+                case "changed":
+                case "changed-xmp-license":
+                case "changed-xmp-attributions": File.AppendAllText(license, "changed license"); break;
                 case "invalid-json": File.WriteAllText(manifest, "invalid"); break;
                 case "traversal":
                     File.WriteAllText(manifest, File.ReadAllText(manifest)
@@ -118,6 +136,24 @@ public sealed class AboutActionsTests
         }
         finally { owner.Close(); Directory.Delete(directory, recursive: true); }
     });
+
+    [Fact]
+    public void Notices_XmpBindingIncludesRecoveredTermsWithoutApprovingOtherDistributionGates()
+    {
+        using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(AppContext.BaseDirectory, "licenses", "manifest.json")));
+        JsonElement root = manifest.RootElement;
+        JsonElement xmp = root.GetProperty("Components").EnumerateArray()
+            .Single(component => component.GetProperty("Dependency").GetString() == "XmpCore/6.1.10.1");
+        string[] documents = xmp.GetProperty("Documents").EnumerateArray().Select(document => document.GetString()!).ToArray();
+        Assert.Equal(new[] { "licenses/XmpCore/LICENSE.txt", "licenses/XmpCore/ATTRIBUTIONS.txt", "licenses/XmpCore/PROVENANCE.txt" }, documents);
+        Assert.Contains("BSD-3-Clause", xmp.GetProperty("Status").GetString());
+        Assert.False(root.GetProperty("PublicDistributionApproved").GetBoolean());
+        string[] issues = root.GetProperty("OpenIssues").EnumerateArray().Select(issue => issue.GetString()!).ToArray();
+        Assert.DoesNotContain(issues, issue => issue.Contains("XmpCore", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(issues, issue => issue.Contains("FFmpeg", StringComparison.Ordinal));
+        Assert.Contains(issues, issue => issue.Contains("Windows-native", StringComparison.Ordinal));
+    }
 
     private static void CopyLegalDocuments(string directory)
     {

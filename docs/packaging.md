@@ -1,6 +1,6 @@
 # Packaging
 
-GlyphFrame retains local self-contained Windows x64 portable ZIP and per-user Setup workflows. The portfolio repository is source-only: these outputs are not included or offered as cleared public downloads. The build and verification scripts create local candidates; they do not sign, tag, upload or publish a release. For a history-free source snapshot instead, see [portfolio preparation](portfolio.md).
+GlyphFrame retains local self-contained Windows x64 portable ZIP and per-user Setup workflows. The portfolio repository is source-only: these outputs are not included or offered as cleared public downloads. The build and verification scripts create local candidates; they do not sign, tag, upload or publish a release. See [portfolio preparation](portfolio.md) for the pending controlled-build/history-preserving publication plan and the existing history-free fallback. Commands and candidate records below still use the current pinned tools; no replacement build is implied.
 
 ## Build a candidate
 
@@ -66,7 +66,27 @@ Helper-only regressions are documented in [testing.md](testing.md#run-the-automa
 
 ## Recorded candidate
 
-Last built paired local candidate, not a downloadable/public release. Record date: 2026-10-26. Its 16-document legal inventory predates the follow-up Windows-native terms and historical XMP conflict findings; it is superseded for licensing review and is not a current legally cleared distribution.
+These are local verification records, not downloadable/public releases. Record date: 2026-10-26. The latest run produced a portable ZIP only; older Setup/ZIP bytes and their acceptance scope remain separate.
+
+### Latest portable snapshot
+
+| Field | Recorded value |
+| --- | --- |
+| Version / target | 1.0.0 / Release / win-x64 / self-contained folder |
+| Build source | `ed628727cb4a7cf8385dacd9d032000a524d9732`; clean working tree at build (`WorkingTreeDirty=false`) |
+| Run identity | `8542ec30764d419c8af0d6cf25cc25b0` |
+| ZIP | `GlyphFrame-1.0.0-win-x64-portable.zip` |
+| ZIP SHA-256 | `7fb33e65f98e17776c0dd992a746bbe707434b258ab08ba489b575adb5d9c4f7` |
+| Artifact checks | All 433 payload paths/lengths/hashes and 19 legal documents/9 exact dependency bindings passed; FFmpeg/ffprobe execution, isolated published startup, normal shutdown and observed-session cleanup passed |
+| Setup / installed copy | No Setup built for this run; installed copy unchanged |
+| Scope | Local Release supplied for screenshot capture, not a new clean-PC or complete native workflow acceptance pass |
+| Licensing | Public binary-distribution gates remain incomplete; collection integrity is not legal clearance |
+
+Later gallery/documentation edits and the recovered XmpCore license/attributions do not change or relabel this ZIP: its 19-document collection predates the current 21-document collection. User-supplied screenshots are recorded separately in the [media notes](screenshots/README.md), not treated as independently bound acceptance evidence. Any later final binary candidate needs its own source/hash binding.
+
+### Previous paired candidate
+
+The preceding paired Setup/ZIP run has a 16-document legal inventory that predates the follow-up Windows-native terms and historical XMP conflict findings. It is superseded for licensing review; its immutable identities remain below rather than being relabeled as the latest portable.
 
 | Field | Recorded value |
 | --- | --- |
@@ -83,7 +103,11 @@ Last built paired local candidate, not a downloadable/public release. Record dat
 
 Earlier extracted-ZIP and clean-PC feedback applies to retained earlier candidates, not automatically to this Setup. The previous `d7e5c68fceb14da7951ee98240fd6bb7` candidate passed same-version installed update, all 416 installed payload hashes, preserved settings/exports and native Rose startup; those observations are not relabeled for this licensing candidate. Native/user observations retain their separate [testing scope](testing.md#manual-observations-and-attribution). Superseded identities, full reports, failures and retries remain in local archives; the public docs do not depend on them.
 
-Later helper/documentation cleanup does not change or relabel these immutable bytes. Final clean-source packaging after commit needs its own manifest/checksums and explicit evidence binding; do not silently transfer every previous observation to a new artifact.
+Later helper/documentation cleanup does not change or relabel these immutable bytes. The later clean-source portable above has its own manifest/checksum and startup evidence; previous installed/native observations are not silently transferred to it.
+
+### XmpCore collection verification
+
+On 2026-10-26, run `9d955d256dde4d5cafdf68b3d8506124` verified a fresh self-contained publish from parent `ed62872` plus the uncommitted XmpCore correction and existing gallery/documentation work. All **21 legal documents / 9 exact dependency bindings**, pinned tool execution, isolated responsive startup, observed production-session lease, normal shutdown and cleanup passed. The recovered BSD text and attributions are present in the published `licenses/XmpCore/` directory. No new Setup/ZIP was produced and the installed copy was unchanged. This is dirty-source local verification, not a replacement clean-source candidate or public approval; the existing ZIP identities above remain immutable.
 
 ## Running and removing the application
 
@@ -118,7 +142,7 @@ Compiler signature/version validation and payload checks do not establish native
 
 ### Verification status
 
-Earlier installer checks cover first install, non-admin HKCU registration, shortcut defaults/opt-in, running-app update/uninstall refusal, same-version repair, native uninstall/data retention and reinstall. Native application smoke checks cover image/PNG and silent-video/MP4 rendering/export. The previous installed icon candidate separately passed same-version update, complete installed payload comparison, retained settings/exports and native Rose startup. The [current licensing candidate](#recorded-candidate) has not been installed; its new About/notices checks are automated WPF fixtures, not native acceptance. None of these checks proves a different-version upgrade.
+Earlier installer checks cover first install, non-admin HKCU registration, shortcut defaults/opt-in, running-app update/uninstall refusal, same-version repair, native uninstall/data retention and reinstall. Native application smoke checks cover image/PNG and silent-video/MP4 rendering/export. The previous installed icon candidate separately passed same-version update, complete installed payload comparison, retained settings/exports and native Rose startup. The [previous paired licensing Setup](#previous-paired-candidate) has not been installed; its About/notices checks are automated WPF fixtures, not native acceptance. The latest portable run produced no new installer. None of these checks proves a different-version upgrade.
 
 The user reported **1.0.0 / Rose** colors/logos, Save & Close, full restart and About all OK, then explicitly confirmed the corrected desktop icon after the earlier icon Setup was applied. Record these as **USER-REPORTED PASS**, distinct from agent-native inspection and read-only Shell icon extraction; no new measured DPI matrix is implied.
 
@@ -128,6 +152,6 @@ True version-changing upgrade/downgrade, clean-PC Setup, reputation prompts on d
 
 - Select final source/artifact identity and carry forward or repeat affected verification honestly.
 - Keep [third-party notices](../THIRD_PARTY_NOTICES.md), bundled [FFmpeg license](../Tools/ffmpeg/LICENSE.txt), [distribution provenance](../Tools/ffmpeg/DISTRIBUTION_README.txt) and [checksums](../Tools/ffmpeg/SHA256SUMS.txt).
-- Original GlyphFrame code is MIT-licensed. Resolve [FFmpeg complete Corresponding Source, conflicting historical XmpCore terms and Windows-native end-user/distributor requirements](licensing.md) before public binary distribution. Original private Git history still contains executable payloads; use the separate history-free [source snapshot](portfolio.md), not that history, for source-only publication. Current project visual provenance is owner-confirmed; future imported media needs separate review. Attribution/checksum verification is not a legal compliance sign-off.
-- Prepare portfolio screenshots, owned/generated sample media and a demo; no personal media or local evidence dumps belong in the package.
+- Original GlyphFrame code is MIT-licensed. XmpCore's historical BSD text/attributions are now recorded; resolve the remaining [FFmpeg complete Corresponding Source and Windows-native end-user/distributor requirements](licensing.md) before public binary distribution. Original private Git history still contains executable payloads. The planned controlled replacement and separately sanitized history-preserving copy are not complete; the history-free [source snapshot](portfolio.md) remains a fallback, not approval to push the current history. Current project visual provenance is owner-confirmed; future imported media needs separate review. Attribution/checksum verification is not a legal compliance sign-off.
+- The portfolio gallery is prepared locally; review its [media provenance](screenshots/README.md) before publication. An application walkthrough/screencast is not required. Personal media and local evidence dumps do not belong in the package.
 - Publish/tag/upload only with explicit authorization. No public release or license choice is created by this document or the packaging command.

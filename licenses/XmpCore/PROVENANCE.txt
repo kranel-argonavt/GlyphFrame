@@ -1,9 +1,10 @@
-XmpCore 6.1.10.1 - unresolved historical license-text verification
+XmpCore 6.1.10.1 - BSD-3-Clause license provenance
 
-This is a provenance note, NOT a replacement license or a permission grant.
-The published package's README declares the same BSD license as Adobe's XMP SDK.
-Its legacy Adobe license URL currently returns 404, and neither the package nor
-the exact source tag supplies a standalone LICENSE/COPYING/NOTICE file.
+The historical license-text evidence gap was resolved on 2026-10-26 using the
+archived Adobe terms and upstream maintainer clarification below. LICENSE.txt
+contains the recovered terms; ATTRIBUTIONS.txt preserves Adobe source-header
+notices and .NET port credits. This provenance record is not itself a license
+grant or approval of the complete GlyphFrame binary distribution.
 
 Project: https://github.com/drewnoakes/xmp-core-dotnet
 Tag: 6.1.10.1
@@ -11,31 +12,53 @@ Tag commit: 66b975558d9199cd3eb49093261a61deb30f8c06
 README: https://github.com/drewnoakes/xmp-core-dotnet/blob/66b975558d9199cd3eb49093261a61deb30f8c06/README.md
 Legacy URL: https://www.adobe.com/devnet/xmp/library/eula-xmp-library-java.html
 
-Package copyright metadata: Copyright 2015-2021
-Package author/maintainer: Drew Noakes
-The README credits initial porting by Yakov Danila and Nathanael Jones.
-The source retains Adobe Systems Incorporated copyright (2006-2007), among
-other per-file notices; these references are not a complete attribution set.
+The exact tag's README says that the same BSD license applies as to Adobe's
+open-source XMP SDK. Its legacy URL is now unavailable, and the package/tag does
+not supply a standalone license. The text was recovered from the archived Adobe
+page cited by the .NET maintainer's accepted license-metadata correction:
 
-Do not classify this component as Apache-2.0 based on MetadataExtractor's license,
-and do not substitute a modern Adobe BSD template with guessed names or dates.
-Public distribution remains pending recovery/verification of the historical
-license and relevant attribution for this release, or an approved alternative.
+Archive: https://web.archive.org/web/20210616112605/https://www.adobe.com/devnet/xmp/library/eula-xmp-library-java.html
+Raw archived response: https://web.archive.org/web/20210616112605id_/https://www.adobe.com/devnet/xmp/library/eula-xmp-library-java.html
+Original HTML SHA-256: 8e8d9f55c6a61ca28de3e194386a1399a64bd0558369642eff8c0b15d3ccfa25
 
-Follow-up verification (2026-10-26):
-The original Adobe XMPCore 6.1.10 Maven artifact's POM declares "The BSD License"
-and references that same unavailable Adobe URL. However, META-INF/LICENSE inside
-the published JAR contains an Adobe confidential/proprietary notice restricting
-reproduction without prior permission, not a BSD redistribution text. The same
-text appears in maintainer Drew Noakes' reconstructed 6.1.10 Java source tag.
-This is conflicting historical evidence, not a recovered BSD license grant.
+Extraction: the page's "The BSD License" heading and six legal paragraphs were
+decoded to plain text, with HTML/nonbreaking-space conversion and paragraph
+spacing normalized. The actual 2009 Adobe copyright line and wording, including
+"MERCHANT ABILITY", were retained; no generic modern BSD template was used.
+The page's browser title refers to ActionScript, but its body explicitly links
+the XMP Toolkit for Java download. This archival inconsistency is not hidden.
+
+Maintainer clarification:
+https://github.com/drewnoakes/xmp-core-dotnet/pull/56
+Merged by Drew Noakes on 2026-09-17:
+https://github.com/drewnoakes/xmp-core-dotnet/commit/c257ed72febafb68e560fcb9622c268666182f61
+That change replaces the obsolete PackageLicenseUrl with BSD-3-Clause, citing
+the same archive. It clarifies the port's existing BSD declaration; GlyphFrame
+does not claim a new .NET 6.1.11 release or change its 6.1.10.1 dependency.
+
+Historical contradictory Java notice and resolution:
+The original Adobe 6.1.10 Maven POM declares BSD, while the JAR's META-INF/LICENSE
+contains an Adobe confidential/proprietary notice. Initial investigation treated
+this as unresolved. Apache Tika's public investigation records Leonard
+Rosenthol's explanation that the build included an incorrect license file and
+was being fixed; the Java 6.1.11 release corrected that packaging issue.
+The .NET maintainer's accepted clarification above connects the port's own
+license declaration to the recovered Adobe terms, rather than relying only on
+a Java dependency upgrade performed by another project.
+
+https://issues.apache.org/jira/browse/TIKA-3204
+Relevant public comment IDs: 17213889 (2020-10-14), 17637533 (2022-11-23).
+https://github.com/drewnoakes/metadata-extractor/issues/502#issuecomment-729719840
 
 Artifact: https://repo.maven.apache.org/maven2/com/adobe/xmp/xmpcore/6.1.10/xmpcore-6.1.10.jar
 SHA-256: 5165d0912036b0bbe9513d58b4849baa6d68c49de50eb858bc481ebf36f15aea
 POM: https://repo.maven.apache.org/maven2/com/adobe/xmp/xmpcore/6.1.10/xmpcore-6.1.10.pom
 Historical source: https://github.com/drewnoakes/adobe-xmp-core/blob/1428bd60ed4ba7558f6511e4eca1dd18c23804c9/META-INF/LICENSE
 
-Do not interpret this as a determination that BSD permission is absent or that
-Adobe's label is necessarily controlling; the conflict needs authoritative
-clarification or an approved dependency alternative. No upstream contact was
-made on the project author's behalf during this investigation.
+Exact .NET source archive inspected for attributions:
+https://codeload.github.com/drewnoakes/xmp-core-dotnet/zip/66b975558d9199cd3eb49093261a61deb30f8c06
+Archive SHA-256: a620f1cc44233e2f0031738478989caa361fdf21ee6356c71e77d2a524cc1dee
+
+The component is BSD-3-Clause, not Apache-2.0 merely because MetadataExtractor
+depends on it. No upstream contact was made on the project author's behalf.
+Other GlyphFrame distribution gates remain explicit in the legal manifest.

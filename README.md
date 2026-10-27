@@ -1,10 +1,47 @@
-# GlyphFrame
+<p align="center">
+  <img src="docs/screenshots/logo.svg" alt="GlyphFrame white GF logo" width="96" height="96">
+</p>
 
-A Windows desktop application that turns local images and videos into colored symbol art.
+<h1 align="center">GlyphFrame</h1>
+
+<p align="center">A Windows desktop application that turns local images and videos into colored symbol art.</p>
 
 **Render → Review → Export.** Inspect the generated result before saving it; repeat an export without rerendering. Processing stays on your computer, with no uploads or telemetry.
 
 This is a **source-only portfolio project**. Original application code, tests, design assets and local installer/build scripts are included; FFmpeg executables, restored packages and ready-to-run Setup/ZIP downloads are not. Binary-release licensing review remains open; see [licensing](docs/licensing.md).
+
+![GlyphFrame startup screen with local media selection, character presets and render settings in the Rose theme](docs/screenshots/startup.png)
+
+## Results
+
+### Image conversion
+
+| Original · AI-generated input | Symbolized · GlyphFrame output |
+| --- | --- |
+| <img src="docs/screenshots/car-original.jpg" alt="AI-generated silver coupe used as input" width="420"> | <img src="docs/screenshots/car-symbolized.png" alt="The same coupe rendered as colored ASCII characters" width="420"> |
+
+### Video conversion
+
+[![Preview frame from the symbolized puppy video](docs/screenshots/puppy-poster.jpg)](docs/screenshots/puppy-symbolized.mp4)
+
+[Open the 5-second MP4 result](docs/screenshots/puppy-symbolized.mp4) · 1080p / 30 FPS. The video opens on demand; it is not an autoplaying application walkthrough. Source footage: Pixabay, as reported by the project author. See [media provenance and review limits](docs/screenshots/README.md).
+
+<details>
+<summary>More screenshots</summary>
+
+**Video review and export**
+
+![GlyphFrame showing a rendered video, playback controls and export settings in the Rose theme](docs/screenshots/application.png)
+
+**Image review and export**
+
+![An image render ready for review and export](docs/screenshots/image-ready.png)
+
+**Compact layout after video export**
+
+![A narrower GlyphFrame window with Export Again, Open Folder and Copy path actions](docs/screenshots/compact-export.png)
+
+</details>
 
 ## Features
 
@@ -40,61 +77,35 @@ dotnet test GlyphFrame.sln -c Release --no-build --no-restore
 
 The acquisition command downloads the fixed vendor archive, verifies archive/executable SHA-256 and extracts only FFmpeg/ffprobe into ignored `artifacts/local-runtime/`. It does not run an installer or modify PATH. Builds never download these tools automatically. An offline `-ArchivePath` option and verification-only mode are documented in [Tools/ffmpeg/README.md](Tools/ffmpeg/README.md). NuGet restore separately obtains the declared .NET package dependencies; source-only does not mean dependency-free.
 
-## Using the application
+## Workflow
 
-1. Browse or drop one local image/video.
-2. Choose the character preset, font, output resolution and polarity. For video, choose Keep/Remove Audio.
-3. Render the image or full video, then review Original/Symbolized. Preview Frame is a separate single-frame video action.
-4. Export the retained result. Choose PNG/JPEG in the image Save dialog; video export publishes the accepted MP4 without encoding it again.
-
-Image zoom/pan and video view scaling do not change rendered pixels. Changes to pixel/audio settings can make a retained result stale until rerendering; failed/cancelled replacement preserves useful previous state.
+Open local media → choose characters/font/resolution → render → compare Original/Symbolized → export. Image export offers PNG/JPEG; video export copies the accepted MP4 without encoding it again. See [supported behavior and controls](docs/product-spec.md) for details.
 
 ## Architecture and stack
 
 C# / .NET 10, WPF, MVVM with CommunityToolkit.Mvvm, dependency injection, SkiaSharp, MetadataExtractor, System.Text.Json, bundled FFmpeg/ffprobe and xUnit.
 
-| Project | Responsibility |
-| --- | --- |
-| `GlyphFrame.Core` | Models, contracts, presets, settings catalog and workflow rules; no project dependencies |
-| `GlyphFrame.Rendering` | Image decoding, glyph/grid/luminance processing, symbol rendering and image encoding |
-| `GlyphFrame.Infrastructure` | Metadata/files/settings, FFmpeg processes, streaming video, managed artifacts and publication |
-| `GlyphFrame.App` | WPF UI, ViewModels, native playback and composition root |
-| `GlyphFrame.Tests` / `GlyphFrame.App.Tests` | Logic, real-media/file integration, application and WPF component verification |
+Core contracts, rendering, infrastructure and WPF presentation live in separate projects; two test projects cover logic, real-media integration and application components.
 
 [Architecture](docs/architecture.md) explains dependencies, conversion flow, ownership and cancellation. [ADR 0001](docs/decisions/0001-native-video-playback.md) explains why independent players share WPF primitives and retain an FFmpeg fallback rather than adding another media runtime or source proxies.
 
 ## Verification and compatibility
 
-The recorded implementation passed **1,278 Release tests**, a zero-warning/error build, formatting/diff checks and **92 separate installer/packaging/session/legal/source-preparation helper checks**. A fresh history-free source copy also built successfully without FFmpeg; explicit acquisition and tool-enabled output hashes were verified separately. Package integrity, native installer workflows and user-reported application checks have separately scoped evidence; tests do not declare a public release.
+Recorded verification: **1,283 Release tests**, **92 separate helper checks**, a zero-warning/error build and formatting/diff checks. A fresh source copy built without FFmpeg; explicit tool acquisition and media integration were checked separately. [Testing](docs/testing.md) records commands, candidate scope, native/user-reported observations and remaining limits; these results are not a public-release certificate.
 
-Manual clean-PC feedback was positive on the user's reported Windows 11 build and last supplied ZIP. This is not an independent runtime inventory, an exhaustive size/DPI/race matrix or a separate Windows 10 pass. Exact candidate identity, commands, evidence methods and remaining limits are in [testing](docs/testing.md) and [packaging](docs/packaging.md#recorded-candidate).
-
-Important limits:
-
-- Windows media components/codecs determine continuous WPF playback; import/FFmpeg support does not guarantee playback of every codec. Original has a frame-preview fallback.
-- Long media/cache paths can prevent WPF review even when the MP4 is valid. A valid accepted artifact remains retained/exportable if review cannot open it.
-- No batch conversion, realtime symbolized playback, GPU/hardware-encoder UI, custom ramp editor or GIF/WebM export is provided.
-- Portfolio screenshots/demo/sample assets and final distribution/licensing decisions are not yet complete. No public release is declared.
+Continuous playback depends on Windows media components/codecs, and long media/cache paths can prevent WPF review even when an accepted MP4 remains exportable. Batch processing, realtime conversion, GPU controls and GIF/WebM export are outside the current scope. See [product limits](docs/product-spec.md).
 
 ## Packaging
 
-Local binary packaging is retained for development, **not offered as a cleared public download**. On Windows with PowerShell 7, initialized local tools and the build prerequisites:
-
-```powershell
-pwsh -NoProfile -File scripts/Build-PortablePackage.ps1
-```
-
-The command creates a fresh local self-contained ZIP, checksum, manifest and report under ignored `artifacts/`; it does not upload, sign or tag a release. Extract the **whole ZIP** and keep its files and `Tools/ffmpeg/` together.
-
-Portable means installer-free deployment, not beside-EXE data: normal settings, privacy-safe logs and managed review cache stay under `%LocalAppData%\GlyphFrame`. See [packaging](docs/packaging.md) for verification, isolation and release boundaries.
-
-An unsigned English **per-user x64 installer** is also available as a local build workflow. With Inno Setup 7 installed explicitly, run `pwsh -NoProfile -File scripts/Build-InstallerPackage.ps1`. It packages the verified portable payload, requests no elevation, adds a Start Menu shortcut and offers an unchecked desktop shortcut. Updates reuse the installation identity; uninstall preserves settings and user exports. This does not declare a public release or signed/trusted download. See [installer policy and validation](docs/packaging.md#installer).
+Local self-contained portable ZIP and unsigned English per-user x64 Setup workflows are retained for development, **not offered as cleared public downloads**. See [packaging](docs/packaging.md) for commands, integrity/startup verification, installation/update/uninstall policy and release boundaries. These scripts do not sign, tag or upload a release.
 
 ## Privacy and third-party software
 
-Source media is opened read-only and never renamed, modified or deleted. Frames are processed through bounded memory; the application owns a generated review-video cache, not a source-media copy. Media paths/content are not saved in preferences or diagnostic logs. There is no telemetry, analytics or upload.
+Source media is opened read-only. Processing, settings and managed review artifacts stay local; the application does not upload media or send telemetry. See [data handling](docs/product-spec.md) for storage, diagnostics and cleanup behavior.
 
-Original GlyphFrame code is [MIT-licensed](LICENSE), Copyright (c) 2026 Nazar Khozin (kranel-argonavt). Third-party components retain their own licenses. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) indexes the retained texts and dependency references; [licensing](docs/licensing.md) separates source publication from the unresolved FFmpeg, XmpCore and Windows-native **binary-distribution** review. No Setup/ZIP release is declared. Attribution and passing integrity checks are not a legal-compliance sign-off.
+Original GlyphFrame code is [MIT-licensed](LICENSE), Copyright (c) 2026 Nazar Khozin (kranel-argonavt). Third-party components retain their own licenses; see [notices](THIRD_PARTY_NOTICES.md) and [open binary-distribution gates](docs/licensing.md). No Setup/ZIP release is declared.
+
+Demonstration media has separate provenance; the code's MIT license does not relicense Pixabay footage. See [media notes](docs/screenshots/README.md).
 
 ## Documentation
 
@@ -103,7 +114,7 @@ Original GlyphFrame code is [MIT-licensed](LICENSE), Copyright (c) 2026 Nazar Kh
 - [Testing](docs/testing.md) — commands, coverage, recorded results and limitations.
 - [Packaging](docs/packaging.md) — self-contained builds, extracted validation and candidate identity.
 - [Licensing](docs/licensing.md) — code license, dependency texts, version binding and open distribution gates.
-- [Portfolio source preparation](docs/portfolio.md) — history-free source snapshot, local-only artifacts and publication boundaries.
+- [Portfolio source preparation](docs/portfolio.md) — planned history-preserving publication, the history-free fallback and local-only boundaries.
 - [ADR 0001: native video playback](docs/decisions/0001-native-video-playback.md) — decision, alternatives and compatibility evidence.
 - [Changelog](CHANGELOG.md) — concise user-visible work, not iteration journals.
 - [Test media fixtures](tests/GlyphFrame.Tests/TestInfrastructure/MediaFixtures.md) — synthetic fixture provenance and reproduction.
