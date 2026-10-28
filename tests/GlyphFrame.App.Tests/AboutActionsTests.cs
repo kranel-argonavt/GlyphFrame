@@ -75,6 +75,10 @@ public sealed class AboutActionsTests
             Assert.Contains("Copyright (c) 2009, Adobe Systems Incorporated  All rights reserved.", text);
             Assert.Contains("Neither the name of Adobe Systems Incorporated", text);
             Assert.Contains("===== licenses/XmpCore/ATTRIBUTIONS.txt =====", text);
+            Assert.Contains("===== licenses/FFmpeg/GCC-RUNTIME-EXCEPTION.txt =====", text);
+            Assert.Contains("===== licenses/FFmpeg/IJG-NOTICES.txt =====", text);
+            Assert.Contains("This software is based in part on the work of the Independent JPEG Group.", text);
+            Assert.Contains("Version: 9.0-glyphframe.2", text);
             Assert.Contains("Initially ported by Yakov Danila and Nathanael Jones", text);
             Assert.Contains("XmpCore 6.1.10.1 - BSD-3-Clause license provenance", text);
             opens++;
@@ -101,6 +105,10 @@ public sealed class AboutActionsTests
     [InlineData("changed-xmp-license")]
     [InlineData("missing-xmp-attributions")]
     [InlineData("changed-xmp-attributions")]
+    [InlineData("missing-ffmpeg-runtime")]
+    [InlineData("changed-ffmpeg-runtime")]
+    [InlineData("missing-ffmpeg-ijg")]
+    [InlineData("changed-ffmpeg-ijg")]
     public void Notices_RejectIncompleteAlteredOrUnsafeLegalCollection(string fault) => InputSettingsPolishTests.Sta(() =>
     {
         string directory = Path.Combine(Path.GetTempPath(), "GlyphFrame-notices-" + Guid.NewGuid().ToString("N"));
@@ -118,14 +126,23 @@ public sealed class AboutActionsTests
                     fault.EndsWith("attributions", StringComparison.Ordinal) ? "ATTRIBUTIONS.txt" : "LICENSE.txt");
             }
             string manifest = Path.Combine(directory, "licenses", "manifest.json");
+            if (fault.Contains("ffmpeg", StringComparison.Ordinal))
+            {
+                license = Path.Combine(directory, "licenses", "FFmpeg",
+                    fault.EndsWith("ijg", StringComparison.Ordinal) ? "IJG-NOTICES.txt" : "GCC-RUNTIME-EXCEPTION.txt");
+            }
             switch (fault)
             {
                 case "missing":
                 case "missing-xmp-license":
                 case "missing-xmp-attributions": File.Delete(license); break;
+                case "missing-ffmpeg-runtime":
+                case "missing-ffmpeg-ijg": File.Delete(license); break;
                 case "changed":
                 case "changed-xmp-license":
                 case "changed-xmp-attributions": File.AppendAllText(license, "changed license"); break;
+                case "changed-ffmpeg-runtime":
+                case "changed-ffmpeg-ijg": File.AppendAllText(license, "changed license"); break;
                 case "invalid-json": File.WriteAllText(manifest, "invalid"); break;
                 case "traversal":
                     File.WriteAllText(manifest, File.ReadAllText(manifest)
@@ -153,6 +170,26 @@ public sealed class AboutActionsTests
         Assert.DoesNotContain(issues, issue => issue.Contains("XmpCore", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(issues, issue => issue.Contains("FFmpeg", StringComparison.Ordinal));
         Assert.Contains(issues, issue => issue.Contains("Windows-native", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Notices_ControlledToolsBindExactPairAndCompleteAdditionalDocuments()
+    {
+        using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(AppContext.BaseDirectory, "licenses", "manifest.json")));
+        JsonElement root = manifest.RootElement;
+        JsonElement tool = root.GetProperty("ControlledFfmpeg");
+        Assert.Equal("9.0-glyphframe.2", tool.GetProperty("Version").GetString());
+        Assert.Equal("a01e45417cfa050c11151a2bf609e983408b8fa688e9d6ab66cb223eba9e7dbe", tool.GetProperty("FfmpegSha256").GetString());
+        Assert.Equal("e9fde8cdd23dd3534d15ff49b6788f80328f916634ae81bf7f8b9331da4ee2a9", tool.GetProperty("FfprobeSha256").GetString());
+        string[] documents = tool.GetProperty("Documents").EnumerateArray().Select(item => item.GetString()!).ToArray();
+        Assert.Equal(12, documents.Length);
+        Assert.Equal(documents.Length, documents.Distinct(StringComparer.Ordinal).Count());
+        Assert.Contains("licenses/FFmpeg/IJG-NOTICES.txt", documents);
+        Assert.Contains("licenses/FFmpeg/WINPTHREADS-COPYING.txt", documents);
+        string[] indexed = root.GetProperty("Files").EnumerateArray().Select(item => item.GetProperty("Path").GetString()!).ToArray();
+        Assert.All(documents, path => Assert.Contains(path, indexed));
+        Assert.False(root.GetProperty("PublicDistributionApproved").GetBoolean());
     }
 
     private static void CopyLegalDocuments(string directory)

@@ -1,6 +1,7 @@
 # Installer policy and manifest helpers. No compiler download, publishing or installation.
 . (Join-Path $PSScriptRoot 'PortablePackage.Helpers.ps1')
 . (Join-Path $PSScriptRoot 'ShellIcon.Helpers.ps1')
+. (Join-Path $PSScriptRoot 'LocalTools.Helpers.ps1')
 
 function Get-InstallerCompiler([string]$Path) {
     $candidates = if ($Path) { @($Path) } else {
@@ -45,6 +46,7 @@ function Get-VerifiedInstallerPayload([string]$PackageDirectory) {
     Assert-InstallerPayloadMatchesManifest $actual $manifest
     Assert-PackageRequiredFiles $payloadRoot
     $legal = Assert-LegalPackage $payloadRoot
+    $null = Assert-ControlledToolLegalBinding $payloadRoot (Get-LocalToolPins (Join-Path $PSScriptRoot '../Tools/ffmpeg/SHA256SUMS.txt'))
     Assert-ExecutableShellIcon (Join-Path $payloadRoot 'GlyphFrame.App.exe') (Join-Path $PSScriptRoot '../src/GlyphFrame.App/Assets/GlyphFrame.ico')
     if ((Get-PortablePackageVersion (Join-Path $payloadRoot 'GlyphFrame.App.dll')) -cne $report.PackageVersion) { throw 'Assembly/package version mismatch.' }
     # Reject pre-installer application builds: their running-process guard is absent.

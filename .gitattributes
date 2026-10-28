@@ -1,2 +1,11 @@
 # Preserve upstream license/notice whitespace. Legal hashes normalize CRLF/LF.
 licenses/**/*.txt -whitespace
+# Build recipes must not inherit Windows checkout line endings.
+scripts/ffmpeg/*.sh text eol=lf
+scripts/ffmpeg/patches/*.patch text eol=lf -whitespace
+scripts/ffmpeg/tests/*.c text eol=lf
+# Retain exact installed runtime notice bytes; hashes in runtime.lock.json are raw.
+scripts/ffmpeg/notices/**/*.txt -text -whitespace
+# Tool provenance pins use raw bytes, unlike normalized legal manifest hashes.
+Tools/ffmpeg/LICENSE.txt -text -whitespace
+Tools/ffmpeg/DISTRIBUTION_README.txt text eol=lf -whitespace

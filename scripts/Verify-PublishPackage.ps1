@@ -69,8 +69,8 @@ function Verify-Tool([string]$RelativePath) {
 try {
     . (Join-Path $PSScriptRoot 'LocalTools.Helpers.ps1')
     $toolPins = Get-LocalToolPins (Join-Path $repositoryRoot 'Tools/ffmpeg/SHA256SUMS.txt')
-    if (-not (Test-LocalTools (Join-Path $repositoryRoot 'artifacts/local-runtime/Tools/ffmpeg') $toolPins)) {
-        throw 'Local video tools are required for package verification. Run scripts/Initialize-LocalTools.ps1 -Download (or -ArchivePath), then retry.'
+    if (-not (Test-LocalTools (Join-Path $repositoryRoot 'artifacts/local-runtime/controlled-9.0-glyphframe.2/Tools/ffmpeg') $toolPins)) {
+        throw 'Controlled local tools are required for package verification. Run scripts/Initialize-LocalTools.ps1 -ArchivePath with the exact reviewed local archive, then retry.'
     }
     [IO.Directory]::CreateDirectory($publishRoot) | Out-Null
     $pathPlan = Get-PackageVerificationPathPlan ([IO.Path]::GetTempPath()) $runId
@@ -99,6 +99,8 @@ try {
         throw 'Published legal manifest differs from repository manifest.'
     }
     $legal = Assert-LegalPackage $publishRoot
+    $controlledLegal = Assert-ControlledToolLegalBinding $publishRoot $toolPins
+    $checks.Add("Controlled tool bytes/version/source-material identity and $($controlledLegal.DocumentsVerified) required notices verified; source hosting/public approval remain open")
     $checks.Add("Legal text hashes and exact dependency versions verified; $($legal.Status)")
     $runtime = Get-Content -LiteralPath (Join-Path $publishRoot 'GlyphFrame.App.runtimeconfig.json') -Raw | ConvertFrom-Json
     if (-not $runtime.runtimeOptions.PSObject.Properties['includedFrameworks']) {

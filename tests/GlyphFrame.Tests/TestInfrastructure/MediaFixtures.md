@@ -25,7 +25,7 @@ Phase 10 adds five locally generated audio fixtures and reuses `video-preview.mp
 The compatible fixture is reproducible from the repository root with the bundled tools using this command shape (change the tone frequency and audio duration for the other AAC cases):
 
 ```powershell
-artifacts/local-runtime/Tools/ffmpeg/ffmpeg.exe -f lavfi -i "testsrc2=size=64x48:rate=10:duration=1.2" -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=1.2" -map 0:v:0 -map 1:a:0 -c:v libx264 -crf 18 -preset veryfast -pix_fmt yuv420p -c:a aac -b:a 96k -ac 1 -f mp4 -y tests/GlyphFrame.Tests/Fixtures/video-audio-aac.mp4
+artifacts/local-runtime/controlled-9.0-glyphframe.2/Tools/ffmpeg/ffmpeg.exe -f lavfi -i "testsrc2=size=64x48:rate=10:duration=1.2" -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=1.2" -map 0:v:0 -map 1:a:0 -c:v libx264 -crf 18 -preset veryfast -pix_fmt yuv420p -c:a aac -b:a 96k -ac 1 -f mp4 -y tests/GlyphFrame.Tests/Fixtures/video-audio-aac.mp4
 ```
 
 The incompatible fixture uses the same video source with a 44.1 kHz sine tone and `-c:a pcm_s16le -ac 1 -f mov`. The committed files were verified with bundled ffprobe for codec, sample rate, channel count, duration, and frame count.

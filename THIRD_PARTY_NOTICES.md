@@ -4,29 +4,23 @@ GlyphFrame references third-party components. A source checkout contains their r
 
 Original GlyphFrame code is Copyright (c) 2026 Nazar Khozin (kranel-argonavt), under the root [MIT LICENSE](LICENSE). That license does not relicense the components or upstream documents below. Full retained texts are in `licenses/` and `Tools/ffmpeg/`; About's local notices viewer includes them. The legal-file manifest records exact dependency versions, text hashes and unresolved distribution issues. **This provisional collection is not public-distribution approval.**
 
-## FFmpeg 9.0
+## FFmpeg 9.0-glyphframe.2 — controlled local integration
 
-- Project: FFmpeg
-- Copyright: Copyright (c) 2000–2026 the FFmpeg developers
-- Local runtime output paths: `Tools/ffmpeg/ffmpeg.exe` and `Tools/ffmpeg/ffprobe.exe`; neither executable is included in the source snapshot
-- Reported version: `9.0-essentials_build-www.gyan.dev`
-- Binary distribution: Gyan Doshi, `ffmpeg-9.0-essentials_build.zip`, Windows x64 static essentials build
-- Distribution URL: <https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0-essentials_build.zip>
-- Upstream project: <https://ffmpeg.org/>
-- Exact upstream source revision: FFmpeg commit `d32b387f2b`
-- Matching upstream source repository: <https://github.com/FFmpeg/FFmpeg>
-- Matching commit page and browsable source tree: <https://github.com/FFmpeg/FFmpeg/commit/d32b387f2b>
-- Distributor support/release mirror: <https://github.com/GyanD/codexffmpeg>
-- Distributor release tag: `9.0`, <https://github.com/GyanD/codexffmpeg/releases/tag/9.0>
-- License: GNU General Public License version 3 (GPLv3), as identified by the binary distributor
+- Project: FFmpeg; Copyright (c) 2000–2026 the FFmpeg developers.
+- Local runtime paths: `Tools/ffmpeg/ffmpeg.exe` and `Tools/ffmpeg/ffprobe.exe`; executables are not committed.
+- Exact version: `9.0-glyphframe.2`; Windows x64 static GPLv3-or-later configuration, with static x264 and zlib, no external-library autodetection/nonfree components.
+- FFmpeg source: [`d32b387f2b0a484599d4587d651891f0c63c4238`](https://github.com/FFmpeg/FFmpeg/commit/d32b387f2b0a484599d4587d651891f0c63c4238), plus the [dated/hash-bound downstream VVC correction](scripts/ffmpeg/patches/README.md).
+- x264: `0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee`, [VideoLAN upstream](https://code.videolan.org/videolan/x264), GPLv2 or later.
+- zlib: [`da607da739fa6047df13e66a2af6b8bec7c2a498`](https://github.com/madler/zlib/commit/da607da739fa6047df13e66a2af6b8bec7c2a498), v1.3.2, zlib license.
+- Static runtime material also includes libgcc, MinGW CRT/import/startup objects and winpthreads. Full GPL/Runtime Library Exception, MinGW and winpthreads notices are retained under `licenses/FFmpeg/`; conditional exceptions do not relicense unrelated code.
+- Exact executable/archive pins: `Tools/ffmpeg/SHA256SUMS.txt`. Full GPLv3 text: `Tools/ffmpeg/LICENSE.txt`. Build/source/patch identities and current delivery limits: `Tools/ffmpeg/DISTRIBUTION_README.txt`.
+- Full FFmpeg license overview, x264 GPL text, zlib text and additional runtime/JPEG notices: `licenses/FFmpeg/`, all verified by the legal manifest and available in About's local viewer.
 
-This distribution is a GPL-enabled build. Its reported configuration includes `--enable-gpl`, `--enable-version3`, and GPL-enabled external components such as libx264 and libx265; it is therefore not described as an LGPL-only build.
+**This software is based in part on the work of the Independent JPEG Group.** GlyphFrame applies no further changes to FFmpeg's `jfdctfst.c`, `jfdctint_template.c` or `jrevdct.c` relative to the pinned FFmpeg revision; this is not a claim that those files are pristine IJG originals. Their complete leading copyright/permission notices are retained in `licenses/FFmpeg/IJG-NOTICES.txt` and the exact source archive.
 
-The upstream FFmpeg revision can be retrieved by checking out commit `d32b387f2b` in the upstream repository. This is not a complete Corresponding Source bundle for the statically linked distribution. The distributor's `codexffmpeg` tag `9.0` is a release mirror, not a repository of build scripts. The selected archive's `DISTRIBUTION_README.txt` records configuration and many library versions, but does not establish all library sources, modifications and build-control material required for the exact binaries. Complete Corresponding Source availability and a compliant distribution route remain unresolved; do not treat the mirror's automatically generated source ZIP as that bundle.
+The [controlled build/source materials](scripts/ffmpeg/README.md) and source-delivery preparation are retained locally with exact hashes. There is no configured public binary/source download yet. Public distribution still requires final source/hash/delivery binding and the separate application/GPL, Windows-native and historical-payload review. These are not Gyan's earlier tools or notices; older packages/history remain private and are not retroactively cleared by this replacement.
 
-The complete GPLv3 license text and distribution README shipped in the selected archive are included at `Tools/ffmpeg/LICENSE.txt` and `Tools/ffmpeg/DISTRIBUTION_README.txt`. Archive, executable, license, and README SHA-256 checksums are recorded in `Tools/ffmpeg/SHA256SUMS.txt`.
-
-GlyphFrame executes the unchanged checksum-identified tools as separate programs. Separate process execution is not by itself a legal determination of aggregate/combined-work status. Before publicly distributing these binaries, resolve complete Corresponding Source availability and applicable GPLv3 obligations. The portfolio source snapshot excludes both EXEs and Git history; the original private development history still contains them and must not simply be made public as though deleting current files removed historical objects. See [source preparation](docs/portfolio.md). This notice documents provenance, not a legal-compliance guarantee.
+GlyphFrame invokes the checksum-identified tools as separate CLI processes; that alone is not an aggregate-versus-combined-work legal determination. Original GlyphFrame code remains MIT; third-party terms remain applicable. This index records provenance/integrity, not a compliance certificate or authorization to publish.
 
 ## Other dependencies
 

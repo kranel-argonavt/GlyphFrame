@@ -195,7 +195,7 @@ public sealed class FfmpegVideoFrameReaderTests
             .Select(file => Path.GetFileName(file)!)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        BundledFfmpegLocator locator = new(Path.Combine(RepositoryRoot, "artifacts", "local-runtime"));
+        BundledFfmpegLocator locator = new(Path.Combine(RepositoryRoot, "artifacts", "local-runtime", "controlled-9.0-glyphframe.2"));
         ProcessRunner processRunner = new();
         using FfmpegValidationService validation = new(locator, processRunner);
         FfprobeVideoMetadataReader metadataReader = new(
@@ -254,7 +254,7 @@ public sealed class FfmpegVideoFrameReaderTests
         using TemporaryMediaDirectory media = new("Поворот 日本語 测试");
         string path = media.CopyFixture("video-preview-rotated.mov", "обернене відео 日本語.MOV");
         Assert.Contains(path, character => character > 127);
-        BundledFfmpegLocator locator = new(Path.Combine(RepositoryRoot, "artifacts", "local-runtime"));
+        BundledFfmpegLocator locator = new(Path.Combine(RepositoryRoot, "artifacts", "local-runtime", "controlled-9.0-glyphframe.2"));
         ProcessRunner processRunner = new();
         using FfmpegValidationService validation = new(locator, processRunner);
         FfprobeVideoMetadataReader metadataReader = new(
@@ -419,7 +419,7 @@ public sealed class FfmpegVideoFrameReaderTests
     }
 
     private static FfmpegVideoFrameReader CreateRealReader() => new(
-        new BundledFfmpegLocator(Path.Combine(RepositoryRoot, "artifacts", "local-runtime")),
+        new BundledFfmpegLocator(Path.Combine(RepositoryRoot, "artifacts", "local-runtime", "controlled-9.0-glyphframe.2")),
         new BinaryProcessRunner(),
         new RecordingMetadataReader(FixtureMetadata("unused.mp4")));
 

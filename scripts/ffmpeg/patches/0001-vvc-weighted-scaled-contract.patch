@@ -1,0 +1,29 @@
+diff --git a/libavcodec/vvc/inter_template.c b/libavcodec/vvc/inter_template.c
+--- a/libavcodec/vvc/inter_template.c
++++ b/libavcodec/vvc/inter_template.c
+@@ -125,3 +125,3 @@ static void av_always_inline FUNC(put_uni_w_scaled)(uint8_t *_dst, const ptrdiff_t _
+     const ptrdiff_t src_stride   = _src_stride / sizeof(pixel);
+-    const int shift              = FFMAX(2, 14 - BIT_DEPTH);
++    const int shift              = denom + FFMAX(2, 14 - BIT_DEPTH);
+     const int offset             = 1 << (shift - 1);
+@@ -166,16 +166,16 @@ static void av_always_inline FUNC(put_uni_w_scaled)(uint8_t *_dst, const ptrdiff_t _
+ 
+ static void FUNC(put_uni_luma_w_scaled)(uint8_t *_dst, const ptrdiff_t _dst_stride,
+     const uint8_t *_src, ptrdiff_t _src_stride, const int src_height,
+-    const int x, const int y, const int dx, const int dy, const int denom, const int wx, const int ox,
+-    const int height, const int8_t *hf, const int8_t *vf, const int width)
++    const int x, const int y, const int dx, const int dy, const int height, const int denom, const int wx,
++    const int ox, const int8_t *hf, const int8_t *vf, const int width)
+ {
+     FUNC(put_uni_w_scaled)(_dst, _dst_stride, _src, _src_stride, src_height, x, y, dx, dy, denom, wx, ox, height, hf, vf, width, 0);
+ }
+ 
+ static void FUNC(put_uni_chroma_w_scaled)(uint8_t *_dst, const ptrdiff_t _dst_stride,
+     const uint8_t *_src, ptrdiff_t _src_stride, const int src_height,
+-    const int x, const int y, const int dx, const int dy, const int denom, const int wx, const int ox,
+-    const int height, const int8_t *hf, const int8_t *vf, const int width)
++    const int x, const int y, const int dx, const int dy, const int height, const int denom, const int wx,
++    const int ox, const int8_t *hf, const int8_t *vf, const int width)
+ {
+     FUNC(put_uni_w_scaled)(_dst, _dst_stride, _src, _src_stride, src_height, x, y, dx, dy,  denom, wx, ox, height, hf, vf, width, 1);
+ }

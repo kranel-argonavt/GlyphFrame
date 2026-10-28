@@ -1,13 +1,13 @@
 # Testing and verification
 
-GlyphFrame separates deterministic logic/component tests, real media/file integration, native application checks and human observations. A passing fixture or test double is not presented as a human playback test or clean-machine certification.
+GlyphFrame distinguishes automated tests, real media integration, native UI inspection and user reports. A passing fixture is not a human playback test or clean-machine certification.
 
 ## Run the automated checks
 
-Use Windows x64 with the .NET 10 SDK and access to the configured NuGet sources. The full suite includes real FFmpeg integration: initialize [pinned local tools](../Tools/ffmpeg/README.md) explicitly first. These tests are not silently skipped when tools are absent. A fresh image-only source build is a separate check, not a full-suite pass. From the repository root:
+Use Windows x64, PowerShell 7, the .NET 10 SDK and access to configured NuGet sources. The full suite requires the [exact locally reviewed video tools](../Tools/ffmpeg/README.md); missing tools do not silently skip integration tests. From the repository root:
 
 ```powershell
-pwsh -NoProfile -File scripts/Initialize-LocalTools.ps1 -Download
+pwsh -NoProfile -File scripts/Initialize-LocalTools.ps1 -ArchivePath 'C:/GFInputs/GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip'
 dotnet restore GlyphFrame.sln
 dotnet build GlyphFrame.sln -c Release --no-restore
 dotnet test GlyphFrame.sln -c Release --no-build --no-restore
@@ -15,14 +15,9 @@ dotnet format GlyphFrame.sln --verify-no-changes --no-restore
 git diff --check
 ```
 
-The two test projects have different responsibilities:
+[GlyphFrame.Tests](../tests/GlyphFrame.Tests/GlyphFrame.Tests.csproj) covers domain/workflow, files, actual Skia output, media/audio integration and artifact publication. [GlyphFrame.App.Tests](../tests/GlyphFrame.App.Tests/GlyphFrame.App.Tests.csproj) covers commands, Settings drafts, clipboard feedback, WPF geometry/bindings and playback/window coordination. Dispatcher-sensitive tests use the established nonparallel WPF collection; a finite passing run does not prove every historical scheduling failure impossible.
 
-- [GlyphFrame.Tests](../tests/GlyphFrame.Tests/GlyphFrame.Tests.csproj): domain/workflow, settings/files, actual Skia output, FFmpeg/container/audio integration and managed-artifact publication.
-- [GlyphFrame.App.Tests](../tests/GlyphFrame.App.Tests/GlyphFrame.App.Tests.csproj): ViewModel commands, independent error contexts, Settings drafts, clipboard feedback, WPF bindings/geometry, playback coordination and native-window components.
-
-Machine-dependent native windows/Dispatcher tests use the established nonparallel WPF collection where required. The committed isolation correction changes test scheduling, not production behavior or assertions. A finite passing sample does not prove every historical low-level Dispatcher failure impossible.
-
-PowerShell 7 helper regressions are separate from xUnit and do not publish or launch the app:
+Helper regressions are separate from xUnit. They use inert fixtures and do not acquire/compile FFmpeg, publish/install the app or declare release approval:
 
 ```powershell
 pwsh -NoProfile -File scripts/Test-PortablePackage.ps1
@@ -30,76 +25,81 @@ pwsh -NoProfile -File scripts/Test-PackageVerificationSession.ps1
 pwsh -NoProfile -File scripts/Test-InstallerPackage.ps1
 pwsh -NoProfile -File scripts/Test-PackageLegal.ps1
 pwsh -NoProfile -File scripts/Test-SourcePreparation.ps1
+pwsh -NoProfile -File scripts/Test-ControlledFfmpeg.ps1
 ```
 
-Publishing/startup validation is an explicit separate operation; see [packaging](packaging.md). Source-preparation helpers use inert synthetic ZIP entries, check pinned hashes/path policy and refuse overwrite; they do not download or execute FFmpeg. Source snapshot verification excludes Git history and runtime payloads; it does not certify secret absence or binary-release licensing.
+Actual publish/startup checks are a [separate packaging operation](packaging.md). A fresh image-only source build without FFmpeg is not a full-suite pass. Source-export path checks are not exhaustive secret/history or licensing audits.
 
 ## Coverage that matters
 
 | Area | Representative assertions |
 | --- | --- |
-| Symbolization | Automatic glyph-based grid, luminance/polarity, alpha compositing, deterministic output and orientation |
-| Image workflow | Valid decoding, retained pixels, stale settings, PNG/JPEG export without rerendering, cancellation and replacement |
-| Real video | MP4/MOV/MKV/AVI, rotated MOV, sequential frames, valid H.264 output, stream-copy/AAC/silent audio and repeated publication |
-| Ownership and files | Leased sessions, obsolete candidate rejection, source preservation, partial cleanup, atomic destination replacement and retry |
-| Presentation | Populated responsive layouts, narrow/long text, render/result transitions, focus/action reachability and reduced-motion logic |
-| Settings and errors | Draft Reset/Cancel/Save, storage failure/retry, notices/log paths, safe error details and bounded logging |
-| Playback | Independent players, paused seek/fullscreen/tab transfer, stale event rejection, audio coordination and handle cleanup |
-| Clipboard | Explicit exact-path copying, truthful failure, cancelled/replaced destination and late-feedback rejection |
+| Symbolization | Glyph-based grid, luminance/polarity, alpha compositing, deterministic output and orientation |
+| Image workflow | Decoding, retained pixels, stale settings, PNG/JPEG export without rerendering, cancellation and replacement |
+| Real video | MP4/MOV/MKV/AVI, rotated MOV, sequential frames, H.264 output, AAC copy/fallback/removal and duration |
+| Ownership/files | Leased sessions, obsolete-result rejection, partial cleanup, atomic publication and retry |
+| Presentation | Responsive/narrow layouts, long text, working/result transitions, focus and reduced motion |
+| Settings/errors | Draft Reset/Cancel/Save, storage failure/retry, notices/paths, bounded logs and independent error contexts |
+| Playback | Separate players, seek/end/fullscreen/tab transfer, stale events, audio ownership and cleanup |
+| Clipboard | Exact destination copying, truthful failure and cancelled/replaced/late-feedback rejection |
 
-Tests use locally generated synthetic media, not personal downloads. [MediaFixtures.md](../tests/GlyphFrame.Tests/TestInfrastructure/MediaFixtures.md) describes committed fixture provenance, metadata-only versus playable samples and reproduction. Tiny integration clips prove specific behavior, not production-scale throughput or stress performance.
+Tests use synthetic media, not personal downloads. [Fixture provenance](../tests/GlyphFrame.Tests/TestInfrastructure/MediaFixtures.md) distinguishes metadata-only/playable samples and reproduction. Tiny clips test contracts, not production-scale throughput or stress performance.
 
 ## Recorded verification snapshot
 
-Current summary as of 2026-10-27; opening this document does not execute tests. Full attempts, previous baselines and superseded package identities remain in local archives.
+As of 2026-10-28. Reading this document executes no checks. These results describe local work based on private parent `e75a021` with uncommitted integration changes, not a clean-source release. The precommit rerun reconfirmed the full suite, helpers, build and formatting; overlapping earlier runs are not additive.
 
-| Check | Recorded result | Boundary |
+| Check | Result | Scope |
 | --- | --- | --- |
-| Automated implementation | **1,283 Release tests**, 488 core/infrastructure/rendering + 795 App; zero failures/skips; Release build with zero warnings/errors; format passed | Rerun for the XmpCore notice correction on parent `ed62872`; dirty source, not clean-source release acceptance. Five additional cases cover exact XmpCore document binding, preserved unresolved gates and missing/changed BSD text or attributions. Earlier 1,278-test source-preparation baseline is retained in local evidence. |
-| PowerShell helpers | **27 installer + 20 portable + 15 session + 17 legal + 13 source checks** passed | 92 separate checks, not additions to xUnit. Source checks cover inert extraction, altered archive/tool bytes, traversal/duplicates, missing pairs and no-overwrite/path policy; no helper-test app launch/installation. |
-| Source-only preparation | Fresh history-free snapshot restored/built with no FFmpeg tools or stale output; 0 warnings/errors. Explicit fixed-archive acquisition, repeat verification and rebuilt output tool hashes passed | Local working-source snapshot, not a new Git commit/public repository or native clean-machine test. Original private Git history remains unchanged and contains older executables. |
-| Local publish after tool relocation | Self-contained Windows x64 output preserved pinned tools and verified **19 legal documents / 9 dependency bindings** | Fresh local publish only; no Setup/ZIP release, native application launch or legal approval inferred. |
-| Package integrity | Latest portable from clean `ed62872`: all **433 payloads**, 19 legal documents/9 dependency bindings, FFmpeg/ffprobe execution and isolated published startup/shutdown/session cleanup passed | [Latest portable identity](packaging.md#latest-portable-snapshot). No Setup built for this run; public binary licensing remains incomplete. Earlier extracted-ZIP/installed-copy observations are not transferred to these bytes. |
-| XmpCore correction | **21 legal documents / 9 exact dependency bindings** verified in fresh self-contained publish; **18 focused About/notices tests** passed, overlapping the full suite | [Correction verification](packaging.md#xmpcore-collection-verification). Existing published-startup/tool/session checks passed; no new Setup/ZIP or manual notices interaction. Public-distribution approval remains false with FFmpeg and Windows-native gates open. |
-| Installer lifecycle | Earlier candidates passed first install, English wizard/task defaults, registration, running-app refusals, same-version repair, native uninstall/data retention and reinstall | The earlier installed icon candidate separately passed update, all installed payload hashes, retained settings/exports and native Rose startup. The preceding paired licensing Setup was not installed, and the latest portable has no matching new Setup; [scope](packaging.md#verification-status). Not a different-version upgrade or clean-PC Setup pass. |
-| Installed branding | Nine EXE/Setup frames checked; installed Shell index zero returned white 20/40-pixel icons. User confirmed Rose Save/restart/About and the visible desktop icon | **USER-REPORTED PASS** for the human observations, not an agent-observed desktop screenshot or a new DPI matrix. |
-| Recovery, publication and cleanup | Real storage/publication failures and retries, render cancellation/retention, playback-error separation and owned-session cleanup exercised | Focused tests overlap the full suite; probes/native observations are separate methods. Some timing-dependent branches remained inconclusive for the agent and have scoped later user feedback, not exhaustive OS-fault certification. |
+| Release xUnit | **1,288 passed: 488 core/infrastructure/rendering + 800 App**, zero failures/skips | Exact controlled `.2` version and both executable hashes; includes missing/altered notices and manifest-binding regressions |
+| Helper regressions | **141 passed: 36 controlled + 18 source + 25 legal + 20 portable + 27 installer + 15 session** | Synthetic policy/integrity checks, not native acceptance |
+| Build and formatting | Release build/rebuild: **0 warnings/errors**; formatting and diff checks passed | .NET application build, not a claim that upstream FFmpeg compilation was warning-free |
+| Source-only build | **459-file** hash-verified fresh snapshot built without a tool cache or FFmpeg EXEs in output; 0 warnings/errors | Run `321899bb23bd4c6797367e7aa9982375`; build-only, no new public history or full suite without tools |
+| Current package | **445 payloads / 31 legal documents / 9 dependency bindings**; exact tools/source-material/twelve-notice binding; published startup, exclusive session, normal exit and cleanup passed | [Exact ZIP/Setup identities](packaging.md#current-local-controlled-tool-candidate); unsigned Setup built but not installed/run |
 
-The current source collection has **21 documents / 9 dependency bindings**, including the recovered XmpCore BSD-3-Clause text and Adobe/.NET port attributions. The text was compared with all six archived Adobe legal paragraphs, and both retained source-header forms were checked against the exact .NET source tag. The existing offline notices tests verify complete display and reject missing/altered XmpCore documents. The full suite and all 92 helper checks were rerun for this correction. An initial sandbox build returned failure without diagnostics; retry with normal .NET cache access passed. The session helper's initial sandbox TEMP exceeded its deliberate path budget; normal Windows TEMP passed without relaxing limits.
+### Current extracted-ZIP native smoke
 
-The private pre-checkpoint review on 2026-10-27 repeated the Release build, all **1,283 tests / 92 helper checks**, formatting and diff checks successfully on parent `ed62872` with the pending notices/gallery changes. The private recovery bundle was restored to an isolated mirror, checked with full Git integrity verification and compared against all backed-up refs; working-file/tool copies were hash-verified. This establishes a recovery baseline, not a new commit, fresh native acceptance or a tested controlled FFmpeg build. The [planned replacement and history-preserving publication copy](portfolio.md#planned-route-preserve-development-history-in-a-reviewed-copy) remain pending.
+A fresh extraction and separate marked profile passed About/notices, image/video render and native Save. The viewer exposes the summary plus all **30 appended document headers**, the controlled version and IJG credit. Actual saved outputs fully decoded: one 320×240 PNG and two six-second 640×360/180-frame MP4s. Keep Audio preserved **283 AAC packet payloads**; Remove Audio produced no audio stream.
 
-The [latest portable ZIP](packaging.md#latest-portable-snapshot) remains the immutable 433-file/19-document candidate from clean `ed62872`, not a package of these later changes. The [previous paired 430-file/16-document candidate](packaging.md#previous-paired-candidate) is older still. Their recorded checks are not new installer/clean-PC/public-distribution acceptance for the corrected collection; any later package needs fresh source/hash binding.
+Rendered playback/end/seek/fullscreen/Escape, stale export blocking after audio changes, cancelled/successful replacement and active 900-frame-render cancellation passed. Only the lease remained after Cancel. Normal close returned zero, removed the owned session and preserved all 445 payloads, ordinary settings and installed EXE/tool hashes.
+
+The normal-name app started but the computer-use helper twice misbound its window to the installed app identity. Only that empty owned test process was terminated; its nonzero exit/retained session is diagnostic evidence, not a cleanup pass. Native interaction used an additional **byte-identical renamed apphost** in a separate extraction. This is a targeting workaround, not a product fix or a normal-name helper pass. No human listening, renewed native PCM fallback, fresh DPI matrix, Setup lifecycle or clean-PC acceptance is inferred.
+
+### Earlier evidence
+
+[ADR 0002](decisions/0002-controlled-ffmpeg-build.md#verification-milestones) summarizes the controlled-build progression, reproduced VVC defects, corrected replay and scoped engineering review. Earlier isolated native checks included PCM-to-AAC fallback; their source-snapshot scope is not transferred to the current package. Superseded legal collections and installed candidates retain their [historical packaging records](packaging.md#historical-candidate-records). Full iteration journals, failed attempts, original TRX/captures and immutable hashes remain local, not public-document dependencies.
 
 ## Manual observations and attribution
 
-- **Responsive UI:** user reported the supplied minimum/smooth-resize, working/cancelling/Ready/Exported, centering/actions/long-text/scroll checklist working. Exact dimensions, per-state/media results and executed bytes were not restated; this is not a complete measured DPI matrix.
-- **Settings/appearance:** ordinary and recovery checks were reported working, including all six accents, Header/About, Cancel/Escape/title-close, Reset, Save/restart and paths/notices. Reported display scales were 100/125/150%, with positive independent accessibility text-size feedback and second-monitor/fullscreen use. Exact text percentage and immutable local-build identity were not supplied for every report.
-- **Installed branding (2026-10-26):** user explicitly reported About 1.0.0, new Rose colors/logos, Save & Close, full restart and About all OK, then confirmed the visible desktop icon after the corrected Setup was applied. Record **USER-REPORTED PASS** for both cases; no package checksum was restated by the user and no broader DPI claim is implied.
-- **Playback/audio:** all seven supplied items were reported passed on the latest committed local build: both players, roughly ten completion/seek/fullscreen repetitions in total, paused/playing comparison, audible Keep Audio/volume/mute/single ownership, Remove Audio/external exports and rapid transitions/replacement. Test clip: 10 seconds, 30 FPS, audio. The user clarified local-build provenance, not an independently identified portable hash.
-- **Clean PC:** user reported successful startup/general functionality on a clean computer, confirmed the last supplied ZIP and the same Windows build as their main PC, previously reported as Windows 11 26H2 / 26300.9711. No prerequisite installation was reported. Record **USER-REPORTED PASS** for those conditions; a target checksum, pre-existing runtime/tool inventory, Windows edition/media inventory and per-feature logs were not supplied. This is not a separate Windows 10 or all-edition pass.
+The following are **USER-REPORTED PASS**, distinct from agent-native captures and automated fixtures:
 
-Accept these positive reports within scope; do not repeat identical ordinary checklists merely because agent targeting was inconclusive. Native screenshots, rendered WPF fixtures, controlled collaborators and human listening remain different evidence methods.
+- **Responsive UI:** minimum/smooth-resize, working/cancelling/Ready/Exported, centering/actions/long-text/scroll checks were reported working. Exact per-state dimensions and executed bytes were not restated.
+- **Settings/appearance:** all six accents, Header/About, Cancel/Escape/title-close, Reset, Save/restart and paths/notices were reported working at 100/125/150% display scale, with positive text-size and second-monitor/fullscreen feedback. Exact accessibility text percentages and immutable build identity were not supplied for every report.
+- **Installed branding:** About 1.0.0 / Rose, logos, Save/restart and the corrected desktop icon were confirmed after an earlier Setup update. No target package checksum or new DPI matrix was supplied.
+- **Playback/audio:** both players, roughly ten end/seek/fullscreen repetitions, tab transfer, audible volume/mute/single-audio ownership, Remove Audio/external exports and rapid replacement were reported working on the latest committed local build. Clip: 10 seconds / 30 FPS / audio; no independently identified portable hash.
+- **Clean PC:** startup/general functionality were reported working using the last supplied ZIP and the same Windows build as the main PC, previously identified as Windows 11 26H2 / 26300.9711. No prerequisite installation was reported, but target checksum, pre-existing runtime inventory, edition/media inventory and per-feature logs were not supplied. This is not a Windows 10/all-edition or current-`.2` package pass.
+
+Accept positive reports within their scope; do not repeat ordinary checklists merely because agent targeting was inconclusive. A failed timing attempt is not retroactively passed by general feedback.
 
 ## Native retest checklist
 
-Use the exact independently extracted candidate and record its hash/source, Windows build, display/text scale and media parameters. For potentially destructive failures use only marked synthetic fixtures, never personal destinations or changed OS security/associations.
+Use the exact independently extracted candidate and record package/source hash, Windows build, display/text scale and media parameters. Use marked synthetic fixtures for failure tests, never personal destinations or OS security changes.
 
-1. Load landscape/portrait images; check Ctrl+wheel Fit floor, drag pan and ordinary-wheel handoff at boundaries. Verify tab/rerender framing, cancelled replacement and successful replacement reset.
-2. Resize around actual layout transitions in both directions through working, Ready, stale/error and exported states. Check all actions, long guidance and constrained-height scrolling.
-3. Exercise Settings draft Reset/Cancel/Escape/title-close, Save/restart, selectable paths and About/notices. Distinguish real storage failure from a controlled dependency exception.
-4. For Original/Symbolized, repeat end → embedded seek → fullscreen reopen; compare time/frame/thumb, paused/playing tab transfer, mute/volume and single-audio ownership. Listen to Keep Audio and externally verify Remove Audio output.
-5. Cancel rendering while actually active, not after completion. Separately cancel publication during actual copy, not Save/overwrite confirmation. Check retained artifact/destination hashes and owned partial cleanup.
-6. Decline overwrite, induce a safe owned-destination write/replace failure, retry without rerendering, and ensure playback guidance/Details remain independent of publication feedback.
-7. Close normally; confirm the positively observed session is removed, no owned media processes/partial files remain and input/package hashes are unchanged.
+1. Check landscape/portrait image Ctrl+wheel Fit floor, drag pan and ordinary-wheel handoff; tab/rerender framing, cancelled replacement and successful reset.
+2. Resize through working, Ready, stale/error and exported transitions in both directions; check actions, long text and constrained-height scrolling.
+3. Check Settings draft Reset/Cancel/Escape/title-close, Save/restart, selectable paths and About/notices. Distinguish actual storage failure from a controlled dependency exception.
+4. Repeat Original/Symbolized end → embedded seek → fullscreen; compare paused/playing time/frame/thumb and tab transfer. Listen for mute/volume/single-audio ownership; externally verify silent output.
+5. Cancel rendering while active. Separately cancel publication during actual copy, not Save/overwrite confirmation; verify retained hashes and owned partial cleanup.
+6. Decline overwrite, induce a safe owned-destination write/replace failure and retry without rerendering. Keep playback guidance/Details independent of export feedback.
+7. Close normally; verify the positively observed session and owned media processes/partials disappear, with input/package hashes unchanged.
 
-An operation finishing before input is an inconclusive timing attempt, not a cancellation pass. A clipboard-service double does not prove system clipboard denial was induced; general manual feedback does not establish a deliberately forced late-feedback race.
+Finishing before Cancel input is **inconclusive**, not a cancellation pass. Clipboard doubles do not prove OS clipboard denial or a deliberately forced native late-feedback race.
 
 ## Remaining release boundaries
 
-- A full measured window/state/DPI matrix, unreported mixed-DPI combinations and all native fault branches are not certified by the available reports.
-- Some human checks identify the latest local implementation rather than immutable final-distribution bytes; bind relevant evidence to the final artifact before publication.
-- The clean-PC report is positive human evidence, not an independently audited absence-of-runtime environment. Broader Windows/codec compatibility remains bounded by tested conditions.
-- The portfolio gallery is prepared locally; [media provenance](screenshots/README.md) and release-owner licensing/distribution review remain separate from application tests. Screenshots and example outputs are presentation assets, not new native acceptance or performance evidence. Successful tests do not authorize tagging or publishing.
+- Available reports do not certify every window/state/DPI/mixed-monitor combination or native fault branch.
+- Bind affected checks to final clean-source artifacts; old local-build/installed/user results do not automatically cover new bytes.
+- Current Setup lifecycle and clean-PC acceptance remain open. Earlier clean-PC feedback is not an audited absence-of-runtime environment; Windows/codec compatibility stays bounded.
+- [Media provenance](screenshots/README.md), [licensing/distribution](licensing.md) and [history preparation](portfolio.md) remain separate from successful tests. No test authorizes a tag, upload or public release.
 
-Detailed attempt journals, TRX, native captures, hashes and provisional package histories are retained in local archives rather than shipped as public documentation dependencies. Current product behavior is in [product-spec.md](product-spec.md); ownership decisions are in [architecture.md](architecture.md).
+Current product behavior is in [product-spec.md](product-spec.md); ownership decisions are in [architecture.md](architecture.md). Detailed local evidence and superseded artifacts are retained rather than embedded in public guides.

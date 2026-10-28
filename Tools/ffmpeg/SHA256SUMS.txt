@@ -1,7 +1,7 @@
-# Gyan Doshi FFmpeg 9.0 essentials_build (Windows x64 static GPLv3)
-# Distribution archive: ffmpeg-9.0-essentials_build.zip
-e6b54767a6065919048f1a098eb27211ca4e12b4348a05d88777a5855d0b6e71  ffmpeg-9.0-essentials_build.zip
-227af0691433b703ffc5725e47f7d06eefc34b4a72e7870e73d30e2cda483ecf  ffmpeg.exe
-901f0efe4793cbb0f017101e3427f816e8fbf9a407bd585f49df30f4325cfd88  ffprobe.exe
+# GlyphFrame controlled FFmpeg 9.0-glyphframe.2; local integration, not public release
+# Exact local two-file archive; no public download configured
+cc5fea33bd2a9c7656b2b6ae17b66417c2c6268b62b8b43e323d5748d98980cb  GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip
+a01e45417cfa050c11151a2bf609e983408b8fa688e9d6ab66cb223eba9e7dbe  ffmpeg.exe
+e9fde8cdd23dd3534d15ff49b6788f80328f916634ae81bf7f8b9331da4ee2a9  ffprobe.exe
 8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903  LICENSE.txt
-eb44a453c699b7bc089dddf6b1d39b08beb8eb56180929d59218a90f7023e8dd  DISTRIBUTION_README.txt
+b6c3e6de93225651b21ae8e9204aca67581cc13bc2e68078be82c3f9f3250650  DISTRIBUTION_README.txt

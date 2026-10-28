@@ -12,7 +12,10 @@ function Assert-PortfolioSourcePath([string]$Path) {
         return
     }
     if ($parts[0] -cnotin @('src','tests','scripts','docs','installer','Tools','licenses')) { throw "Unexpected source directory: $Path" }
-    if ($Path -notmatch '\.(?i:cs|csproj|sln|props|targets|ps1|md|txt|json|xaml|manifest|config|ico|png|jpe?g|webp|bmp|svg|mp4|mov|mkv|avi|wav|iss)$') { throw "Executable/archive/unknown source file: $Path" }
+    if ($Path -notmatch '\.(?i:cs|csproj|sln|props|targets|ps1|md|txt|json|xaml|manifest|config|ico|png|jpe?g|webp|bmp|svg|mp4|mov|mkv|avi|wav|iss)$' -and
+        $Path -cnotmatch '^scripts/ffmpeg/[a-z0-9-]+\.sh$' -and
+        $Path -cnotmatch '^scripts/ffmpeg/patches/[0-9]{4}-[a-z0-9-]+\.patch$' -and
+        $Path -cne 'scripts/ffmpeg/tests/vvc-weighted-scaled.c') { throw "Executable/archive/unknown source file: $Path" }
     if ($Path -match '\.(?i:ico|png|jpe?g|webp|bmp|svg|mp4|mov|mkv|avi|wav)$' -and
         $Path -notmatch '^(?:tests/GlyphFrame.Tests/Fixtures/|src/GlyphFrame.App/Assets/|docs/design_reference/|docs/screenshots/)') { throw "Media outside reviewed asset locations: $Path" }
     if ($parts[0] -ceq 'Tools' -and $Path -cnotin @('Tools/ffmpeg/README.md','Tools/ffmpeg/LICENSE.txt','Tools/ffmpeg/DISTRIBUTION_README.txt','Tools/ffmpeg/SHA256SUMS.txt')) { throw 'Only tool provenance/instructions belong in source publication.' }

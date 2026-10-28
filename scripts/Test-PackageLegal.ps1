@@ -37,6 +37,28 @@ function Reset-Fixture {
     Write-Fixture 'GlyphFrame.App.deps.json' '{"libraries":{"Example/1.2.3":{"type":"package"},"GlyphFrame.App/1.0.0":{"type":"project"}}}'
 }
 function Save-Manifest { Write-Fixture 'licenses/manifest.json' ($script:manifest | ConvertTo-Json -Depth 6) }
+function Controlled-Fixture {
+    Reset-Fixture
+    $script:toolPins=@{'GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip'=('a'*64)}
+    foreach($name in @('ffmpeg.exe','ffprobe.exe')) {
+        Write-Fixture "Tools/ffmpeg/$name" "inert $name"
+        $script:toolPins[$name]=(Get-FileHash (Join-Path $root "Tools/ffmpeg/$name")).Hash.ToLowerInvariant()
+    }
+    foreach($path in Get-ControlledToolLegalPaths) {
+        if($path -notin $script:manifest.Files.Path) {
+            Write-Fixture $path "Retained synthetic notice`n"
+            $script:manifest.Files+=@{Path=$path;TextSha256=(Get-LegalTextHash (Join-Path $root $path))}
+        }
+    }
+    $script:manifest.ControlledFfmpeg=@{
+        Version='9.0-glyphframe.2';ArchiveFile='GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip';ArchiveSha256=('a'*64)
+        FfmpegSha256=$script:toolPins['ffmpeg.exe'];FfprobeSha256=$script:toolPins['ffprobe.exe']
+        SourceMaterialsFile='GlyphFrame-ffmpeg-9.0-glyphframe.2-build-materials.zip'
+        SourceMaterialsSha256='c2172927ec454ead9eed21cdc6d9be1904816fef085eb539492c3d54a035f5aa'
+        Documents=@(Get-ControlledToolLegalPaths)
+    }
+    Save-Manifest
+}
 try {
     Reset-Fixture
     Run-Check 'Valid collection binds exact dependency and preserves unresolved status' {
@@ -108,6 +130,27 @@ try {
         Assert-PortableFilePath 'licenses/manifest.json'
         Assert-Throws { Assert-PortableFilePath 'licenses/settings.json' }
         Assert-Throws { Assert-PortableFilePath 'other/manifest.json' }
+    }
+    Run-Check 'Controlled CLI pair binds actual inert bytes and all twelve required notices' {
+        Controlled-Fixture
+        $result=Assert-ControlledToolLegalBinding $root $script:toolPins
+        Assert-Check ($result.Version -ceq '9.0-glyphframe.2' -and $result.DocumentsVerified -eq 12) 'Incomplete binding.'
+    }
+    foreach($fault in @('missing-binding','version','binary-pin','source-pin','omitted-notice','changed-notice','changed-tool')) {
+        Run-Check "Controlled binding fails closed: $fault" {
+            Controlled-Fixture
+            switch($fault) {
+                'missing-binding' {$script:manifest.Remove('ControlledFfmpeg')}
+                'version' {$script:manifest.ControlledFfmpeg.Version='9.0-essentials_build'}
+                'binary-pin' {$script:manifest.ControlledFfmpeg.FfmpegSha256=('b'*64)}
+                'source-pin' {$script:manifest.ControlledFfmpeg.SourceMaterialsSha256=('b'*64)}
+                'omitted-notice' {$script:manifest.ControlledFfmpeg.Documents=@($script:manifest.ControlledFfmpeg.Documents|Where-Object {$_ -notlike '*IJG*'})}
+                'changed-notice' {Write-Fixture 'licenses/FFmpeg/IJG-NOTICES.txt' 'changed'}
+                'changed-tool' {Write-Fixture 'Tools/ffmpeg/ffprobe.exe' 'changed'}
+            }
+            Save-Manifest
+            Assert-Throws {Assert-ControlledToolLegalBinding $root $script:toolPins}
+        }
     }
     Write-Host "Legal helper checks passed: $passed; failed: 0. No network, publish or app launch."
 }

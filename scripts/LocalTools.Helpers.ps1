@@ -9,7 +9,7 @@ function Get-LocalToolPins([string]$ManifestPath) {
             throw 'Malformed or duplicate pinned tool checksum.'
         }
     }
-    $names = @('ffmpeg-9.0-essentials_build.zip', 'ffmpeg.exe', 'ffprobe.exe', 'LICENSE.txt', 'DISTRIBUTION_README.txt')
+    $names = @('GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip', 'ffmpeg.exe', 'ffprobe.exe', 'LICENSE.txt', 'DISTRIBUTION_README.txt')
     if ($pins.Count -ne $names.Count -or @($names | Where-Object { -not $pins.ContainsKey($_) }).Count) { throw 'Unexpected tool pin set; review version, provenance and acquisition together.' }
     return ,$pins
 }
@@ -30,21 +30,23 @@ function Install-LocalToolArchive([string]$Archive, [string]$Destination, [strin
     Assert-PortableDirectoryChain $Destination
     Assert-PortableDirectoryChain $RunRoot
     if (([IO.File]::GetAttributes($Archive) -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
-        (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $Pins['ffmpeg-9.0-essentials_build.zip']) { throw 'Archive checksum mismatch; no extracted file will be accepted.' }
+        (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $Pins['GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip']) { throw 'Archive checksum mismatch; no extracted file will be accepted.' }
     if ([IO.Directory]::Exists($Destination) -or [IO.File]::Exists($Destination)) { throw 'Destination already exists; refusing partial-cache repair or overwrite.' }
     $stage = Join-Path $RunRoot 'staged-tools'
     if (Test-Path -LiteralPath $stage) { throw 'Staging must be fresh.' }
     [void][IO.Directory]::CreateDirectory($stage)
     $zip = [IO.Compression.ZipFile]::OpenRead($Archive)
     try {
+        if ($zip.Entries.Count -ne 2) { throw 'The reviewed controlled archive contains exactly two tool files.' }
         $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
         foreach ($entry in $zip.Entries) {
             $relative = $entry.FullName.TrimEnd('/')
             Assert-PortableRelativePath $relative
+            if ($entry.FullName -cnotin @('Tools/ffmpeg/ffmpeg.exe','Tools/ffmpeg/ffprobe.exe')) { throw 'Unexpected controlled tool archive entry.' }
             if (-not $seen.Add($relative) -or ((($entry.ExternalAttributes -shr 16) -band 0xF000) -eq 0xA000)) { throw 'Conflicting or linked archive entry.' }
         }
         foreach ($name in @('ffmpeg.exe', 'ffprobe.exe')) {
-            $entry = $zip.GetEntry("ffmpeg-9.0-essentials_build/bin/$name")
+            $entry = $zip.GetEntry("Tools/ffmpeg/$name")
             if ($null -eq $entry -or $entry.Length -le 0 -or $entry.Length -gt 268435456) { throw "Missing or oversized pinned $name archive entry." }
             $output = [IO.FileStream]::new((Join-Path $stage $name), [IO.FileMode]::CreateNew)
             $input = $entry.Open()

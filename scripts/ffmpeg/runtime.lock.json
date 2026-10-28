@@ -1,0 +1,50 @@
+{
+  "SchemaVersion": 1,
+  "Profile": "windows-x64-static-gpl3-experimental-1",
+  "PublicDistributionApproved": false,
+  "Scope": "Conservative runtime notice set for isolated testing; not application deployment or complete Corresponding Source approval.",
+  "Components": [
+    {
+      "Name": "gcc-runtime",
+      "Package": "mingw-w64-ucrt-x86_64-gcc",
+      "Version": "16.2.0-6",
+      "Upstream": "https://github.com/gcc-mirror/gcc/tree/releases/gcc-16.2.0/libgcc",
+      "Treatment": "GPLv3 with GCC Runtime Library Exception 3.1 for covered files and eligible compilation; retain both texts. No compiler executable redistribution is proposed."
+    },
+    {
+      "Name": "mingw-runtime",
+      "Package": "mingw-w64-ucrt-x86_64-crt",
+      "Version": "14.0.0.r569.g34eeafb7d-1",
+      "Upstream": "https://github.com/mingw-w64/mingw-w64/commit/34eeafb7d",
+      "Treatment": "Retain the complete installed MinGW-w64 general/runtime notice set without pruning individual attributions. Windows import libraries are not copies of the Windows system DLLs."
+    },
+    {
+      "Name": "winpthreads",
+      "Package": "mingw-w64-ucrt-x86_64-winpthreads",
+      "Version": "14.0.0.r569.g34eeafb7d-1",
+      "Upstream": "https://github.com/mingw-w64/mingw-w64/blob/34eeafb7d/mingw-w64-libraries/winpthreads/COPYING",
+      "Treatment": "Static code is present despite FFmpeg --disable-pthreads. Retain the whole MIT/Lockless BSD notice, not just the first grant."
+    }
+  ],
+  "Notices": [
+    { "Path": "notices/gcc/COPYING3.txt", "HostPath": "ucrt64/share/licenses/libgcc/COPYING3", "Component": "gcc-runtime", "SHA256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903" },
+    { "Path": "notices/gcc/COPYING.RUNTIME.txt", "HostPath": "ucrt64/share/licenses/libgcc/COPYING.RUNTIME", "Component": "gcc-runtime", "SHA256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74" },
+    { "Path": "notices/mingw/COPYING.txt", "HostPath": "ucrt64/share/licenses/crt/COPYING", "Component": "mingw-runtime", "SHA256": "99a69660981156c21336fdb5661f89341b013c94e4bf9e1c7467b4745718397f" },
+    { "Path": "notices/mingw/COPYING.MinGW-w64-runtime.txt", "HostPath": "ucrt64/share/licenses/crt/COPYING.MinGW-w64-runtime.txt", "Component": "mingw-runtime", "SHA256": "1db8da07b436c68833c0673ffee3d9fcb2526047f3820b81661865dfedc79a1f" },
+    { "Path": "notices/mingw/COPYING.MinGW-w64.txt", "HostPath": "ucrt64/share/licenses/crt/COPYING.MinGW-w64.txt", "Component": "mingw-runtime", "SHA256": "f38e6194bd3bfa1b654f118e5acefe0aead437bbe669eee43957ccc65a7127f1" },
+    { "Path": "notices/winpthreads/COPYING.txt", "HostPath": "ucrt64/share/licenses/winpthreads/COPYING", "Component": "winpthreads", "SHA256": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177" }
+  ],
+  "Objects": [
+    { "Path": "ucrt64/lib/gcc/x86_64-w64-mingw32/16.2.0/libgcc.a", "Component": "gcc-runtime", "SHA256": "3bf27ff273d71b177ace7b12396a71b53bb813f763f67b3140166df1f9bb90b1" },
+    { "Path": "ucrt64/lib/gcc/x86_64-w64-mingw32/16.2.0/crtbegin.o", "Component": "gcc-runtime", "SHA256": "b61d8cef207fe4928c44d91ad722d15c53b9ae32a26fb69f05ace4287e887905" },
+    { "Path": "ucrt64/lib/gcc/x86_64-w64-mingw32/16.2.0/crtend.o", "Component": "gcc-runtime", "SHA256": "c3c2b8de9ec26db0994f669680d4aadad3639fc970e96f858ac0a6cc9515bde3" },
+    { "Path": "ucrt64/lib/crt2.o", "Component": "mingw-runtime", "SHA256": "6904489841a7d0d71aed3f49bfca3f722ae9e7c5073c1716f48b2c6be4502e83" },
+    { "Path": "ucrt64/lib/libmingw32.a", "Component": "mingw-runtime", "SHA256": "26b6d5cea09c4fa2241e53d250c2018c613edbd991c206c0d6806478fff969be" },
+    { "Path": "ucrt64/lib/libmingwex.a", "Component": "mingw-runtime", "SHA256": "18eed21dc92be399a2792683a98931759f05ca6e0825f3ef54e897f5de1671ae" },
+    { "Path": "ucrt64/lib/libmsvcrt.a", "Component": "mingw-runtime", "SHA256": "bf17690d34211b6db09dac09ffec8cdcde2214f4e01312ebf9347439396610d7" },
+    { "Path": "ucrt64/lib/libbcrypt.a", "Component": "mingw-runtime", "SHA256": "199fe027dd1d6b6314076624798e57792b816e2bbe143eb7ff5abb6dab46e145" },
+    { "Path": "ucrt64/lib/libkernel32.a", "Component": "mingw-runtime", "SHA256": "a0906d87ca3c7bceb571f5de5fd44b6f6c571d2600ae8c70fb006ad651700198" },
+    { "Path": "ucrt64/lib/libshell32.a", "Component": "mingw-runtime", "SHA256": "0d705833bbd1000f50bea5bc2cf44326acb37b308eeb23fc5fc33d77f142c85d" },
+    { "Path": "ucrt64/lib/libpthread.a", "Component": "winpthreads", "SHA256": "7d4fea0820a353641a6f9d0109f05d4e206886666600bce4589dff93faf9f8c0" }
+  ]
+}

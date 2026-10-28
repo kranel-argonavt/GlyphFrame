@@ -24,7 +24,7 @@ public sealed class AudioVideoExportIntegrationTests
         string videoOnly = media.CopyFixture("video-preview.mp4", "symbolized video.partial");
         string source = media.CopyFixture("video-audio-aac.mp4", "source audio 日本語.mp4");
         string output = Path.Combine(media.RootPath, "mux packet result 测试.partial");
-        BundledFfmpegLocator locator = new(Path.Combine(RepositoryRoot, "artifacts", "local-runtime"));
+        BundledFfmpegLocator locator = new(Path.Combine(RepositoryRoot, "artifacts", "local-runtime", "controlled-9.0-glyphframe.2"));
         ProcessRunner runner = new();
         FfmpegAudioMuxer muxer = new(locator);
 
@@ -173,7 +173,7 @@ public sealed class AudioVideoExportIntegrationTests
         string outputFileName)
     {
         string output = Path.Combine(media.RootPath, outputFileName);
-        BundledFfmpegLocator locator = new(Path.Combine(RepositoryRoot, "artifacts", "local-runtime"));
+        BundledFfmpegLocator locator = new(Path.Combine(RepositoryRoot, "artifacts", "local-runtime", "controlled-9.0-glyphframe.2"));
         ProcessRunner runner = new();
         FfmpegValidationService validation = new(locator, runner);
         FfprobeVideoMetadataReader metadataReader = new(

@@ -3,7 +3,7 @@
   "PublicDistributionApproved": false,
   "HashNormalization": "UTF-8 without BOM; CRLF normalized to LF",
   "OpenIssues": [
-    "FFmpeg 9.0 complete Corresponding Source/build material and binary distribution route are unverified. A controlled replacement and separately sanitized history-preserving publication copy are planned, not completed. Original private history retains binaries; the history-free source snapshot remains a fallback.",
+    "Controlled FFmpeg 9.0-glyphframe.2 is integrated locally with exact tool/source/patch/material hashes and retained notices. Final Corresponding Source delivery/hosting, application/GPL scope and public binary distribution approval remain open. Earlier vendor binaries remain in private historical objects pending a separately sanitized publication copy.",
     "Windows-native .NET Library / Windows SDK end-user and distributor protective-term requirements need a reviewed fulfillment mechanism for Setup and portable; retaining vendor texts alone is not fulfillment."
   ],
   "Components": [
@@ -156,7 +156,7 @@
     },
     {
       "Path": "THIRD_PARTY_NOTICES.md",
-      "TextSha256": "fc63cece85a72168f838550c8db0ab1ccfdfbf2115a7c6f6edf2d0142e163920",
+      "TextSha256": "95597aa2617dc8d060a11613c7c5af257be26308cfb272f4990493edcdbf34e0",
       "UpstreamByteSha256": null,
       "Source": "GlyphFrame dependency attribution index"
     },
@@ -164,17 +164,17 @@
       "Path": "Tools/ffmpeg/LICENSE.txt",
       "TextSha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
       "UpstreamByteSha256": null,
-      "Source": "Gyan ffmpeg-9.0-essentials_build.zip, LICENSE; original archive/file digests in Tools/ffmpeg/SHA256SUMS.txt"
+      "Source": "Full GPLv3 text, unchanged; controlled FFmpeg 9.0-glyphframe.2 licensing, not vendor-build provenance"
     },
     {
       "Path": "Tools/ffmpeg/DISTRIBUTION_README.txt",
-      "TextSha256": "eb44a453c699b7bc089dddf6b1d39b08beb8eb56180929d59218a90f7023e8dd",
+      "TextSha256": "b6c3e6de93225651b21ae8e9204aca67581cc13bc2e68078be82c3f9f3250650",
       "UpstreamByteSha256": null,
-      "Source": "Gyan ffmpeg-9.0-essentials_build.zip, README; original archive/file digests in Tools/ffmpeg/SHA256SUMS.txt"
+      "Source": "GlyphFrame controlled FFmpeg 9.0-glyphframe.2 exact binary/source/patch/material identities and local-only delivery status"
     },
     {
       "Path": "licenses/README.md",
-      "TextSha256": "ee56058cce2d637d571ea8d90f4aa941c48260d7c2fa8dbf0a5ae29e5da3518f",
+      "TextSha256": "b231d871538b453812912417f58ab9f21acb56070ed845f891c17e0bb518add8",
       "UpstreamByteSha256": null,
       "Source": "GlyphFrame license inventory policy"
     },
@@ -217,6 +217,67 @@
       "UpstreamByteSha256": "3bdf7142d570f11780d1a5fcb6cbe47f5cf4a15bc634acf8db93fe3be8837119",
       "Source": "https://raw.githubusercontent.com/dotnet/core/6c25b9da384e8d8a16fd12c79da8a8aa6bdfc6a1/license-information-windows.md",
       "Extraction": "Upstream Markdown retained as inert plain text; relative references are resolved at the recorded upstream source URL, not repository-local links."
+    },
+    {
+      "Path": "licenses/FFmpeg/FFMPEG-LICENSE.txt",
+      "TextSha256": "2e1d16c72fd74e12063776371da757322f8b77589386532f4fd8634bde7de1af",
+      "UpstreamByteSha256": "2e1d16c72fd74e12063776371da757322f8b77589386532f4fd8634bde7de1af",
+      "Source": "https://github.com/FFmpeg/FFmpeg/blob/d32b387f2b0a484599d4587d651891f0c63c4238/LICENSE.md"
+    },
+    {
+      "Path": "licenses/FFmpeg/GCC-COPYING3.txt",
+      "TextSha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "UpstreamByteSha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "Source": "Exact controlled-build runtime notice copied from the hash-bound scripts/ffmpeg/runtime.lock.json collection; upstream/package scope in scripts/ffmpeg/runtime-notices.md"
+    },
+    {
+      "Path": "licenses/FFmpeg/GCC-RUNTIME-EXCEPTION.txt",
+      "TextSha256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
+      "UpstreamByteSha256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
+      "Source": "Exact controlled-build runtime notice copied from the hash-bound scripts/ffmpeg/runtime.lock.json collection; upstream/package scope in scripts/ffmpeg/runtime-notices.md"
+    },
+    {
+      "Path": "licenses/FFmpeg/IJG-NOTICES.txt",
+      "TextSha256": "5c9d2dcbaa9687306e8fa3017a66ed56bef0986e5390dcab755c57a8771ceffa",
+      "UpstreamByteSha256": null,
+      "Source": "Leading copyright/permission comment blocks from libavcodec/jfdctfst.c, jfdctint_template.c and jrevdct.c at FFmpeg d32b387f2b0a484599d4587d651891f0c63c4238",
+      "Extraction": "Complete first comment blocks, filename headings and LF separators; no wording edits. Full source archive is pinned separately."
+    },
+    {
+      "Path": "licenses/FFmpeg/MINGW-COPYING.txt",
+      "TextSha256": "99a69660981156c21336fdb5661f89341b013c94e4bf9e1c7467b4745718397f",
+      "UpstreamByteSha256": "99a69660981156c21336fdb5661f89341b013c94e4bf9e1c7467b4745718397f",
+      "Source": "Exact controlled-build runtime notice copied from the hash-bound scripts/ffmpeg/runtime.lock.json collection; upstream/package scope in scripts/ffmpeg/runtime-notices.md"
+    },
+    {
+      "Path": "licenses/FFmpeg/MINGW-RUNTIME.txt",
+      "TextSha256": "1db8da07b436c68833c0673ffee3d9fcb2526047f3820b81661865dfedc79a1f",
+      "UpstreamByteSha256": "1db8da07b436c68833c0673ffee3d9fcb2526047f3820b81661865dfedc79a1f",
+      "Source": "Exact controlled-build runtime notice copied from the hash-bound scripts/ffmpeg/runtime.lock.json collection; upstream/package scope in scripts/ffmpeg/runtime-notices.md"
+    },
+    {
+      "Path": "licenses/FFmpeg/MINGW-SCOPE.txt",
+      "TextSha256": "f38e6194bd3bfa1b654f118e5acefe0aead437bbe669eee43957ccc65a7127f1",
+      "UpstreamByteSha256": "f38e6194bd3bfa1b654f118e5acefe0aead437bbe669eee43957ccc65a7127f1",
+      "Source": "Exact controlled-build runtime notice copied from the hash-bound scripts/ffmpeg/runtime.lock.json collection; upstream/package scope in scripts/ffmpeg/runtime-notices.md"
+    },
+    {
+      "Path": "licenses/FFmpeg/WINPTHREADS-COPYING.txt",
+      "TextSha256": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177",
+      "UpstreamByteSha256": "63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177",
+      "Source": "Exact controlled-build runtime notice copied from the hash-bound scripts/ffmpeg/runtime.lock.json collection; upstream/package scope in scripts/ffmpeg/runtime-notices.md"
+    },
+    {
+      "Path": "licenses/FFmpeg/X264-COPYING.txt",
+      "TextSha256": "32b1062f7da84967e7019d01ab805935caa7ab7321a7ced0e30ebe75e5df1670",
+      "UpstreamByteSha256": "32b1062f7da84967e7019d01ab805935caa7ab7321a7ced0e30ebe75e5df1670",
+      "Source": "https://code.videolan.org/videolan/x264/-/blob/0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee/COPYING"
+    },
+    {
+      "Path": "licenses/FFmpeg/ZLIB-LICENSE.txt",
+      "TextSha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+      "UpstreamByteSha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+      "Source": "https://github.com/madler/zlib/blob/da607da739fa6047df13e66a2af6b8bec7c2a498/LICENSE"
     }
   ],
   "OwnershipEvidence": {
@@ -225,5 +286,28 @@
     "Author": "Nazar Khozin",
     "Scope": "Current GlyphFrame GF/logo/icon design and historical design reference; excludes unrelated/future media",
     "Documents": "docs/design_reference/README.md"
+  },
+  "ControlledFfmpeg": {
+    "Version": "9.0-glyphframe.2",
+    "ArchiveFile": "GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip",
+    "ArchiveSha256": "cc5fea33bd2a9c7656b2b6ae17b66417c2c6268b62b8b43e323d5748d98980cb",
+    "FfmpegSha256": "a01e45417cfa050c11151a2bf609e983408b8fa688e9d6ab66cb223eba9e7dbe",
+    "FfprobeSha256": "e9fde8cdd23dd3534d15ff49b6788f80328f916634ae81bf7f8b9331da4ee2a9",
+    "SourceMaterialsFile": "GlyphFrame-ffmpeg-9.0-glyphframe.2-build-materials.zip",
+    "SourceMaterialsSha256": "c2172927ec454ead9eed21cdc6d9be1904816fef085eb539492c3d54a035f5aa",
+    "Documents": [
+      "Tools/ffmpeg/LICENSE.txt",
+      "Tools/ffmpeg/DISTRIBUTION_README.txt",
+      "licenses/FFmpeg/FFMPEG-LICENSE.txt",
+      "licenses/FFmpeg/GCC-COPYING3.txt",
+      "licenses/FFmpeg/GCC-RUNTIME-EXCEPTION.txt",
+      "licenses/FFmpeg/IJG-NOTICES.txt",
+      "licenses/FFmpeg/MINGW-COPYING.txt",
+      "licenses/FFmpeg/MINGW-RUNTIME.txt",
+      "licenses/FFmpeg/MINGW-SCOPE.txt",
+      "licenses/FFmpeg/WINPTHREADS-COPYING.txt",
+      "licenses/FFmpeg/X264-COPYING.txt",
+      "licenses/FFmpeg/ZLIB-LICENSE.txt"
+    ]
   }
 }

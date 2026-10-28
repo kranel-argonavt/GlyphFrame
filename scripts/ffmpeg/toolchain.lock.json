@@ -1,0 +1,703 @@
+{
+  "SchemaVersion": 1,
+  "Environment": "UCRT64",
+  "Scope": "Exact installed package inventory and critical executable identities, not complete hermetic-host attestation",
+  "BaseArchive": "msys2-base-x86_64-20260927.tar.xz",
+  "BaseSHA256": "ea2f31a0b6ade63914ce441ffb022f0f6aa96982bfefa2326460a26d5fb01322",
+  "Packages": [
+    {
+      "Name": "base",
+      "Version": "2022.06-1"
+    },
+    {
+      "Name": "bash",
+      "Version": "5.3.20-2"
+    },
+    {
+      "Name": "bash-completion",
+      "Version": "2.18.0-1"
+    },
+    {
+      "Name": "brotli",
+      "Version": "1.2.1-1"
+    },
+    {
+      "Name": "bsdtar",
+      "Version": "3.8.10-2"
+    },
+    {
+      "Name": "bzip2",
+      "Version": "1.0.8-4"
+    },
+    {
+      "Name": "ca-certificates",
+      "Version": "20260816-2"
+    },
+    {
+      "Name": "coreutils",
+      "Version": "8.32-5"
+    },
+    {
+      "Name": "curl",
+      "Version": "8.23.0-1"
+    },
+    {
+      "Name": "dash",
+      "Version": "0.5.13.5-1"
+    },
+    {
+      "Name": "db",
+      "Version": "6.2.32-6"
+    },
+    {
+      "Name": "diffutils",
+      "Version": "3.12-1"
+    },
+    {
+      "Name": "file",
+      "Version": "5.48-1"
+    },
+    {
+      "Name": "filesystem",
+      "Version": "2026.10.17-1"
+    },
+    {
+      "Name": "findutils",
+      "Version": "4.11.0-2"
+    },
+    {
+      "Name": "gawk",
+      "Version": "5.4.1-1"
+    },
+    {
+      "Name": "gcc-libs",
+      "Version": "16.2.0-1"
+    },
+    {
+      "Name": "gdbm",
+      "Version": "1.26-1"
+    },
+    {
+      "Name": "getent",
+      "Version": "2.18.90-6"
+    },
+    {
+      "Name": "gettext",
+      "Version": "0.22.5-1"
+    },
+    {
+      "Name": "git",
+      "Version": "2.56.0-1"
+    },
+    {
+      "Name": "gmp",
+      "Version": "6.3.0-2"
+    },
+    {
+      "Name": "gnupg",
+      "Version": "2.4.9-3"
+    },
+    {
+      "Name": "grep",
+      "Version": "1~3.0-7"
+    },
+    {
+      "Name": "gzip",
+      "Version": "1.15-1"
+    },
+    {
+      "Name": "heimdal",
+      "Version": "7.8.0-7"
+    },
+    {
+      "Name": "heimdal-libs",
+      "Version": "7.8.0-7"
+    },
+    {
+      "Name": "inetutils",
+      "Version": "2.8-1"
+    },
+    {
+      "Name": "info",
+      "Version": "7.2-3"
+    },
+    {
+      "Name": "less",
+      "Version": "710-1"
+    },
+    {
+      "Name": "libargp",
+      "Version": "20260115-1"
+    },
+    {
+      "Name": "libasprintf",
+      "Version": "0.22.5-1"
+    },
+    {
+      "Name": "libassuan",
+      "Version": "3.0.2-1"
+    },
+    {
+      "Name": "libbz2",
+      "Version": "1.0.8-4"
+    },
+    {
+      "Name": "libcbor",
+      "Version": "0.14.0-2"
+    },
+    {
+      "Name": "libcurl",
+      "Version": "8.23.0-1"
+    },
+    {
+      "Name": "libdb",
+      "Version": "6.2.32-6"
+    },
+    {
+      "Name": "libedit",
+      "Version": "20240808_3.1-1"
+    },
+    {
+      "Name": "libexpat",
+      "Version": "2.9.0-1"
+    },
+    {
+      "Name": "libffi",
+      "Version": "3.8.0-1"
+    },
+    {
+      "Name": "libfido2",
+      "Version": "1.17.0-1"
+    },
+    {
+      "Name": "libgcrypt",
+      "Version": "1.12.4-1"
+    },
+    {
+      "Name": "libgdbm",
+      "Version": "1.26-1"
+    },
+    {
+      "Name": "libgettextpo",
+      "Version": "0.22.5-1"
+    },
+    {
+      "Name": "libgnutls",
+      "Version": "3.8.13-2"
+    },
+    {
+      "Name": "libgpg-error",
+      "Version": "1.61-1"
+    },
+    {
+      "Name": "libhogweed",
+      "Version": "4.0-1"
+    },
+    {
+      "Name": "libiconv",
+      "Version": "1.19-1"
+    },
+    {
+      "Name": "libidn2",
+      "Version": "2.3.8-1"
+    },
+    {
+      "Name": "libintl",
+      "Version": "0.22.5-1"
+    },
+    {
+      "Name": "libksba",
+      "Version": "1.8.1-1"
+    },
+    {
+      "Name": "liblz4",
+      "Version": "1.10.0-1"
+    },
+    {
+      "Name": "liblzma",
+      "Version": "5.8.4-1"
+    },
+    {
+      "Name": "libnettle",
+      "Version": "4.0-1"
+    },
+    {
+      "Name": "libnghttp2",
+      "Version": "1.70.0-1"
+    },
+    {
+      "Name": "libnghttp3",
+      "Version": "1.18.0-1"
+    },
+    {
+      "Name": "libngtcp2",
+      "Version": "1.25.0-1"
+    },
+    {
+      "Name": "libnpth",
+      "Version": "1.8-1"
+    },
+    {
+      "Name": "libopenssl",
+      "Version": "3.6.5-1"
+    },
+    {
+      "Name": "libp11-kit",
+      "Version": "0.26.5-1"
+    },
+    {
+      "Name": "libpcre",
+      "Version": "8.45-5"
+    },
+    {
+      "Name": "libpcre2_8",
+      "Version": "10.49-1"
+    },
+    {
+      "Name": "libpsl",
+      "Version": "0.23.2-1"
+    },
+    {
+      "Name": "libreadline",
+      "Version": "8.3.006-1"
+    },
+    {
+      "Name": "libsqlite",
+      "Version": "3.54.0-1"
+    },
+    {
+      "Name": "libssh2",
+      "Version": "1.11.1-1"
+    },
+    {
+      "Name": "libtasn1",
+      "Version": "4.21.0-1"
+    },
+    {
+      "Name": "libunistring",
+      "Version": "1.4.2-1"
+    },
+    {
+      "Name": "libutil-linux",
+      "Version": "2.40.2-2"
+    },
+    {
+      "Name": "libxcrypt",
+      "Version": "4.5.2-1"
+    },
+    {
+      "Name": "libzstd",
+      "Version": "1.5.7-1"
+    },
+    {
+      "Name": "make",
+      "Version": "4.4.1-3"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-binutils",
+      "Version": "2.47-4"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-cc-libs",
+      "Version": "16.2.0-6"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-crt",
+      "Version": "14.0.0.r569.g34eeafb7d-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-gcc",
+      "Version": "16.2.0-6"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-gettext-runtime",
+      "Version": "1.0-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-gmp",
+      "Version": "6.3.0-2"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-headers",
+      "Version": "14.0.0.r569.g34eeafb7d-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-isl",
+      "Version": "0.28-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-libgcc",
+      "Version": "16.2.0-6"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-libiconv",
+      "Version": "1.19-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-libstdc++",
+      "Version": "16.2.0-6"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-libwinpthread",
+      "Version": "14.0.0.r569.g34eeafb7d-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-mpc",
+      "Version": "1.4.1-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-mpfr",
+      "Version": "4.2.2-3"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-nasm",
+      "Version": "3.02-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-pkgconf",
+      "Version": "1~3.0.10-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-tzdata",
+      "Version": "2026e-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-windows-default-manifest",
+      "Version": "20260815-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-winpthreads",
+      "Version": "14.0.0.r569.g34eeafb7d-1"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-zlib",
+      "Version": "1.3.2-3"
+    },
+    {
+      "Name": "mingw-w64-ucrt-x86_64-zstd",
+      "Version": "1.5.7-2"
+    },
+    {
+      "Name": "mintty",
+      "Version": "1~3.8.3-1"
+    },
+    {
+      "Name": "mpfr",
+      "Version": "4.2.2-1"
+    },
+    {
+      "Name": "msys2-keyring",
+      "Version": "1~20260814-1"
+    },
+    {
+      "Name": "msys2-launcher",
+      "Version": "1.5-3"
+    },
+    {
+      "Name": "msys2-runtime",
+      "Version": "3.6.11-4"
+    },
+    {
+      "Name": "nano",
+      "Version": "9.2-1"
+    },
+    {
+      "Name": "ncurses",
+      "Version": "6.6-2"
+    },
+    {
+      "Name": "nettle",
+      "Version": "4.0-1"
+    },
+    {
+      "Name": "openssh",
+      "Version": "10.6p1-1"
+    },
+    {
+      "Name": "openssl",
+      "Version": "3.6.5-1"
+    },
+    {
+      "Name": "p11-kit",
+      "Version": "0.26.5-1"
+    },
+    {
+      "Name": "pacman",
+      "Version": "6.1.0-26"
+    },
+    {
+      "Name": "pacman-contrib",
+      "Version": "1.10.6-2"
+    },
+    {
+      "Name": "pacman-mirrors",
+      "Version": "20260129-1"
+    },
+    {
+      "Name": "patch",
+      "Version": "2.8.1-1"
+    },
+    {
+      "Name": "perl",
+      "Version": "5.42.3-3"
+    },
+    {
+      "Name": "perl-authen-sasl",
+      "Version": "2.2100-2"
+    },
+    {
+      "Name": "perl-clone",
+      "Version": "0.51-1"
+    },
+    {
+      "Name": "perl-convert-binhex",
+      "Version": "1.125-3"
+    },
+    {
+      "Name": "perl-encode-locale",
+      "Version": "1.05-3"
+    },
+    {
+      "Name": "perl-error",
+      "Version": "0.17030-3"
+    },
+    {
+      "Name": "perl-file-listing",
+      "Version": "6.16-2"
+    },
+    {
+      "Name": "perl-html-parser",
+      "Version": "3.86-2"
+    },
+    {
+      "Name": "perl-html-tagset",
+      "Version": "3.24-2"
+    },
+    {
+      "Name": "perl-http-cookiejar",
+      "Version": "0.014-2"
+    },
+    {
+      "Name": "perl-http-cookies",
+      "Version": "6.12-2"
+    },
+    {
+      "Name": "perl-http-daemon",
+      "Version": "6.17-2"
+    },
+    {
+      "Name": "perl-http-date",
+      "Version": "6.08-2"
+    },
+    {
+      "Name": "perl-http-message",
+      "Version": "7.04-2"
+    },
+    {
+      "Name": "perl-http-negotiate",
+      "Version": "6.01-4"
+    },
+    {
+      "Name": "perl-io-html",
+      "Version": "1.004-3"
+    },
+    {
+      "Name": "perl-io-socket-ssl",
+      "Version": "2.099-2"
+    },
+    {
+      "Name": "perl-io-stringy",
+      "Version": "2.113-4"
+    },
+    {
+      "Name": "perl-libwww",
+      "Version": "6.83-3"
+    },
+    {
+      "Name": "perl-lwp-mediatypes",
+      "Version": "6.05-2"
+    },
+    {
+      "Name": "perl-mailtools",
+      "Version": "2.22-2"
+    },
+    {
+      "Name": "perl-mime-tools",
+      "Version": "5.518-2"
+    },
+    {
+      "Name": "perl-net-http",
+      "Version": "6.24-2"
+    },
+    {
+      "Name": "perl-net-smtp-ssl",
+      "Version": "1.04-3"
+    },
+    {
+      "Name": "perl-net-ssleay",
+      "Version": "1.96-2"
+    },
+    {
+      "Name": "perl-termreadkey",
+      "Version": "2.38-9"
+    },
+    {
+      "Name": "perl-timedate",
+      "Version": "2.35-2"
+    },
+    {
+      "Name": "perl-try-tiny",
+      "Version": "0.32-2"
+    },
+    {
+      "Name": "perl-uri",
+      "Version": "5.40-1"
+    },
+    {
+      "Name": "perl-www-robotrules",
+      "Version": "6.03-2"
+    },
+    {
+      "Name": "pinentry",
+      "Version": "1.3.3-1"
+    },
+    {
+      "Name": "rebase",
+      "Version": "4.5.0-5"
+    },
+    {
+      "Name": "sed",
+      "Version": "4.9-1"
+    },
+    {
+      "Name": "tar",
+      "Version": "1.35-3"
+    },
+    {
+      "Name": "time",
+      "Version": "1.10-1"
+    },
+    {
+      "Name": "tzcode",
+      "Version": "2026e-1"
+    },
+    {
+      "Name": "util-linux",
+      "Version": "2.40.2-2"
+    },
+    {
+      "Name": "wget",
+      "Version": "1.25.0-4"
+    },
+    {
+      "Name": "which",
+      "Version": "2.25-1"
+    },
+    {
+      "Name": "xz",
+      "Version": "5.8.4-1"
+    },
+    {
+      "Name": "zlib",
+      "Version": "1.3.2-1"
+    },
+    {
+      "Name": "zstd",
+      "Version": "1.5.7-1"
+    }
+  ],
+  "Files": [
+    {
+      "Path": "ucrt64/bin/ar.exe",
+      "SHA256": "8d08df0c76076bb016fc8d0546224856d9d7133ed597a6d769dcec52be62c4be"
+    },
+    {
+      "Path": "ucrt64/bin/as.exe",
+      "SHA256": "a608bd29d15d7cad470567070c7362191881f238d6e8525f4c3ab908cf36fcc5"
+    },
+    {
+      "Path": "ucrt64/bin/gcc.exe",
+      "SHA256": "70325d325c126905fc04c5bc57727969f4529173a139c129e3ff92b7adc2941e"
+    },
+    {
+      "Path": "ucrt64/bin/ld.exe",
+      "SHA256": "a279cc83f198a606f255a597b3a067b51f11a9bbf8fe46de2a0dc8bb71b47f4f"
+    },
+    {
+      "Path": "ucrt64/bin/nasm.exe",
+      "SHA256": "668dc94885b21efa0936491bca7dadd4a194c5b58fdf56b69d94a0e89b9f3f6b"
+    },
+    {
+      "Path": "ucrt64/bin/objdump.exe",
+      "SHA256": "cfabf2663d6312ce40b65b8b414b8aa5f03e2b71b0efd398714df1c418cad0b8"
+    },
+    {
+      "Path": "ucrt64/bin/pkgconf.exe",
+      "SHA256": "232ce7083cdccce95a6602ff8e73d805f38407b33a7d4113f837d62e5f0a87bd"
+    },
+    {
+      "Path": "ucrt64/bin/ranlib.exe",
+      "SHA256": "28916f7c0b99cf2c6c14b9f5aa5e8b6f60ac011d93aaa86fd4afb30e51135bd4"
+    },
+    {
+      "Path": "ucrt64/bin/strip.exe",
+      "SHA256": "ad18528483f279a5abee07c4b9f7dc1f8ed74f9c1bcd72cecdbb104429d022a0"
+    },
+    {
+      "Path": "ucrt64/lib/gcc/x86_64-w64-mingw32/16.2.0/cc1.exe",
+      "SHA256": "271909382f0b22b2f9e6e1179152e36ac3f23ffa57466af91e11756494183017"
+    },
+    {
+      "Path": "ucrt64/lib/gcc/x86_64-w64-mingw32/16.2.0/cc1plus.exe",
+      "SHA256": "29345184cd6a51badfaa90e0de5a0de060105b3017fe2495da1c39ff15bebf46"
+    },
+    {
+      "Path": "ucrt64/lib/gcc/x86_64-w64-mingw32/16.2.0/collect2.exe",
+      "SHA256": "cc319b6989b0f58b148d052ad6d626fa7f30aa49317e65b7606f96e788191e66"
+    },
+    {
+      "Path": "ucrt64/lib/gcc/x86_64-w64-mingw32/16.2.0/g++-mapper-server.exe",
+      "SHA256": "4e478e564c6b8552ecc78c711f2a8a3af697d0bf35151cc1d4ee40d7f3b660d0"
+    },
+    {
+      "Path": "ucrt64/lib/gcc/x86_64-w64-mingw32/16.2.0/lto-wrapper.exe",
+      "SHA256": "ed8d29645b431638b5a15d73c26bb50b78a721af3ffb6688d2895e8dd1c24363"
+    },
+    {
+      "Path": "ucrt64/lib/gcc/x86_64-w64-mingw32/16.2.0/lto1.exe",
+      "SHA256": "119b52d8b18fbe00d6b8c7e8ff95c03e97a6116b9e9448b3603d667013ae4db1"
+    },
+    {
+      "Path": "usr/bin/bash.exe",
+      "SHA256": "3b852c1f2094661227f96a86cb9f7d1547012c0344a7e7b589bf51bccaad2002"
+    },
+    {
+      "Path": "usr/bin/cygpath.exe",
+      "SHA256": "affc7e714e0d2673a4e5451ef17acd81e776853f60489ad538ecbb3550fa84f7"
+    },
+    {
+      "Path": "usr/bin/diff.exe",
+      "SHA256": "d64621f766d8910a92cb3d99bd7f23c0b1c736eece0e19dccbccead93aa81854"
+    },
+    {
+      "Path": "usr/bin/git.exe",
+      "SHA256": "6af740c0ae29183ac7671788c65c898ceda25b8b9a458010d3e87edf1c119336"
+    },
+    {
+      "Path": "usr/bin/make.exe",
+      "SHA256": "91b7e155590d59db22e5eb0a3ffeec6350149f70f9ed2c242d133e584eb72fee"
+    },
+    {
+      "Path": "usr/bin/msys-2.0.dll",
+      "SHA256": "d3b5324eef7fe377c3412bd8d9f5c526ba1136940e34105436b15e5f1ae90717"
+    },
+    {
+      "Path": "usr/bin/tar.exe",
+      "SHA256": "df0582941d1f451a76337863ba1dc8d8986ad0faf44f0e5f5c34afeb43c36453"
+    },
+    {
+      "Path": "usr/bin/uname.exe",
+      "SHA256": "1cba275ff8e0c81f48898f017758c558ee5951cb0448c36628580beffdf4ef89"
+    }
+  ]
+}

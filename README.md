@@ -70,12 +70,14 @@ dotnet run --project src/GlyphFrame.App/GlyphFrame.App.csproj -c Release --no-bu
 A fresh source checkout builds without FFmpeg: image workflows are available, while video tooling is reported unavailable. To enable video and the full integration suite, explicitly prepare the pinned local tools with **PowerShell 7**, then rebuild:
 
 ```powershell
-pwsh -NoProfile -File scripts/Initialize-LocalTools.ps1 -Download
+pwsh -NoProfile -File scripts/Initialize-LocalTools.ps1 -ArchivePath 'C:\GFInputs\GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip'
 dotnet build GlyphFrame.sln -c Release --no-restore
 dotnet test GlyphFrame.sln -c Release --no-build --no-restore
 ```
 
-The acquisition command downloads the fixed vendor archive, verifies archive/executable SHA-256 and extracts only FFmpeg/ffprobe into ignored `artifacts/local-runtime/`. It does not run an installer or modify PATH. Builds never download these tools automatically. An offline `-ArchivePath` option and verification-only mode are documented in [Tools/ffmpeg/README.md](Tools/ffmpeg/README.md). NuGet restore separately obtains the declared .NET package dependencies; source-only does not mean dependency-free.
+The initializer accepts only the exact reviewed local controlled-tool archive, checks archive/executable SHA-256 and extracts just FFmpeg/ffprobe into ignored `artifacts/local-runtime/controlled-9.0-glyphframe.2/`. It never executes acquired tools, runs an installer or modifies PATH. There is no public download configured, no automatic vendor fallback and no `-Download` mode. Obtain the reviewed archive from the maintainer; [local setup and verification](Tools/ffmpeg/README.md) explains this pre-publication limit. NuGet restore separately obtains the declared .NET dependencies; source-only does not mean dependency-free.
+
+The [offline controlled-tool rebuild](scripts/ffmpeg/README.md) retains source/patch/runtime material for the locally integrated `.2` pair. Functional replay is not bit-identical output; different EXEs need review and new pins. The previous vendor cache/packages remain untouched, and local integration does not declare binary/source-distribution approval.
 
 ## Workflow
 
@@ -91,7 +93,7 @@ Core contracts, rendering, infrastructure and WPF presentation live in separate 
 
 ## Verification and compatibility
 
-Recorded verification: **1,283 Release tests**, **92 separate helper checks**, a zero-warning/error build and formatting/diff checks. A fresh source copy built without FFmpeg; explicit tool acquisition and media integration were checked separately. [Testing](docs/testing.md) records commands, candidate scope, native/user-reported observations and remaining limits; these results are not a public-release certificate.
+Recorded verification: **1,288 Release tests**, **141 separate helper checks**, a zero-warning/error application rebuild and formatting/diff checks. The current suite uses the exact controlled `.2` pair. A new local self-contained ZIP and unsigned Setup verify 445 payloads, 31 legal documents and 9 dependency bindings. Scoped native checks of the extracted ZIP passed notices, PNG/MP4 render/export, playback/seek/fullscreen and active cancellation, using a byte-identical renamed apphost to avoid a helper identity collision. Setup/clean-PC acceptance and public distribution remain open. [Testing](docs/testing.md) records exact identities, methods and limits; these results are not a public-release certificate.
 
 Continuous playback depends on Windows media components/codecs, and long media/cache paths can prevent WPF review even when an accepted MP4 remains exportable. Batch processing, realtime conversion, GPU controls and GIF/WebM export are outside the current scope. See [product limits](docs/product-spec.md).
 

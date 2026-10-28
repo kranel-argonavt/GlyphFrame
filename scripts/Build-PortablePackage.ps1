@@ -61,6 +61,8 @@ try {
     [IO.File]::WriteAllText((Join-Path $payloadRoot 'README.md'), $readme.Replace('{{VERSION}}', $version), [Text.UTF8Encoding]::new($false))
     Assert-PackageRequiredFiles $payloadRoot
     $legal = Assert-LegalPackage $payloadRoot
+    . (Join-Path $PSScriptRoot 'LocalTools.Helpers.ps1')
+    $null = Assert-ControlledToolLegalBinding $payloadRoot (Get-LocalToolPins (Join-Path $repositoryRoot 'Tools/ffmpeg/SHA256SUMS.txt'))
     $payload = @(Get-PortablePayload $payloadRoot)
     $payload | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $runRoot 'payload-manifest.json') -Encoding utf8
     $checks.Add('Version matches published assembly/About; required staged files and forbidden-content policy passed; PDBs excluded')

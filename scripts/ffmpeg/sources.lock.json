@@ -1,0 +1,53 @@
+{
+  "SchemaVersion": 2,
+  "Profile": "windows-x64-static-gpl3-experimental-2",
+  "ToolVersion": "9.0-glyphframe.2",
+  "SourceDateEpoch": 1785786727,
+  "PublicDistributionApproved": false,
+  "WarningReviewComplete": false,
+  "CorrespondingSourceApproved": false,
+  "Patches": [
+    {
+      "Component": "ffmpeg",
+      "File": "patches/0001-vvc-weighted-scaled-contract.patch",
+      "SHA256": "668e3930142242aba07f58dbf624f2adc95f5551da479e5a06c54b995f057cd0",
+      "Files": [
+        {
+          "Path": "libavcodec/vvc/inter_template.c",
+          "BeforeSHA256": "943fe527c80cf19678477955b7ea16e7cb2a991cf5d40d39c4537104c493f899",
+          "AfterSHA256": "30bee796fc2fe3ff5f41e3398e6a9df139d0c42683dd9fc19fc5ca010a046fdb"
+        }
+      ]
+    }
+  ],
+  "Artifacts": [
+    {
+      "Name": "ffmpeg",
+      "Revision": "d32b387f2b0a484599d4587d651891f0c63c4238",
+      "File": "ffmpeg-d32b387f2b0a484599d4587d651891f0c63c4238.tar.gz",
+      "SHA256": "8a830a34bfaf98514b5d45cf6c01b1fe78b38d5e4c10eab0de2531b783c15f90",
+      "Upstream": "https://github.com/FFmpeg/FFmpeg/commit/d32b387f2b0a484599d4587d651891f0c63c4238"
+    },
+    {
+      "Name": "x264",
+      "Revision": "0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee",
+      "File": "x264-0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee-lf.tar.gz",
+      "SHA256": "91c2f4bae6f8a33eceea90851f20298067a64fc3901f449aa4a74f5f52f13036",
+      "Upstream": "https://code.videolan.org/videolan/x264.git"
+    },
+    {
+      "Name": "zlib",
+      "Revision": "da607da739fa6047df13e66a2af6b8bec7c2a498",
+      "File": "zlib-da607da739fa6047df13e66a2af6b8bec7c2a498.tar.gz",
+      "SHA256": "b9258cf6254e7f7c37f1cd61dba943a1c5ea3cff5718c789834dac359094f5f7",
+      "Upstream": "https://github.com/madler/zlib/commit/da607da739fa6047df13e66a2af6b8bec7c2a498"
+    },
+    {
+      "Name": "x264-history",
+      "Revision": "0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee",
+      "File": "x264-upstream-history.bundle",
+      "SHA256": "600d97701b4bce46d6f71f73f2e3647179e2eb508d4a057265479351a54eb42d",
+      "Upstream": "https://code.videolan.org/videolan/x264.git"
+    }
+  ]
+}

@@ -4,6 +4,48 @@ function Get-LegalTextHash([string]$Path) {
     return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($text))).ToLowerInvariant()
 }
 
+function Get-ControlledToolLegalPaths {
+    return @('Tools/ffmpeg/LICENSE.txt','Tools/ffmpeg/DISTRIBUTION_README.txt',
+        'licenses/FFmpeg/FFMPEG-LICENSE.txt','licenses/FFmpeg/X264-COPYING.txt','licenses/FFmpeg/ZLIB-LICENSE.txt',
+        'licenses/FFmpeg/GCC-COPYING3.txt','licenses/FFmpeg/GCC-RUNTIME-EXCEPTION.txt',
+        'licenses/FFmpeg/MINGW-COPYING.txt','licenses/FFmpeg/MINGW-RUNTIME.txt','licenses/FFmpeg/MINGW-SCOPE.txt',
+        'licenses/FFmpeg/WINPTHREADS-COPYING.txt','licenses/FFmpeg/IJG-NOTICES.txt')
+}
+
+# Separate from NuGet dependency coverage: binds the actual CLI pair to its documents.
+function Assert-ControlledToolLegalBinding([string]$Root, $Pins) {
+    Assert-PortableDirectoryChain $Root
+    $manifest=Get-Content -LiteralPath (Join-Path $Root 'licenses/manifest.json') -Raw | ConvertFrom-Json
+    if (-not $manifest.PSObject.Properties['ControlledFfmpeg']) { throw 'Missing controlled-tool legal binding.' }
+    $tool=$manifest.ControlledFfmpeg
+    if ($tool.Version -cne '9.0-glyphframe.2' -or
+        $tool.ArchiveFile -cne 'GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip' -or
+        $tool.ArchiveSha256 -cne $Pins[$tool.ArchiveFile] -or
+        $tool.FfmpegSha256 -cne $Pins['ffmpeg.exe'] -or $tool.FfprobeSha256 -cne $Pins['ffprobe.exe'] -or
+        $tool.SourceMaterialsFile -cne 'GlyphFrame-ffmpeg-9.0-glyphframe.2-build-materials.zip' -or
+        $tool.SourceMaterialsSha256 -cne 'c2172927ec454ead9eed21cdc6d9be1904816fef085eb539492c3d54a035f5aa') {
+        throw 'Controlled version/binary/source-material legal identity differs from reviewed pins.'
+    }
+    $required=@(Get-ControlledToolLegalPaths)
+    if (@($tool.Documents).Count -ne $required.Count -or
+        @(Compare-Object ($required|Sort-Object) @($tool.Documents|Sort-Object)).Count) { throw 'Incomplete controlled-tool notice set.' }
+    foreach ($document in $required) {
+        $entry=@($manifest.Files | Where-Object Path -CEQ $document)
+        $path=Join-Path $Root $document
+        Assert-PortableDirectoryChain ([IO.Path]::GetDirectoryName($path))
+        if ($entry.Count -ne 1 -or -not [IO.File]::Exists($path) -or
+            ([IO.File]::GetAttributes($path) -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+            (Get-LegalTextHash $path) -cne $entry[0].TextSha256) { throw 'Unverified controlled-tool legal document.' }
+    }
+    foreach ($name in @('ffmpeg.exe','ffprobe.exe')) {
+        $path=Join-Path $Root "Tools/ffmpeg/$name"
+        Assert-PortableDirectoryChain ([IO.Path]::GetDirectoryName($path))
+        if (-not [IO.File]::Exists($path) -or ([IO.File]::GetAttributes($path) -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+            (Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant() -cne $Pins[$name]) { throw 'Controlled legal binding does not match actual tool bytes.' }
+    }
+    return [pscustomobject]@{Version=$tool.Version;DocumentsVerified=$required.Count;SourceDelivery='Local material identity only; public hosting/distribution approval remains open'}
+}
+
 function Assert-LegalPackage([string]$Root) {
     Assert-PortableDirectoryChain $Root
     $manifestPath = Join-Path $Root 'licenses/manifest.json'

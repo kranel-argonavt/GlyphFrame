@@ -20,7 +20,7 @@ try {
     $zip = [IO.Compression.ZipFile]::Open($zipPath,[IO.Compression.ZipArchiveMode]::Create)
     try {
         foreach ($name in @('ffmpeg.exe','ffprobe.exe')) {
-            $entry=$zip.CreateEntry("ffmpeg-9.0-essentials_build/bin/$name")
+            $entry=$zip.CreateEntry("Tools/ffmpeg/$name")
             $stream=$entry.Open()
             try { $stream.Write([Text.Encoding]::UTF8.GetBytes("inert $name")) } finally { $stream.Dispose() }
             $bytes=[Text.Encoding]::UTF8.GetBytes("inert $name")
@@ -30,7 +30,7 @@ try {
     $destination=Join-Path $root 'accepted-tools'
     $run=New-PortableRunDirectory $root ([Guid]::NewGuid().ToString('N'))
     Run-Check 'Wrong archive hash rejected before installation' { Assert-Throws {Install-LocalToolArchive $zipPath $destination $run $pins};Assert-Check (-not(Test-Path -LiteralPath $destination)) 'Destination created on bad input.' }
-    $pins['ffmpeg-9.0-essentials_build.zip']=(Get-FileHash -LiteralPath $zipPath).Hash.ToLowerInvariant()
+    $pins['GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip']=(Get-FileHash -LiteralPath $zipPath).Hash.ToLowerInvariant()
     Run-Check 'Safe archive pair extracted, hashed and atomically accepted without execution' {Install-LocalToolArchive $zipPath $destination $run $pins;Assert-Check (Test-LocalTools $destination $pins) 'Pair not verified.'}
     Run-Check 'Existing destination cannot be overwritten' {Assert-Throws {Install-LocalToolArchive $zipPath $destination $run $pins}}
     Run-Check 'Altered local tool is rejected rather than silently replaced' {[IO.File]::AppendAllText((Join-Path $destination 'ffmpeg.exe'),'changed');Assert-Throws {Test-LocalTools $destination $pins}}
@@ -40,29 +40,43 @@ try {
     Run-Check 'Source policy rejects executables, archives, Git history and private/generated paths' {
         foreach($path in @('Tools/ffmpeg/ffmpeg.exe','src/other.dll','src/bin/a.cs','artifacts/report.md','.git/config','secrets.txt','docs/screenshot.zip','docs/unreviewed.mp4','licenses/package.nupkg','../outside.cs')) {Assert-Throws {Assert-PortfolioSourcePath $path}}
     }
+    Run-Check 'Controlled-build shell recipes are accepted only in their reviewed scripts scope' {
+        Assert-PortfolioSourcePath 'scripts/ffmpeg/build.sh'
+        foreach($path in @('scripts/other.sh','src/build.sh','scripts/ffmpeg/nested/build.sh','scripts/ffmpeg/build.exe.sh','scripts/ffmpeg/Build.sh')) {Assert-Throws {Assert-PortfolioSourcePath $path}}
+    }
+    Run-Check 'Downstream patch and C regression source accepted only in explicit scopes' {
+        Assert-PortfolioSourcePath 'scripts/ffmpeg/patches/0001-vvc-weighted-scaled-contract.patch'
+        Assert-PortfolioSourcePath 'scripts/ffmpeg/tests/vvc-weighted-scaled.c'
+        foreach($path in @('scripts/other.patch','scripts/ffmpeg/a.c','src/unreviewed.c','scripts/ffmpeg/tests/other.c',
+            'scripts/ffmpeg/patches/0001-test.exe.patch','scripts/ffmpeg/patches/nested/0001-test.patch')) {Assert-Throws {Assert-PortfolioSourcePath $path}}
+    }
     Run-Check 'Checksum manifest duplicates are rejected' {
         $path=Join-Path $root 'bad-pins.txt'
         [IO.File]::WriteAllText($path, ('a'*64)+'  ffmpeg.exe'+"`n"+('a'*64)+'  ffmpeg.exe')
         Assert-Throws {Get-LocalToolPins $path}
     }
-    foreach ($case in @('traversal','duplicate','missing-pair','wrong-tool')) {
+    foreach ($case in @('traversal','duplicate','missing-pair','wrong-tool','vendor-layout','extra-file','linked-tool')) {
         Run-Check "Pinned but unsafe/incomplete synthetic archive rejected: $case" {
             $archive=Join-Path $root "$case.zip"
             $badZip=[IO.Compression.ZipFile]::Open($archive,[IO.Compression.ZipArchiveMode]::Create)
             try {
                 $names=switch($case) {
-                    'traversal' {@('../outside.exe','ffmpeg-9.0-essentials_build/bin/ffmpeg.exe','ffmpeg-9.0-essentials_build/bin/ffprobe.exe')}
-                    'duplicate' {@('ffmpeg-9.0-essentials_build/bin/ffmpeg.exe','ffmpeg-9.0-essentials_build/bin/FFMPEG.exe')}
-                    'missing-pair' {@('ffmpeg-9.0-essentials_build/bin/ffmpeg.exe')}
-                    'wrong-tool' {@('ffmpeg-9.0-essentials_build/bin/ffmpeg.exe','ffmpeg-9.0-essentials_build/bin/ffprobe.exe')}
+                    'traversal' {@('../outside.exe','Tools/ffmpeg/ffmpeg.exe','Tools/ffmpeg/ffprobe.exe')}
+                    'duplicate' {@('Tools/ffmpeg/ffmpeg.exe','Tools/ffmpeg/FFMPEG.exe')}
+                    'missing-pair' {@('Tools/ffmpeg/ffmpeg.exe')}
+                    'wrong-tool' {@('Tools/ffmpeg/ffmpeg.exe','Tools/ffmpeg/ffprobe.exe')}
+                    'vendor-layout' {@('ffmpeg-9.0-essentials_build/bin/ffmpeg.exe','ffmpeg-9.0-essentials_build/bin/ffprobe.exe')}
+                    'extra-file' {@('Tools/ffmpeg/ffmpeg.exe','Tools/ffmpeg/ffprobe.exe','other.txt')}
+                    'linked-tool' {@('Tools/ffmpeg/ffmpeg.exe','Tools/ffmpeg/ffprobe.exe')}
                 }
                 foreach($name in $names) {
                     $entry=$badZip.CreateEntry($name)
+                    if($case -eq 'linked-tool') {$entry.ExternalAttributes=-1610612736}
                     $stream=$entry.Open()
                     try {$stream.Write([Text.Encoding]::UTF8.GetBytes('different inert data'))} finally {$stream.Dispose()}
                 }
             } finally {$badZip.Dispose()}
-            $pins['ffmpeg-9.0-essentials_build.zip']=(Get-FileHash -LiteralPath $archive).Hash.ToLowerInvariant()
+            $pins['GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip']=(Get-FileHash -LiteralPath $archive).Hash.ToLowerInvariant()
             $caseRun=New-PortableRunDirectory $root ([Guid]::NewGuid().ToString('N'))
             $caseDestination=Join-Path $root "rejected-$case"
             Assert-Throws {Install-LocalToolArchive $archive $caseDestination $caseRun $pins}
