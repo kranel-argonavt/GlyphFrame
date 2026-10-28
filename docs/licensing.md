@@ -20,9 +20,9 @@ The Windows runtime is **not wholly MIT**, even though the source repositories/r
 
 Publish, portable staging and Setup payload reuse enforce required documents, canonical text hashes and exact dependency coverage. Missing/empty/changed texts, unsafe paths, duplicates and unreviewed dependency versions fail verification. A passing integrity check is **not** a legal-compliance certificate. Local candidate reports explicitly retain incomplete licensing status and the open issues.
 
-## Source-only portfolio scope
+## Git repository and release-asset scope
 
-The portfolio publication scope is original source code, project-owned assets, synthetic test fixtures, build/installer scripts and retained notices. It excludes FFmpeg executables, restored NuGet packages, .NET/native runtime binaries and Setup/ZIP outputs. Dependencies are acquired separately by the developer; no third-party package implementation is vendored as application source. Keeping dependency references does not resolve their terms or authorize distributing their compiled contents.
+The agreed target is the project with its reviewed development history **and separate ready-to-run GitHub Releases**, not a history-free source-only product. Git contains original source, project-owned assets, synthetic fixtures, build/installer scripts and notices; generated FFmpeg/runtime/application binaries, restored packages and Setup/ZIP outputs stay outside Git. Release assets are the place for the self-contained application packages and matching tool source/build/notices collection once their gates close. End users receive bundled tools; explicit local acquisition applies to developers building from source. No third-party implementation is vendored as application source, and dependency references do not authorize binary distribution.
 
 Deleting the current EXEs does **not** remove earlier Git objects containing them. The original repository/history and local candidate packages remain private. The [publication plan](portfolio.md#planned-route-preserve-development-history-in-a-reviewed-copy) now has a locally integrated controlled FFmpeg replacement; the separate history-preserving copy still needs sanitization and verification. The existing history-free source snapshot remains a conservative fallback, not evidence that the original history is publishable. Source preparation does not certify patent clearance, every upstream claim, or an eventual binary release.
 
@@ -38,6 +38,23 @@ The MIT license for original code does not settle the aggregate-versus-combined-
 For the **locally integrated controlled pair**, `licenses/FFmpeg/` contains the complete extra license/notice collection copied from pinned sources and the [runtime-material collection](../scripts/ffmpeg/runtime-notices.md). Both corrected tools have code/data-bound audit maps confirming static winpthreads, libgcc and MinGW material. The package verifier separately requires exact version/binary/archive/source-material identity and all twelve tool documents; the existing About viewer displays indexed texts offline. This integration changes neither the existing installed application nor immutable older packages, and it does not approve GPL/application, Windows deployment, source hosting or public distribution.
 
 The [final engineering/material review](decisions/0002-controlled-ffmpeg-build.md#final-2-engineering-and-material-review) distinguishes source/build reconstruction from runtime/package acceptance. The immutable 27-file material archive recorded in `Tools/ffmpeg/DISTRIBUTION_README.txt` remains bound to the original corrected build; later application-packaging checks do not relabel it as a freshly rebuilt archive. Formal experimental/public-distribution approval flags remain false.
+
+Private commit `e43fada` now has a completed clean-source build/test/package binding and independent extracted startup/session check; [candidate identities](packaging.md#current-local-controlled-tool-candidate) distinguish it from the earlier dirty-source packages. This closes that technical provenance step, not final native acceptance, source-delivery approval or the requirements above.
+
+## Next distribution decisions
+
+Engineering options, rechecked against primary license guidance on 2026-10-28; **not an accepted agreement, public source offer or legal opinion**:
+
+| Scope | Concrete next step | What remains unapproved |
+| --- | --- | --- |
+| Public Git repository/history | Audit a separate history-preserving copy and settle the gallery's remaining media review; retain source/patch notices; do not start a fresh history | Public-history/assets review and owner authorization; this Git storage boundary is not abandonment of ready-to-run Releases |
+| Controlled FFmpeg downloads | Proposed online route: offer the exact tool archive and corresponding 27-file source/build archive together, with hashes and clear source directions beside every binary download | Final source completeness/scope review, hosting target, actual links and availability verification; no automatic upload or written offer |
+| Application/tool boundary | Record the separate CLI-process/file/pipe interface and review component-specific grants; preserve original-code MIT and upstream notices | Aggregate-versus-combined-work conclusion; neither automatic whole-app GPL relicensing nor automatic clearance from using processes |
+| Self-contained Setup and portable | Review a component-scoped terms mechanism for the Microsoft-covered native files, covering **both** delivery routes, without restricting MIT/GPL components | Owner/legal review, other distributor obligations and actual agreement UX; neither notices alone nor a Setup checkbox is declared sufficient |
+
+The proposed download route follows [GPLv3 section 6(d)](https://www.gnu.org/licenses/gpl-3.0.en.html#section6): equivalent source access and clear directions, not a requirement to install sources with the application. The [GNU FAQ](https://www.gnu.org/licenses/gpl-faq.en.html#MereAggregation) distinguishes independent aggregation from a combined program by interface and communication semantics; it does not decide this project's status. FFmpeg's [LGPL linking checklist](https://ffmpeg.org/legal.html) is explicitly not the applicable checklist for this GPLv3-enabled tool configuration.
+
+Microsoft's [.NET Library terms](https://dotnet.microsoft.com/en-us/dotnet_library_license.htm) and retained [Windows SDK terms](../licenses/WPF/WINDOWS-SDK-LICENSE.txt) also include distributor indemnity obligations; these are not silently accepted on the owner's behalf by preparing a package. Any draft terms or change to deployment model needs a separate decision. The Git checkout itself does not convey those runtime binaries; the planned self-contained Release assets do. Neither this distinction nor binary terms require an automatic license change to original source code.
 
 ## XmpCore historical license resolution
 

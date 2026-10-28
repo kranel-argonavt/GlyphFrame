@@ -1,6 +1,6 @@
 # ADR 0002: Controlled Windows FFmpeg tools
 
-Date: 2026-10-27; updated 2026-10-28. Status: **reviewed `9.0-glyphframe.2` selected for local builds/tests/packages; public distribution remains unapproved**.
+Date: 2026-10-27; updated 2026-10-28. Status: **reviewed `9.0-glyphframe.2` integrated and verified through clean-source application builds/tests/packages at private commit `e43fada`; public distribution remains unapproved**.
 
 ## Context and decision
 
@@ -57,7 +57,7 @@ These are distinct historical stages, not additive test counts or claims about u
 | Corrected `.2` build/replay | First build passed **2,885 configured sample-free FATE tests**. An extracted 26-file material ZIP rebuilt using its own scripts on the same pinned host. Each corrected pair passed the 9,072-case regression, zlib/x264 checks, **19 CLI probes, 12 H.264/AAC cases and six selected VVC sample/thread CRC comparisons**. The replay was not independent-host or bit-identical. |
 | Isolated corrected application | Exact-version/two-hash adaptation passed the then-current **1,283-test** suite without skips. Separate native checks covered PCM fallback, AAC-copy/silent exports, PNG, playback/fullscreen, replacement and active Cancel. This was a framework-dependent snapshot, not the final self-contained package. |
 | Engineering/material review | Corrected objects/EXEs received matched-section stack/linker audits and full notice/source-material integrity checks; details below. The 27-file documentation refresh was not another literal rebuild. |
-| Local rollout | Maintained acquisition/build/test/legal/package integration and the current extracted-ZIP native smoke passed. See the single current [verification summary](../testing.md#recorded-verification-snapshot) and [package identities](../packaging.md#current-local-controlled-tool-candidate). |
+| Local rollout and committed verification | Initial dirty-source integration/native checks were followed by fresh independent builds, the full suite/helpers and clean-source ZIP/Setup from private commit `e43fada`. Independently extracted original-name startup/session cleanup passed. See the single current [verification summary](../testing.md#recorded-verification-snapshot) and [package identities](../packaging.md#current-local-controlled-tool-candidate); earlier native workflows are not relabeled as a repeat on the new bytes. |
 
 Official external VVC coverage used only `CodingToolsSets_A_2`, `RPR_A_4` and `SCALING_A_1` from the [FATE sample collection](https://fate-suite.ffmpeg.org/vvc-conformance/), at one/four threads with pinned upstream CRC references. Neither those six runs nor sample-free FATE is the complete external-sample corpus. Downloaded samples remain local, not public source/build material.
 
@@ -90,12 +90,12 @@ It retains exact FFmpeg/x264/zlib archives, upstream x264 ancestry, patch, regre
 
 The exact first corrected `.2` pair is selected from ignored `artifacts/local-runtime/controlled-9.0-glyphframe.2/`. [Initialization](../../Tools/ffmpeg/README.md) accepts only the pinned two-file local archive; no public download/vendor fallback or arbitrary-tool switch is configured. Different replay EXE hashes require new review/pins, not silent substitution.
 
-Current tests and package checks bind actual tool bytes to version, source-material identity and twelve required notices. The self-contained native smoke used a byte-identical renamed apphost because of a helper identity collision; failed targeting/termination remains separate from normal-close cleanup. [Testing](../testing.md#current-extracted-zip-native-smoke) owns the current native scope; this ADR does not duplicate it or transfer older installed/user evidence.
+Current tests and package checks bind actual tool bytes to version, source-material identity and twelve required notices. Clean-source commit `e43fada` now has new hash-bound ZIP/Setup candidates, with direct original-name extracted startup/session cleanup verified. The earlier dirty-source native workflow used a byte-identical renamed apphost because of a computer-use helper identity collision; failed targeting/termination remains separate from normal-close cleanup, and that helper was not exercised by the new probe. [Testing](../testing.md#current-extracted-zip-native-smoke) owns current and earlier scope; this ADR does not transfer older native/installed/user acceptance.
 
 Local integration is complete within that scope. Remaining work is explicit:
 
 - Review source delivery/hosting, final application/GPL scope and Windows-native protective terms; retain all notice/source identities.
-- Bind affected acceptance to clean-source final artifacts. Current unsigned Setup was not installed/run; current clean-PC and other limits remain in [testing](../testing.md#remaining-release-boundaries).
+- Retain the completed private clean-source binding and identify artifacts for remaining affected native/final-publication checks. Current unsigned Setup was not installed/run; current clean-PC and other limits remain in [testing](../testing.md#remaining-release-boundaries).
 - Prepare a separately audited [history-preserving publication copy](../portfolio.md#planned-route-preserve-development-history-in-a-reviewed-copy); retain the private baseline/backups and remove historical executables from intended public history.
 - Obtain owner authorization before tagging, uploading or publishing.
 

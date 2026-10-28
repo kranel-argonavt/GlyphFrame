@@ -47,23 +47,29 @@ Tests use synthetic media, not personal downloads. [Fixture provenance](../tests
 
 ## Recorded verification snapshot
 
-As of 2026-10-28. Reading this document executes no checks. These results describe local work based on private parent `e75a021` with uncommitted integration changes, not a clean-source release. The precommit rerun reconfirmed the full suite, helpers, build and formatting; overlapping earlier runs are not additive.
+As of 2026-10-28. Reading this document executes no checks. The latest completed run used a fresh independent checkout of private commit `e43fadad905deafeb636be1e9a7aec830984f918`, with `WorkingTreeDirty=false` throughout build/tests/packages. The full suite, helpers, formatting and packaging were rerun; overlapping precommit results are not additive. Later documentation edits do not relabel these artifacts. This single-commit verification clone is not the planned history-preserving publication copy or a public release.
 
 | Check | Result | Scope |
 | --- | --- | --- |
 | Release xUnit | **1,288 passed: 488 core/infrastructure/rendering + 800 App**, zero failures/skips | Exact controlled `.2` version and both executable hashes; includes missing/altered notices and manifest-binding regressions |
 | Helper regressions | **141 passed: 36 controlled + 18 source + 25 legal + 20 portable + 27 installer + 15 session** | Synthetic policy/integrity checks, not native acceptance |
 | Build and formatting | Release build/rebuild: **0 warnings/errors**; formatting and diff checks passed | .NET application build, not a claim that upstream FFmpeg compilation was warning-free |
-| Source-only build | **459-file** hash-verified fresh snapshot built without a tool cache or FFmpeg EXEs in output; 0 warnings/errors | Run `321899bb23bd4c6797367e7aa9982375`; build-only, no new public history or full suite without tools |
+| Source-only build | **459-file** hash-verified fresh checkout built without a tool cache or FFmpeg EXEs in output; 0 warnings/errors and missing-tool guidance observed | Built before explicit tool initialization; build-only, not full runtime/image-only or clean-machine acceptance |
 | Current package | **445 payloads / 31 legal documents / 9 dependency bindings**; exact tools/source-material/twelve-notice binding; published startup, exclusive session, normal exit and cleanup passed | [Exact ZIP/Setup identities](packaging.md#current-local-controlled-tool-candidate); unsigned Setup built but not installed/run |
 
 ### Current extracted-ZIP native smoke
 
-A fresh extraction and separate marked profile passed About/notices, image/video render and native Save. The viewer exposes the summary plus all **30 appended document headers**, the controlled version and IJG credit. Actual saved outputs fully decoded: one 320×240 PNG and two six-second 640×360/180-frame MP4s. Keep Audio preserved **283 AAC packet payloads**; Remove Audio produced no audio stream.
+The clean-source ZIP passed independent extraction and all **445 path/length/hash** comparisons before and after startup. Direct process control launched the original `GlyphFrame.App.exe`, without an alias, using a separate marked profile. A responsive window and exclusive production-session lease were observed; normal close returned zero and removed the observed session, leaving no session directories. The extracted legal collection and controlled-tool binding passed again. Ordinary settings and installed app/tool hashes remained unchanged.
+
+This is an extracted startup/session smoke, not a repeat of native render/export, playback/listening, PCM fallback, DPI, Setup lifecycle or clean-PC acceptance. It did not exercise the computer-use helper, so the earlier identity collision is not declared fixed. See [the clean-source candidate](packaging.md#current-local-controlled-tool-candidate) for exact identities.
+
+### Earlier controlled-tool native smoke
+
+The preceding dirty-source candidate's fresh extraction and separate marked profile passed About/notices, image/video render and native Save. The viewer exposes the summary plus all **30 appended document headers**, the controlled version and IJG credit. Actual saved outputs fully decoded: one 320×240 PNG and two six-second 640×360/180-frame MP4s. Keep Audio preserved **283 AAC packet payloads**; Remove Audio produced no audio stream.
 
 Rendered playback/end/seek/fullscreen/Escape, stale export blocking after audio changes, cancelled/successful replacement and active 900-frame-render cancellation passed. Only the lease remained after Cancel. Normal close returned zero, removed the owned session and preserved all 445 payloads, ordinary settings and installed EXE/tool hashes.
 
-The normal-name app started but the computer-use helper twice misbound its window to the installed app identity. Only that empty owned test process was terminated; its nonzero exit/retained session is diagnostic evidence, not a cleanup pass. Native interaction used an additional **byte-identical renamed apphost** in a separate extraction. This is a targeting workaround, not a product fix or a normal-name helper pass. No human listening, renewed native PCM fallback, fresh DPI matrix, Setup lifecycle or clean-PC acceptance is inferred.
+The normal-name app started but the computer-use helper twice misbound its window to the installed app identity. Only that empty owned test process was terminated; its nonzero exit/retained session is diagnostic evidence, not a cleanup pass. Native interaction used an additional **byte-identical renamed apphost** in a separate extraction. This is a targeting workaround, not a product fix or a normal-name helper pass. No human listening, renewed native PCM fallback, fresh DPI matrix, Setup lifecycle or clean-PC acceptance is inferred. These observations remain bound to the [initial controlled-tool rollout](packaging.md#initial-controlled-tool-rollout), not the new clean-source package.
 
 ### Earlier evidence
 
@@ -98,7 +104,7 @@ Finishing before Cancel input is **inconclusive**, not a cancellation pass. Clip
 ## Remaining release boundaries
 
 - Available reports do not certify every window/state/DPI/mixed-monitor combination or native fault branch.
-- Bind affected checks to final clean-source artifacts; old local-build/installed/user results do not automatically cover new bytes.
+- The selected private commit now has a clean-source build/test/package binding and fresh extracted startup. Remaining affected native checks must still identify their actual artifact; older local-build/installed/user results do not automatically cover new bytes or a later publication-copy rebuild.
 - Current Setup lifecycle and clean-PC acceptance remain open. Earlier clean-PC feedback is not an audited absence-of-runtime environment; Windows/codec compatibility stays bounded.
 - [Media provenance](screenshots/README.md), [licensing/distribution](licensing.md) and [history preparation](portfolio.md) remain separate from successful tests. No test authorizes a tag, upload or public release.
 

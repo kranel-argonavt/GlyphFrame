@@ -8,7 +8,7 @@
 
 **Render → Review → Export.** Inspect the generated result before saving it; repeat an export without rerendering. Processing stays on your computer, with no uploads or telemetry.
 
-This is a **source-only portfolio project**. Original application code, tests, design assets and local installer/build scripts are included; FFmpeg executables, restored packages and ready-to-run Setup/ZIP downloads are not. Binary-release licensing review remains open; see [licensing](docs/licensing.md).
+GlyphFrame is being prepared for **a public repository with development history and separate GitHub Releases for ready-to-run Setup/portable packages**. Git tracks source, tests, project assets, notices and build/installer scripts, not generated EXEs or archives. Release assets remain local candidates until the [publication plan](docs/portfolio.md) and [distribution review](docs/licensing.md) are completed; no public downloads are declared yet.
 
 ![GlyphFrame startup screen with local media selection, character presets and render settings in the Rose theme](docs/screenshots/startup.png)
 
@@ -75,7 +75,7 @@ dotnet build GlyphFrame.sln -c Release --no-restore
 dotnet test GlyphFrame.sln -c Release --no-build --no-restore
 ```
 
-The initializer accepts only the exact reviewed local controlled-tool archive, checks archive/executable SHA-256 and extracts just FFmpeg/ffprobe into ignored `artifacts/local-runtime/controlled-9.0-glyphframe.2/`. It never executes acquired tools, runs an installer or modifies PATH. There is no public download configured, no automatic vendor fallback and no `-Download` mode. Obtain the reviewed archive from the maintainer; [local setup and verification](Tools/ffmpeg/README.md) explains this pre-publication limit. NuGet restore separately obtains the declared .NET dependencies; source-only does not mean dependency-free.
+The initializer accepts only the exact reviewed local controlled-tool archive, checks archive/executable SHA-256 and extracts just FFmpeg/ffprobe into ignored `artifacts/local-runtime/controlled-9.0-glyphframe.2/`. It never executes acquired tools, runs an installer or modifies PATH. There is no public download configured, no automatic vendor fallback and no `-Download` mode. Obtain the reviewed archive from the maintainer; [local setup and verification](Tools/ffmpeg/README.md) explains this pre-publication developer limit. NuGet restore separately obtains the declared .NET dependencies; a source checkout is not dependency-free.
 
 The [offline controlled-tool rebuild](scripts/ffmpeg/README.md) retains source/patch/runtime material for the locally integrated `.2` pair. Functional replay is not bit-identical output; different EXEs need review and new pins. The previous vendor cache/packages remain untouched, and local integration does not declare binary/source-distribution approval.
 
@@ -93,13 +93,13 @@ Core contracts, rendering, infrastructure and WPF presentation live in separate 
 
 ## Verification and compatibility
 
-Recorded verification: **1,288 Release tests**, **141 separate helper checks**, a zero-warning/error application rebuild and formatting/diff checks. The current suite uses the exact controlled `.2` pair. A new local self-contained ZIP and unsigned Setup verify 445 payloads, 31 legal documents and 9 dependency bindings. Scoped native checks of the extracted ZIP passed notices, PNG/MP4 render/export, playback/seek/fullscreen and active cancellation, using a byte-identical renamed apphost to avoid a helper identity collision. Setup/clean-PC acceptance and public distribution remain open. [Testing](docs/testing.md) records exact identities, methods and limits; these results are not a public-release certificate.
+Clean-source verification of private commit `e43fada`: **1,288 Release tests**, **141 separate helper checks**, zero-warning/error application builds and formatting/diff checks. A fresh checkout first built without video tools, then used the exact controlled `.2` pair. Its self-contained ZIP and unsigned Setup verify 445 payloads, 31 legal documents and 9 dependency bindings with `WorkingTreeDirty=false`. Independently extracted startup under the original EXE name, an exclusive session, graceful exit and cleanup passed. Earlier native rendering/playback/export evidence is recorded separately, not claimed as a repeat on these bytes. Setup lifecycle, clean-PC acceptance and public distribution remain open. [Testing](docs/testing.md) records scope and limits; later documentation edits do not relabel the packages.
 
 Continuous playback depends on Windows media components/codecs, and long media/cache paths can prevent WPF review even when an accepted MP4 remains exportable. Batch processing, realtime conversion, GPU controls and GIF/WebM export are outside the current scope. See [product limits](docs/product-spec.md).
 
 ## Packaging
 
-Local self-contained portable ZIP and unsigned English per-user x64 Setup workflows are retained for development, **not offered as cleared public downloads**. See [packaging](docs/packaging.md) for commands, integrity/startup verification, installation/update/uninstall policy and release boundaries. These scripts do not sign, tag or upload a release.
+The target is self-contained portable ZIP and English per-user x64 Setup downloads in **GitHub Releases**, with the controlled FFmpeg/ffprobe pair bundled inside. End users should not need to install .NET or FFmpeg separately; developer tool acquisition above is not an end-user setup step. Current candidates are unsigned and local, **not cleared public downloads**. Corresponding tool source/build materials and notices will accompany the selected release route. See [packaging](docs/packaging.md) for verification and installation/update/uninstall policy; the scripts do not sign, tag or upload a release.
 
 ## Privacy and third-party software
 
@@ -116,7 +116,7 @@ Demonstration media has separate provenance; the code's MIT license does not rel
 - [Testing](docs/testing.md) — commands, coverage, recorded results and limitations.
 - [Packaging](docs/packaging.md) — self-contained builds, extracted validation and candidate identity.
 - [Licensing](docs/licensing.md) — code license, dependency texts, version binding and open distribution gates.
-- [Portfolio source preparation](docs/portfolio.md) — planned history-preserving publication, the history-free fallback and local-only boundaries.
+- [Publication preparation](docs/portfolio.md) — history-preserving repository, separate release assets, the unselected history-free fallback and approval boundaries.
 - [ADR 0001: native video playback](docs/decisions/0001-native-video-playback.md) — decision, alternatives and compatibility evidence.
 - [Changelog](CHANGELOG.md) — concise user-visible work, not iteration journals.
 - [Test media fixtures](tests/GlyphFrame.Tests/TestInfrastructure/MediaFixtures.md) — synthetic fixture provenance and reproduction.

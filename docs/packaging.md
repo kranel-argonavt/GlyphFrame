@@ -1,6 +1,6 @@
 # Packaging
 
-GlyphFrame retains local self-contained Windows x64 portable ZIP and per-user Setup workflows. The portfolio repository is source-only: these outputs are not included or offered as cleared public downloads. The build and verification scripts create local candidates; they do not sign, tag, upload or publish a release. See [portfolio preparation](portfolio.md) for the history-preserving publication plan and history-free fallback. Current build commands use the controlled `.2` pins/versioned cache; immutable older candidate records below retain their original vendor-tool identities and do not become acceptance of the replacement.
+GlyphFrame's target publication format is a **public repository retaining its reviewed development history, plus separate GitHub Releases for self-contained Windows x64 portable ZIP and per-user Setup**. Generated tools/packages do not belong in Git; that is a storage boundary, not a decision to abandon binary releases. End-user packages bundle the controlled FFmpeg/ffprobe pair and .NET/WPF runtime rather than require manual tool installation. Current outputs remain local provisional candidates until the release gates close. Build/verification scripts do not sign, tag, upload or publish. See [publication preparation](portfolio.md) for the chosen history-preserving route; the history-free export is only a fallback. Current commands use `.2` pins/versioned cache; old candidate identities remain immutable.
 
 ## Build a candidate
 
@@ -32,6 +32,27 @@ artifacts/portable-packages/<run-id>/
 ```
 
 The version comes from the published assembly's Major.Minor.Build, matching About. The [portable README template](Portable_README.md) is read by the build script and its `{{VERSION}}` token is substituted. Do not rename/remove that template without updating the script.
+
+## Controlled FFmpeg delivery candidate
+
+The local-only delivery layout groups the **unchanged pinned two-file initializer ZIP**, the **frozen 27-file source/build ZIP**, all twelve required tool documents and explicit checksum/source directions. The wrapper keeps both inner archive identities; it does not regenerate sources from a moving branch or change the initializer contract.
+
+```text
+GlyphFrame-ffmpeg-9.0-glyphframe.2-delivery-candidate/
+├── README.md
+├── RELEASE-NOTES-DRAFT.md
+├── manifest.json
+├── SHA256SUMS.txt
+├── tools/GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip
+├── sources/GlyphFrame-ffmpeg-9.0-glyphframe.2-build-materials.zip
+└── notices/[complete tool GPL/license/provenance texts]
+```
+
+The candidate's relative source links work after extraction; they are **not live GitHub download URLs**. No upload, written source offer, final Corresponding Source approval or agreement is created. Source completeness/scope, hosting and availability verification remain release gates. The EXE-only initializer ZIP must not be presented as a cleared standalone release without its accompanying notices/source-delivery route. End-user Setup/portable still bundle the tools; this separate delivery kit serves development and source-distribution preparation, not manual end-user installation.
+
+On 2026-10-28, the local candidate passed **18 outer file/hash checks, a separate fresh extraction, 17 checksum entries, all 27 frozen source entries, both exact tool entries, twelve complete notice copies and thirteen relative source/notice links**. Nine additional inert verifier probes exercised malformed/tampered archive rejection. No input executable or compiler was run. The candidate ZIP SHA-256 is `99d2660dc91434daceca2e86c4f36f4aee8defa05d1e81647ab6d90820d4551a`; preparation used private `e43fada` plus documentation edits (`WorkingTreeDirty=true`), without changing inner archive bytes or approval flags. This is delivery assembly/integrity evidence, not a newly compiled or legally approved tool build.
+
+The final release must identify its actual application/tool/source bytes and provide reviewed source directions beside the relevant download. Preserve complete notices with conveyed tools; do not treat a link alone as a replacement for a license copy. Local archive integrity checks establish bytes/layout, not legal clearance. Windows-native runtime terms and other application release gates remain separate from this FFmpeg-only candidate.
 
 ## What verification establishes
 
@@ -66,7 +87,32 @@ Helper-only regressions are documented in [testing.md](testing.md#run-the-automa
 
 ## Current local controlled-tool candidate
 
-On 2026-10-28, the reviewed `9.0-glyphframe.2` tools were integrated through a separate versioned cache and exact offline archive pins. The new local candidates below are built from parent `e75a0215c19a8d8324548230c62b8f9c2487f82c` **with uncommitted changes** (`WorkingTreeDirty=true`); the parent commit does not contain this integration. Subsequent documentation edits do not relabel their payloads.
+On 2026-10-28, a fresh independent checkout of **`e43fadad905deafeb636be1e9a7aec830984f918`** passed source-only build, exact controlled-tool initialization, full Release tests/helpers, formatting and packaging. Both new candidates record **`WorkingTreeDirty=false`**. Later documentation edits do not relabel their source or payloads; this private verification clone is not a sanitized public-history copy.
+
+| Field | Recorded value |
+| --- | --- |
+| Version / target | 1.0.0 / Release / win-x64 / self-contained folder |
+| Portable run | `7977ff5567ca4cc196eb36b44ce79ab6` |
+| ZIP SHA-256 | `16fcde50181fa91321b726e06608bf3093aa4a2232b8535dff1d0689c87a7238` |
+| Installer run | `ec03236eb523403d9000f44d54cb0336` |
+| Setup SHA-256 | `13d4f75cdc96da4302acccd0385224cff929140e42fc232f0cc5925dafbc8e8b` |
+| Artifact checks | All **445 payload paths/lengths/hashes**, **31 legal documents / 9 dependency bindings**, exact controlled tools/source-material identity and twelve required notices passed |
+| Startup checks | Published and independently extracted original-name EXE: responsive window, positively observed exclusive production session, graceful exit zero and owned-session cleanup passed |
+| Setup scope | Unsigned, Inno Setup 7.1.0; built from exactly that verified portable payload; shell icon/version/Publisher checks passed; **not installed or run** |
+| Native scope | Fresh extracted startup/session/integrity only; no repeated native rendering/export, playback/listening, PCM fallback, DPI or clean-PC matrix |
+| Distribution | Local provisional candidates; source delivery, GPL scope and Windows-native terms remain open |
+
+The fresh suite passed **1,288 Release tests + 141 separate helper checks**. All 459 checkout files remained unchanged; installed app/tool/settings hashes and previous artifacts were preserved. Compared with the prior dirty-source candidate, five application binaries now identify the committed source revision, while 31 text-file raw differences are verified CRLF/LF-only. Exact FFmpeg/ffprobe bytes are unchanged; legal canonical hashes pass. These are not byte-identical application packages or a transfer of all earlier native acceptance.
+
+The extracted probe used direct process control, not the computer-use helper; its earlier identity collision is not declared fixed. See [testing](testing.md#recorded-verification-snapshot) for current and historical evidence boundaries. Complete generated reports and hash-verified retained copies remain local; no public download location or release is created here.
+
+## Historical candidate records
+
+These are immutable local verification records from 2026-10-26 through 2026-10-28, not downloadable/public releases or the current clean-source candidate. Their byte identities and acceptance scope remain separate.
+
+### Initial controlled-tool rollout
+
+On 2026-10-28, the reviewed `9.0-glyphframe.2` tools were integrated through a separate versioned cache and exact offline archive pins. These initial candidates were built from parent `e75a0215c19a8d8324548230c62b8f9c2487f82c` **with uncommitted changes** (`WorkingTreeDirty=true`); the parent commit does not contain this integration. They are superseded locally by the clean-source candidate above, not relabeled as clean-source outputs.
 
 | Field | Recorded value |
 | --- | --- |
@@ -81,13 +127,9 @@ On 2026-10-28, the reviewed `9.0-glyphframe.2` tools were integrated through a s
 | Native scope | Extracted-ZIP About/notices, PNG/MP4 render/export, playback/end/seek/fullscreen/Escape, stale-audio export blocking, replacement and active Cancel passed on this host through a byte-identical renamed apphost; clean-PC/Setup acceptance **not tested** |
 | Distribution | Local provisional candidates only; source hosting, GPL/distribution scope and Windows-native protective-term review remain open |
 
-The application suite passed **1,288 Release tests**, plus **141 separate helper checks**; see [testing](testing.md#recorded-verification-snapshot). Fresh native exports fully decode: two 640×360/180-frame MP4s (AAC-copy and silent) and one 320×240 PNG. All 283 AAC packet payloads match the source; the silent MP4 contains no audio. The native notices text exposes all 30 appended document headers plus the summary/controlled version/IJG credit. Normal close returned zero, removed the owned session and preserved all 445 extracted payloads, ordinary settings and installed app/tool hashes.
+That integration suite passed **1,288 Release tests**, plus **141 separate helper checks**, not additive to the later clean-source rerun. Native exports fully decode: two 640×360/180-frame MP4s (AAC-copy and silent) and one 320×240 PNG. All 283 AAC packet payloads match the source; the silent MP4 contains no audio. The native notices text exposes all 30 appended document headers plus the summary/controlled version/IJG credit. Normal close returned zero, removed the owned session and preserved all 445 extracted payloads, ordinary settings and installed app/tool hashes.
 
 The normal-name apphost started, but the computer-use helper twice misbound its window to the installed application's identity. That own empty test process was terminated; its nonzero exit and retained marked session are diagnostic evidence, not a cleanup pass. Native input used an additional byte-identical `GlyphFrame.PackageSmoke.exe` copy in a separate fresh extraction; the 445 original files were not changed. No runtime/product fix or ordinary installed update was needed. This alias-based smoke does not certify normal-name helper targeting, human listening, PCM fallback again, a new DPI matrix, clean-PC or Setup lifecycle. Earlier installed-copy/user acceptance is not transferred. Old vendor cache, installed application and previous packages remain unchanged.
-
-## Historical candidate records
-
-These are immutable local verification records from 2026-10-26, not downloadable/public releases or the current controlled-tool candidate. That historical run produced a portable ZIP only; older Setup/ZIP bytes and their acceptance scope remain separate.
 
 ### Latest portable snapshot
 
@@ -165,7 +207,7 @@ Compiler signature/version validation and payload checks do not establish native
 
 ### Verification status
 
-Earlier installer checks cover first install, non-admin HKCU registration, shortcut defaults/opt-in, running-app update/uninstall refusal, same-version repair, native uninstall/data retention and reinstall. Native application smoke checks cover image/PNG and silent-video/MP4 rendering/export. The previous installed icon candidate separately passed same-version update, complete installed payload comparison, retained settings/exports and native Rose startup. The [previous paired licensing Setup](#previous-paired-candidate) has not been installed; its About/notices checks are automated WPF fixtures, not native acceptance. The current controlled-tool run produced a new Setup but did not install or run it. None of these checks proves a different-version upgrade.
+Earlier installer checks cover first install, non-admin HKCU registration, shortcut defaults/opt-in, running-app update/uninstall refusal, same-version repair, native uninstall/data retention and reinstall. Native application smoke checks cover image/PNG and silent-video/MP4 rendering/export. The previous installed icon candidate separately passed same-version update, complete installed payload comparison, retained settings/exports and native Rose startup. The [previous paired licensing Setup](#previous-paired-candidate) has not been installed; its About/notices checks are automated WPF fixtures, not native acceptance. Neither the initial controlled-tool Setup nor the current clean-source Setup was installed or run. None of these checks proves a different-version upgrade.
 
 The user reported **1.0.0 / Rose** colors/logos, Save & Close, full restart and About all OK, then explicitly confirmed the corrected desktop icon after the earlier icon Setup was applied. Record these as **USER-REPORTED PASS**, distinct from agent-native inspection and read-only Shell icon extraction; no new measured DPI matrix is implied.
 
