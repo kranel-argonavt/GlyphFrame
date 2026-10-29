@@ -89,6 +89,11 @@
   ],
   "Files": [
     {
+      "Path": "licenses/WindowsNative/COMPONENT-TERMS.txt",
+      "TextSha256": "a5765bc2fd69b95edb19c381d30bcfb45ee62bd918bed82ad29c2735f8dd3c95",
+      "Source": "Original GlyphFrame nonoperative component-terms draft 0.2; implementation preview only, not an adopted agreement"
+    },
+    {
       "Path": "licenses/CommunityToolkit.Mvvm/LICENSE.txt",
       "TextSha256": "1e1101b893f295b4526da2c167e4234610f1078e2fe43a0e814c1a883656877b",
       "UpstreamByteSha256": "651997ef19dbb9ecb8dd660dbc86444a65af21f18cfe08daa69bf201cd5cfdfc",
@@ -174,7 +179,7 @@
     },
     {
       "Path": "licenses/README.md",
-      "TextSha256": "b231d871538b453812912417f58ab9f21acb56070ed845f891c17e0bb518add8",
+      "TextSha256": "afc452aa0904c1bd287230422e8c94bae5e119361e51c2071dfba855f9ab2fb0",
       "UpstreamByteSha256": null,
       "Source": "GlyphFrame license inventory policy"
     },
@@ -280,6 +285,12 @@
       "Source": "https://github.com/madler/zlib/blob/da607da739fa6047df13e66a2af6b8bec7c2a498/LICENSE"
     }
   ],
+  "WindowsNativeTerms": {
+    "ProfilePath": "licenses/WindowsNative/profile.json",
+    "ProfileTextSha256": "a7f3a765f0ea0f29e0593027172ab0c837de8758ecf1e24da92b918b1b4fcf13",
+    "Purpose": "ImplementationPreview",
+    "OperativeAgreementAdopted": false
+  },
   "OwnershipEvidence": {
     "Status": "USER-REPORTED confirmed for current project-specific visuals; not independently investigated",
     "Date": "2026-10-26",

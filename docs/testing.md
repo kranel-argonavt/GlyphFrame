@@ -23,6 +23,7 @@ Helper regressions are separate from xUnit. They use inert fixtures and do not a
 pwsh -NoProfile -File scripts/Test-PortablePackage.ps1
 pwsh -NoProfile -File scripts/Test-PackageVerificationSession.ps1
 pwsh -NoProfile -File scripts/Test-InstallerPackage.ps1
+pwsh -NoProfile -File scripts/Test-NativeTerms.ps1
 pwsh -NoProfile -File scripts/Test-PackageLegal.ps1
 pwsh -NoProfile -File scripts/Test-SourcePreparation.ps1
 pwsh -NoProfile -File scripts/Test-ControlledFfmpeg.ps1
@@ -45,9 +46,32 @@ Actual publish/startup checks are a [separate packaging operation](packaging.md)
 
 Tests use synthetic media, not personal downloads. [Fixture provenance](../tests/GlyphFrame.Tests/TestInfrastructure/MediaFixtures.md) distinguishes metadata-only/playable samples and reproduction. Tiny clips test contracts, not production-scale throughput or stress performance.
 
+## Windows-native preview verification
+
+The later implementation-preview work is separate from the clean-source baseline below. On private parent `66e8d99` with uncommitted changes, **1,315 Release tests** passed (488 domain/integration + 827 app/UI); 27 cover the new bundle/record/compiled-dialog paths. Initial restricted testhost connection failures were followed by an unrestricted run that exposed and corrected exception handling/test expectations. WPF fixtures cover unchecked/default/invalid-scope behavior, write failure/decline and constrained-height/enlarged-text reachability; these are not native DPI acceptance.
+
+The fresh preview portable verified **447 payloads, 32 legal documents and 9 dependency bindings**, including the nonoperative terms/profile. All **154 helper checks** passed (36 controlled + 18 source + 25 legal + 20 portable + 30 installer + 15 session + 10 native-terms); an initial AppContainer file-move denial was rerun outside that restriction. Fresh pending/decline produced no acknowledgement/media cache. A separately labeled synthetic nonoperative profile entered the workspace, held the observed exclusive session and exited with cleanup. The first accepted-profile probe lacked a complete window observation and failed graceful-close verification; the corrected probe passed. This is not human/legal assent. Setup compilation succeeded after recorded Inno syntax/API corrections; compilation and static policy assertions are not an installed round-trip, silent-mode native pass, downgrade or uninstall acceptance.
+
+The initial agent-assisted normal-name native app inspection remained blocked after one refreshed retry by the computer-use helper's installed-app identity collision. Its owned empty process was closed, no session/record remained, and ordinary installed-app/settings/acknowledgement state was unchanged. The Setup preview page was inspected natively: full text, initially negative choice/disabled Next, optional notices with Escape, affirmative review enabling Next and transition to Tasks before Install without a record. The owner authorized Cancel/Yes; Setup logged normal deinitialization without installing or changing ordinary state. That initial check covered page/decline behavior, not installation or silent-scope acceptance. An AppContainer-redirected ordinary-profile comparison was discarded and repeated against the actual baseline profile. Detailed attempts remain local; the subsequent human-run protocol below is separate evidence, not a claim that agent targeting was fixed. Operative wording, author obligations and public approval remain [open](licensing.md#decisions-before-operative-distribution).
+
+### Other-PC manual preview protocol
+
+On 2026-10-29, the owner completed **A0–A6 and B0–B4** using the [exact working-tree preview pair](packaging.md#manually-tested-preview-candidate) on another AMD64 PC: Windows 11 Home/Core, 25H2, **26200.8246**. The agent reviewed 19 state snapshots and two silent-result summaries; UI behavior is **USER-REPORTED PASS**, not agent-observed interaction. Screenshots were not supplied. Baseline observations showed no registered/default installation, acknowledgement, settings or session directories. `dotnet` was already found, so this is not a proven runtime-free machine. Display/text scales were not recorded for this run.
+
+| Scenario | Result and evidence |
+| --- | --- |
+| A0–A2: fresh profile, silent refusal, interactive cancellation | Silent exit **1** plus the exact refusal marker, not merely a nonzero exit; record/settings/default installation remained absent. The owner confirmed initial negative choice, disabled Next, text viewers and Cancel/Escape/title-close. |
+| A3–A4: installed and portable first use | Owner confirmed no duplicate same-scope prompt, About/notices, saved accent/restart, synthetic-video render/export and draft Reset/Cancel. Snapshots bind the expected installed apphost and unchanged shared record/settings/export after portable use. |
+| A5–A6: same-version repair, uninstall/reinstall | Acknowledged silent repair exited **0**. Default apphost/registration disappeared after uninstall and returned after reinstall; record/settings/export hashes remained identical. Owner confirmed retained accent and portable/installed startup. This is not a different-version upgrade. |
+| B0–B2: missing, corrupt and foreign records | Owner confirmed preview without workspace and successful decline paths. Missing record stayed absent; both negative record hashes exactly match the supplied fixtures after decline. |
+| B3: persistence failure and recovery | Two snapshots identify a directory obstacle instead of a record. Owner confirmed app/Setup refusal, successful app retry after removing only the empty obstacle, restart and App-to-Setup reuse. The new record hash is intentional; settings/export remained unchanged. |
+| B4: invalid profile in a separate portable copy | Owner confirmed disabled affirmative controls/no workspace for the damaged copy and normal original/installed startup. Final shared-state hashes remained unchanged. Damaged-copy contents/UI were not independently captured. |
+
+All final observations show zero media-session directories. This does not independently prove exclusive-lease ownership or process cleanup; earlier positively observed lease checks retain their separate scope. The foreign zero-hash record and invalid profile are negative fixtures, not a real valid changed-runtime upgrade. Raw reports, backups and diagnostics remain local; no acknowledgement/settings file or test kit belongs in Git. These results do not close operative terms, Publisher obligations, the DPI/OS matrix or a future clean-source/publication-copy release check.
+
 ## Recorded verification snapshot
 
-As of 2026-10-28. Reading this document executes no checks. The latest completed run used a fresh independent checkout of private commit `e43fadad905deafeb636be1e9a7aec830984f918`, with `WorkingTreeDirty=false` throughout build/tests/packages. The full suite, helpers, formatting and packaging were rerun; overlapping precommit results are not additive. Later documentation edits do not relabel these artifacts. This single-commit verification clone is not the planned history-preserving publication copy or a public release.
+Historical clean-source baseline as of 2026-10-28. Reading this document executes no checks. That run used a fresh independent checkout of private commit `e43fadad905deafeb636be1e9a7aec830984f918`, with `WorkingTreeDirty=false` throughout build/tests/packages. The full suite, helpers, formatting and packaging were rerun; overlapping precommit results are not additive. Later implementation/documentation work does not relabel these artifacts. This single-commit verification clone is not the planned history-preserving publication copy or a public release.
 
 | Check | Result | Scope |
 | --- | --- | --- |
@@ -105,7 +129,7 @@ Finishing before Cancel input is **inconclusive**, not a cancellation pass. Clip
 
 - Available reports do not certify every window/state/DPI/mixed-monitor combination or native fault branch.
 - The selected private commit now has a clean-source build/test/package binding and fresh extracted startup. Remaining affected native checks must still identify their actual artifact; older local-build/installed/user results do not automatically cover new bytes or a later publication-copy rebuild.
-- Current Setup lifecycle and clean-PC acceptance remain open. Earlier clean-PC feedback is not an audited absence-of-runtime environment; Windows/codec compatibility stays bounded.
+- The preview pair's scoped other-PC lifecycle protocol is complete as recorded above, not a general release certification. Different-version upgrade/downgrade, a real valid changed-runtime scope and native DPI/enlarged-text checks are not covered by that run. No current report proves absence of preinstalled runtimes; Windows/codec compatibility stays bounded.
 - [Media provenance](screenshots/README.md), [licensing/distribution](licensing.md) and [history preparation](portfolio.md) remain separate from successful tests. No test authorizes a tag, upload or public release.
 
 Current product behavior is in [product-spec.md](product-spec.md); ownership decisions are in [architecture.md](architecture.md). Detailed local evidence and superseded artifacts are retained rather than embedded in public guides.

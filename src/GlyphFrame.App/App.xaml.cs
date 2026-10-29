@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using GlyphFrame.App.Services;
 using GlyphFrame.App.ViewModels;
+using GlyphFrame.App.Views;
 using GlyphFrame.Core.Interfaces;
 using GlyphFrame.Core.Media;
 using GlyphFrame.Core.Models;
@@ -33,6 +34,9 @@ public partial class App : Application
         base.OnStartup(e);
 
         InstallationLifetimeMarker.RegisterForCurrentProcess();
+        ShutdownMode normalShutdownMode = ShutdownMode;
+        // A pre-workspace modal window must not trigger last-window shutdown on acknowledgement.
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var services = new ServiceCollection();
         ConfigureServices(services);
@@ -52,6 +56,15 @@ public partial class App : Application
             _serviceProvider.GetRequiredService<IApplicationSettingsManager>();
         await settingsManager.InitializeAsync();
 
+        bool acknowledged = NativeTermsStartupGate.EnsureAcknowledged(AppContext.BaseDirectory,
+            _serviceProvider.GetRequiredService<IApplicationPaths>().ApplicationDataDirectory,
+            (bundle, error, save) => new NativeTermsWindow(bundle, error, save).ShowDialog() == true);
+        if (!acknowledged)
+        {
+            Shutdown();
+            return;
+        }
+
         _ = WarmFfmpegValidationAsync(
             _serviceProvider.GetRequiredService<IFfmpegValidationService>());
         _artifactRecoveryCancellation = new CancellationTokenSource();
@@ -61,6 +74,7 @@ public partial class App : Application
 
         MainWindow = _serviceProvider.GetRequiredService<MainWindow>();
         MainWindow.Show();
+        ShutdownMode = normalShutdownMode;
     }
 
     protected override void OnExit(ExitEventArgs e)

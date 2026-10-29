@@ -24,7 +24,12 @@ try {
     $payload = Get-VerifiedInstallerPayload $PortablePackageDirectory
     $include = Join-Path $runRoot 'payload-files.iss'
     Write-InstallerFileList $payload.Root $payload.Files $include
-    $arguments = @('--quiet-progress', '--no-ide-signtools', '--no-signing', "--output-dir=$runRoot", "--define=ProductVersion=$($payload.Report.PackageVersion)", "--define=PayloadFiles=$include", (Join-Path $repo 'installer/GlyphFrame.iss'))
+    $termsFile = Join-Path $runRoot 'native-component-terms.txt'
+    $noticesFile = Join-Path $runRoot 'native-component-notices.txt'
+    $termsScope = Write-InstallerNativeTermsDocument $payload.Root $termsFile
+    Write-InstallerNativeNoticesDocument $payload.Root $noticesFile
+    $arguments = @('--quiet-progress', '--no-ide-signtools', '--no-signing', "--output-dir=$runRoot", "--define=ProductVersion=$($payload.Report.PackageVersion)", "--define=PayloadFiles=$include",
+        "--define=NativeTermsFile=$termsFile", "--define=NativeNoticesFile=$noticesFile", "--define=NativeTermsBundle=$($termsScope.Identity)", (Join-Path $repo 'installer/GlyphFrame.iss'))
     & $compiler @arguments 2>&1 | Tee-Object -FilePath (Join-Path $runRoot 'compile.log') | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "ISCC failed: $LASTEXITCODE" }
     $setup = Join-Path $runRoot "GlyphFrame-$($payload.Report.PackageVersion)-win-x64-Setup.exe"
@@ -35,6 +40,7 @@ try {
     $numericVersion = '{0}.{1}.{2}.{3}' -f $version.FileMajorPart, $version.FileMinorPart, $version.FileBuildPart, $version.FilePrivatePart
     if ($version.CompanyName.Trim() -cne 'Nazar Khozin (kranel-argonavt)' -or $numericVersion -cne "$($payload.Report.PackageVersion).0") { throw 'Setup Publisher/version mismatch.' }
     Assert-InstallerPayloadMatchesManifest @(Get-PortablePayload $payload.Root) $payload.Files
+    if ((Get-NativeTermsProfile $payload.Root).Identity -cne $termsScope.Identity) { throw 'Terms scope changed during compilation.' }
     $hash = Write-PortableChecksum $setup ($setup + '.sha256')
     $success = $true
 }
@@ -48,6 +54,7 @@ finally {
        PayloadFileCount=if($payload){@($payload.Files).Count}else{0}; SetupPath=$setup; SetupSha256=$hash;
        NativeInstallUpgradeUninstallAcceptance='NOT TESTED by compilation'; PublicRelease='NOT CREATED';
        Licensing=if($payload){$payload.Licensing}else{$null};
+       NativeTerms=if($payload){$payload.NativeTerms | Select-Object Identity,Purpose,Version,OperativeAgreement}else{$null};
        Retention='Run-owned build outputs and failures retained; no automatic compiler download/install or cleanup';
        FinalSourceCommit=(& git -C $repo rev-parse HEAD); FinalWorkingTreeStatus=@(& git -C $repo status --porcelain=v1 --untracked-files=all) } |
         ConvertTo-Json -Depth 13 | Set-Content -LiteralPath (Join-Path $runRoot 'report.json')

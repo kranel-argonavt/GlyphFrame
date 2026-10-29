@@ -1,0 +1,53 @@
+<Window x:Class="GlyphFrame.App.Views.NativeTermsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Microsoft component terms — GlyphFrame"
+        Width="760" Height="660" MinWidth="420" MinHeight="360"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource MainBackgroundBrush}"
+        SnapsToDevicePixels="True" UseLayoutRounding="True">
+    <ScrollViewer x:Name="RootViewport" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <Grid x:Name="ContentLayout" Height="{Binding ViewportHeight, ElementName=RootViewport}" MinHeight="400">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel x:Name="HeaderPanel" Margin="22,18,22,12" SizeChanged="ContentSizeChanged">
+            <TextBlock FontSize="20" FontWeight="SemiBold" Text="Microsoft component terms" TextWrapping="Wrap" />
+            <TextBlock Margin="0,8,0,0" Foreground="{StaticResource WarningBrush}" TextWrapping="Wrap"
+                       Text="Local implementation preview — nonoperative draft, not a legal agreement." />
+            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap"
+                       Text="This review concerns five bundled Microsoft components. Original MIT code, FFmpeg and other components retain their separate rights. GPL sources do not require this acknowledgement." />
+        </StackPanel>
+        <TextBox x:Name="TermsText" Grid.Row="1" Margin="22,0,22,12" Padding="12"
+                 AutomationProperties.Name="Complete draft Microsoft component terms"
+                 IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Disabled" Height="Auto" />
+        <Border x:Name="ActionArea" Grid.Row="2" Padding="22,12" SizeChanged="ContentSizeChanged" Background="{StaticResource CardBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+            <StackPanel>
+                <WrapPanel Margin="0,0,0,8">
+                    <Button x:Name="ReferencesButton" Content="Microsoft reference texts" Height="Auto" MinHeight="32"
+                            Margin="0,0,8,4" Padding="8,4" Click="References_Click" />
+                    <Button x:Name="NoticesButton" Content="Other licenses and source information" Height="Auto" MinHeight="32"
+                            Margin="0,0,0,4" Padding="8,4" Click="Notices_Click" />
+                </WrapPanel>
+                <CheckBox x:Name="Acknowledgement" Margin="0,0,0,10" Checked="ChoiceChanged" Unchecked="ChoiceChanged"
+                          AutomationProperties.Name="Acknowledge nonoperative draft for local verification">
+                    <TextBlock Text="I acknowledge reviewing this nonoperative draft for local verification only."
+                               TextWrapping="Wrap" />
+                </CheckBox>
+                <TextBlock x:Name="Feedback" Margin="0,0,0,8" TextWrapping="Wrap" Visibility="Collapsed"
+                           Foreground="{StaticResource ErrorBrush}" AutomationProperties.LiveSetting="Polite" />
+                <WrapPanel HorizontalAlignment="Right">
+                    <Button x:Name="DeclineButton" Content="Decline &amp; Exit" IsCancel="True" MinWidth="130"
+                            Height="Auto" MinHeight="{StaticResource ControlHeight}" Margin="0,0,8,4" Click="Decline_Click" />
+                    <Button x:Name="ContinueButton" Content="Acknowledge &amp; Continue" IsEnabled="False" MinWidth="170"
+                            Height="Auto" MinHeight="{StaticResource ControlHeight}" Margin="0,0,0,4"
+                            Style="{StaticResource PrimaryButtonStyle}" Click="Continue_Click" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+    </ScrollViewer>
+</Window>

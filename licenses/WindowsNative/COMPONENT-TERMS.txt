@@ -1,0 +1,164 @@
+GLYPHFRAME — MICROSOFT COMPONENT TERMS
+NONOPERATIVE REVIEW DRAFT 0.2 — 28 OCTOBER 2026
+NOT ADOPTED. DO NOT SHIP, ENABLE OR TREAT AS AN ACCEPTED AGREEMENT.
+
+Review notice: the numbered sections are candidate agreement wording, not an
+effective agreement. Preparing, reading or reviewing this draft obtains no
+assent. Adoption, legal sufficiency and the acceptance mechanism require
+separate decisions. Complete vendor texts accompany this draft unchanged.
+
+1. PARTIES AND LIMITED COMPONENT SCOPE
+
+The Publisher is the GlyphFrame distributor, Nazar Khozin (kranel-argonavt).
+These component terms concern your use or redistribution of the Microsoft
+Components supplied in the Publisher's package. Microsoft and its suppliers
+retain their rights. Nothing here authorizes the Publisher to change their
+licenses or bind them to a new promise or support obligation.
+
+"Microsoft Components" means only the following Microsoft-supplied object-code
+files in the reviewed self-contained Windows package:
+
+  .NET Library License:
+    coreclr.dll
+    PresentationNative_cor3.dll
+    vcruntime140_cor3.dll
+    wpfgfx_cor3.dll
+
+  Windows SDK License:
+    D3DCompiler_47_cor3.dll
+
+The full reference documents are NET-LIBRARY-LICENSE.txt and
+WINDOWS-SDK-LICENSE.txt. They accompany this document; their names identify the
+applicable Microsoft text for each group above. The accompanying component
+inventory identifies the package files and runtime versions. A filename alone
+does not extend this scope to a different implementation or future replacement.
+This rider grants no entitlement to an entire SDK, developer tools or optional
+services merely described in a reference agreement.
+
+2. INDEPENDENT SOFTWARE RIGHTS
+
+Original GlyphFrame code remains available under its MIT license. FFmpeg,
+ffprobe and other components retain their own licenses and notices. These
+component terms do not restrict independently granted rights to use, inspect,
+modify, build, redistribute or sell that separately licensed software, and do
+not impose Microsoft terms on independently MIT-licensed Microsoft source.
+
+Reading or copying GPL-covered tools or their corresponding source does not
+require acceptance of these component terms, running GlyphFrame or an online
+account. Refusal of this Microsoft-containing bundle does not revoke those
+independent rights or authorize deletion of your media, exports or settings.
+
+3. USE OF THE MICROSOFT COMPONENTS
+
+To the extent allowed by the applicable Microsoft permissions and these terms,
+you may install and use the Microsoft Components in object-code form as
+incorporated in GlyphFrame on Microsoft Windows. Make component copies only to
+the extent those permissions allow. This rider grants no additional copy count,
+standalone-component offering or full-SDK/developer entitlement. Redistribution
+of this Microsoft-containing package is addressed in section 5.
+
+Modification or renaming of original GlyphFrame code remains governed by MIT.
+These terms neither grant nor withdraw permissions you obtain separately from
+Microsoft. Any modified or renamed package that retains Microsoft Components
+must have the applicable Microsoft permissions for those files; MIT alone does
+not supply them.
+
+4. COMPONENT PROTECTIONS AND EXCEPTIONS
+
+For the Microsoft Components only, comply with the applicable technical
+limitations and preserve Microsoft/supplier copyright, trademark, patent and
+other notices. Do not imply Microsoft endorsement of GlyphFrame, circumvent
+component limitations, use the Components unlawfully or offer standalone
+copies, rentals, loans or transfers outside the applicable permissions.
+
+Do not reverse engineer, decompile, disassemble or attempt to derive source
+from a Microsoft Component except where applicable law expressly permits it
+despite that restriction. For Library-covered Components, also preserve the
+exception to the extent required by third-party licensing terms governing
+included open-source components. A separate license continues to govern its
+own covered code. This is not a prohibition on inspecting or modifying
+GlyphFrame's MIT code or GPL-covered tools.
+
+The applicable restrictions in .NET Library sections 3(a)(iii) and 5 and Windows
+SDK sections 2(a)(iii) and 7 are incorporated with their exceptions, limited to
+the Components in section 1. They include restrictions on subjecting Microsoft-
+covered component source to a prohibited excluded license. For the SDK-covered
+file, the applicable benchmark-disclosure and commercial-hosting restrictions
+remain subject to SDK section 7, including its exceptions. This does not create
+a blanket ban on benchmarking or commercial use of GlyphFrame, change an
+independent license, or assign restrictions for absent SDK features to the app.
+
+Comply with applicable export-control and sanctions requirements for the
+Microsoft Components. This rider does not confer patent or export clearance.
+
+5. REDISTRIBUTION OF A MICROSOFT-CONTAINING PACKAGE
+
+The original-code MIT grant alone does not authorize redistribution of Microsoft
+binaries. If you redistribute a GlyphFrame package containing the Microsoft
+Components, you must agree to these component terms before doing so and comply
+with the applicable Microsoft redistribution permissions and requirements.
+
+When relying on the Publisher's permission to redistribute this package, retain
+the unmodified Microsoft Components as part of the application, not standalone
+downloads. Preserve the full component terms, vendor texts, copyright notices
+and component inventory. Require your distributors and external end users to
+agree to terms protecting the Microsoft Components at least as much as the
+applicable Microsoft reference agreement. Do not claim Microsoft sponsorship or
+apply an MIT/GPL label to these Microsoft files without independent authority.
+This paragraph does not limit a different permission you obtain separately from
+Microsoft or restrict a fork of the original MIT code without these Components.
+
+Preserve each separately licensed component's independent rights and comply
+with its own notice/source-delivery conditions. GPL source access must not depend
+on accepting these Microsoft-component terms. For any redistributed FFmpeg
+binaries, maintain the matching source-delivery route or replace it with another
+route satisfying the applicable GPL requirements. No fixed server or project URL
+is imposed by this rider.
+
+Redistribution without launching GlyphFrame does not waive the conditions for
+redistributing the Microsoft Components.
+
+The Publisher remains responsible for the Publisher's own upstream obligations.
+These terms do not transfer the Publisher's Microsoft indemnity obligations to
+ordinary end users or create a new blanket end-user indemnity. A recipient
+acting as a distributor remains responsible for obligations applicable to that
+recipient's own distribution activity.
+
+6. MICROSOFT WARRANTY, LIABILITY AND STATUTORY RIGHTS
+
+The applicable Microsoft/supplier warranty disclaimers, liability limitations
+and regional/statutory safeguards in the complete .NET Library sections 10–12
+and Windows SDK sections 13–15 form part of this rider for the Microsoft
+Components only. Their full conditions, regional variations and mandatory
+exceptions apply; these provisions are not a new liability limit for all
+GlyphFrame software.
+
+No additional warranty or support commitment from Microsoft or its suppliers is
+made by the Publisher. No term removes nonwaivable consumer rights or limits
+liability where applicable law does not permit it. The MIT and other licenses'
+own warranty/disclaimer provisions remain separate. This rider does not select
+a new whole-application governing law or exclusive forum; the reference texts
+retain their own applicable provisions within their proper subject matter.
+
+7. DATA AND OPTIONAL FEATURES
+
+These component terms do not create an account, advertising permission or
+permission for GlyphFrame to upload your media. Any applicable vendor data/
+service provisions for the Components remain as stated in the full reference
+agreements. This does not assert that every described SDK service is included
+or that Microsoft/Windows can never perform diagnostics. Applicable data and
+statutory rights remain unaffected.
+
+8. SCOPE OF ACCEPTANCE
+
+An affirmative acceptance applies only to the identified version of these
+Microsoft-component terms and the identified component scope. It is not a new
+license for original GlyphFrame code or other independently licensed components.
+Merely downloading a file, viewing a repository or reading this document is not
+an explicit affirmative choice to accept these terms. An unrelated theme or
+preference change does not constitute acceptance of revised terms.
+
+Declining this Microsoft-containing bundle does not revoke your independent
+source/license rights or authorize deletion of your media, exports or settings.
+
+END OF NONOPERATIVE REVIEW DRAFT — NO AGREEMENT ADOPTED

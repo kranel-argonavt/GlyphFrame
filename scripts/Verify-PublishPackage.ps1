@@ -23,6 +23,8 @@ $application = $null
 $failure = $null
 $sessionObservation = $null
 $sessionCleanup = $null
+$previewFixture = $null
+$freshPreview = $false
 
 Assert-PortableDirectoryChain ([IO.Path]::GetDirectoryName($runRoot))
 if ([IO.Directory]::Exists($runRoot) -or [IO.File]::Exists($runRoot)) {
@@ -99,6 +101,7 @@ try {
         throw 'Published legal manifest differs from repository manifest.'
     }
     $legal = Assert-LegalPackage $publishRoot
+    $nativeTerms = Get-NativeTermsProfile $publishRoot
     $controlledLegal = Assert-ControlledToolLegalBinding $publishRoot $toolPins
     $checks.Add("Controlled tool bytes/version/source-material identity and $($controlledLegal.DocumentsVerified) required notices verified; source hosting/public approval remain open")
     $checks.Add("Legal text hashes and exact dependency versions verified; $($legal.Status)")
@@ -166,8 +169,38 @@ try {
     }
     if (-not $application.Responding) { throw 'Published app is not responding.' }
     $checks.Add('Published app created a responsive window and survived bounded startup observation outside repository')
+    if ($application.MainWindowTitle -cne 'Microsoft component terms — GlyphFrame' -or
+        [IO.File]::Exists((Join-Path $dataRoot 'GlyphFrame/native-terms-acknowledgement.txt')) -or
+        [IO.Directory]::Exists((Join-Path $dataRoot 'GlyphFrame/Cache'))) {
+        throw 'Fresh package did not remain at the unacknowledged preview gate before media work.'
+    }
+    if (-not $application.CloseMainWindow() -or -not $application.WaitForExit(15000) -or $application.ExitCode -ne 0) {
+        throw 'Declining the fresh preview did not exit normally.'
+    }
+    if ([IO.File]::Exists((Join-Path $dataRoot 'GlyphFrame/native-terms-acknowledgement.txt')) -or
+        [IO.Directory]::Exists((Join-Path $dataRoot 'GlyphFrame/Cache'))) { throw 'Decline created acknowledgement or media state.' }
+    $freshPreview = $true
+    $checks.Add('Fresh nonoperative preview blocked media work; window-close decline exited without acknowledgement/cache')
+    $application.Dispose()
+    $application = $null
+    $previewFixture = New-IsolatedNativeTermsPreviewFixture -PackageRoot $publishRoot -DataRoot $dataRoot
+    $application = [Diagnostics.Process]::Start($start)
+    if (-not $application.WaitForInputIdle(15000)) { throw 'Synthetic preview-acknowledged app did not become input-idle.' }
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+    do {
+        $application.Refresh()
+        if ($application.HasExited) { throw 'Synthetic preview-acknowledged app exited before creating its workspace.' }
+        if ($application.MainWindowHandle -ne [IntPtr]::Zero) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($application.MainWindowHandle -eq [IntPtr]::Zero -or $application.WaitForExit($StartupObservationSeconds * 1000)) {
+        throw 'Synthetic preview-acknowledged workspace did not survive startup observation.'
+    }
     $sessionObservation = Wait-PackageActiveSession -DataRoot $dataRoot -ApplicationProcessId $application.Id `
         -IsApplicationRunning { -not $application.HasExited }
+    if (-not $application.Responding -or $application.MainWindowTitle -ceq 'Microsoft component terms — GlyphFrame') {
+        throw 'Synthetic nonoperative fixture did not enter a responsive workspace.'
+    }
     $checks.Add('Isolation verified: production session observed under this run data root with an actively held exclusive lease')
     if (-not $application.CloseMainWindow() -or -not $application.WaitForExit(15000)) {
         throw 'Published app did not shut down gracefully within 15 seconds.'
@@ -212,6 +245,9 @@ finally {
         DataRetention = 'Marked temporary data retained for inspection/interactive retesting; verify session cleanup before deleting this run-owned root. Failure working directory also retained.'
         SessionObservation = $sessionObservation
         SessionCleanup = $sessionCleanup
+        FreshPreviewPendingAndDeclined = $freshPreview
+        SyntheticPreviewFixture = $previewFixture
+        NativeTermsHumanOrLegalAssent = 'NOT CREATED; implementation preview only'
         Checks = $checks.ToArray()
         InteractiveStartupSettingsRenderExport = 'NOT TESTED by this automated script'
         CleanWindowsWithoutInstalledDotnet = 'PENDING Phase 15'

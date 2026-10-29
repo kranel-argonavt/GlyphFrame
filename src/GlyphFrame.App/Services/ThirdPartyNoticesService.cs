@@ -37,7 +37,7 @@ public sealed class ThirdPartyNoticesService
         return null;
     }
 
-    private string ReadDocuments()
+    internal string ReadDocuments()
     {
         // Only local inert text, with no URL fetching or arbitrary manifest-directed file access.
         string manifestPath = ResolveDocument("licenses/manifest.json", manifest: true);

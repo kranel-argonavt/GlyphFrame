@@ -1,0 +1,23 @@
+{
+  "SchemaVersion": 1,
+  "Purpose": "ImplementationPreview",
+  "Version": "0.2",
+  "TermsPath": "licenses/WindowsNative/COMPONENT-TERMS.txt",
+  "TermsTextSha256": "a5765bc2fd69b95edb19c381d30bcfb45ee62bd918bed82ad29c2735f8dd3c95",
+  "RuntimeFrameworks": {
+    "Microsoft.NETCore.App": "10.0.12",
+    "Microsoft.WindowsDesktop.App": "10.0.12"
+  },
+  "Components": [
+    { "Path": "coreclr.dll", "Length": 4614992, "Sha256": "128aee8c62a673d64739e585e3876b61133571cec83a46240a62581d5465639b" },
+    { "Path": "PresentationNative_cor3.dll", "Length": 1235240, "Sha256": "42e2e543c17e1b37499baf00d956433b8afb655348ec0fae89c926fb7d149b6e" },
+    { "Path": "vcruntime140_cor3.dll", "Length": 124544, "Sha256": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066" },
+    { "Path": "wpfgfx_cor3.dll", "Length": 1956136, "Sha256": "501a1cd67d51bb1663870b12af0f8c0ba29b3d37b8b509be896d2aaf32db214a" },
+    { "Path": "D3DCompiler_47_cor3.dll", "Length": 4741488, "Sha256": "a05f99734f7c4822fefc12b367af21fd0976ed6608752fb1e1e80b6ece7ecbbb" }
+  ],
+  "References": [
+    { "Path": "licenses/dotnet/NET-LIBRARY-LICENSE.txt", "TextSha256": "88d7ebd0935cc71b685323974add2759139b2afbe97081081eeb5f913d0b769f" },
+    { "Path": "licenses/WPF/WINDOWS-SDK-LICENSE.txt", "TextSha256": "375140d46a2d826ed19c54c0f0a22a50043f8cff772566fc764345339b95c6d2" },
+    { "Path": "licenses/dotnet/WINDOWS-LICENSE-MAPPING.txt", "TextSha256": "3bdf7142d570f11780d1a5fcb6cbe47f5cf4a15bc634acf8db93fe3be8837119" }
+  ]
+}

@@ -46,6 +46,7 @@ function Get-VerifiedInstallerPayload([string]$PackageDirectory) {
     Assert-InstallerPayloadMatchesManifest $actual $manifest
     Assert-PackageRequiredFiles $payloadRoot
     $legal = Assert-LegalPackage $payloadRoot
+    $nativeTerms = Get-NativeTermsProfile $payloadRoot
     $null = Assert-ControlledToolLegalBinding $payloadRoot (Get-LocalToolPins (Join-Path $PSScriptRoot '../Tools/ffmpeg/SHA256SUMS.txt'))
     Assert-ExecutableShellIcon (Join-Path $payloadRoot 'GlyphFrame.App.exe') (Join-Path $PSScriptRoot '../src/GlyphFrame.App/Assets/GlyphFrame.ico')
     if ((Get-PortablePackageVersion (Join-Path $payloadRoot 'GlyphFrame.App.dll')) -cne $report.PackageVersion) { throw 'Assembly/package version mismatch.' }
@@ -53,7 +54,10 @@ function Get-VerifiedInstallerPayload([string]$PackageDirectory) {
     if (-not [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes((Join-Path $payloadRoot 'GlyphFrame.App.dll'))).Contains('InstallationLifetimeMarker')) {
         throw 'This application predates the installation lifetime protocol; build a fresh portable candidate.'
     }
-    return [pscustomobject]@{ Root=$payloadRoot; Files=$actual; Report=$report; PackageDirectory=$root; Licensing=$legal }
+    if (-not [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes((Join-Path $payloadRoot 'GlyphFrame.App.dll'))).Contains('NativeTermsStartupGate')) {
+        throw 'This application predates the native-terms startup protocol; build a fresh portable candidate.'
+    }
+    return [pscustomobject]@{ Root=$payloadRoot; Files=$actual; Report=$report; PackageDirectory=$root; Licensing=$legal; NativeTerms=$nativeTerms }
 }
 
 function Assert-InstallerPayloadMatchesManifest($Actual, $Manifest) {

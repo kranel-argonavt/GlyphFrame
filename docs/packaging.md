@@ -54,6 +54,30 @@ On 2026-10-28, the local candidate passed **18 outer file/hash checks, a separat
 
 The final release must identify its actual application/tool/source bytes and provide reviewed source directions beside the relevant download. Preserve complete notices with conveyed tools; do not treat a link alone as a replacement for a license copy. Local archive integrity checks establish bytes/layout, not legal clearance. Windows-native runtime terms and other application release gates remain separate from this FFmpeg-only candidate.
 
+## Windows-native terms preview
+
+The current implementation is **ImplementationPreview**, not an operative agreement or cleared release. It retains the unchanged nonoperative 0.2 draft, complete Microsoft reference texts and all other indexed notices. `licenses/WindowsNative/profile.json`, itself hash-bound by the legal manifest, identifies the reviewed text, two included runtime versions and five exact covered DLL bytes. A changed runtime/document scope requires a new identity; absent, partial, mixed or modified scope blocks self-contained startup before media work. Framework-dependent developer builds with none of those bundled DLLs do not use this bundle-specific gate.
+
+Setup shows the complete draft/references before installation, with an initially negative choice and an optional local notices viewer. Only an explicit acknowledged Install attempt can persist new state, after the running-app/downgrade guards. Reading or cancelling earlier writes no acknowledgement. A new/unacknowledged silent scope refuses. The application first-use screen uses the same independent record and skips only an identical current profile; Decline/Escape/close exits. Persistence errors remain failures with retry/decline, not success. The installer/app never accept a Publisher indemnity on the owner's behalf.
+
+The local `%LocalAppData%\GlyphFrame\native-terms-acknowledgement.txt` protocol is four UTF-8 ASCII lines: versioned header, `Purpose=ImplementationPreview`, `Bundle=<canonical profile SHA-256>`, and `AcknowledgedUtc=<UTC yyyy-MM-ddTHH:mm:ss.fffZ>`. Readers bound input to 1 KiB; writes use an owned sibling temporary file and atomic replacement. It is user-writable convenience state, not tamper-proof identity or legal evidence. Settings Reset/Save/Cancel and uninstall do not grant or erase this separate choice. No acknowledgement belongs in a packaged payload. A future operative purpose/scope must not reuse preview records.
+
+Package verification now first observes a fresh pending preview, no media cache/record, and normal decline. It then creates an explicitly labeled **synthetic nonoperative fixture only in that run's marked disposable data root**, relaunches, positively observes the production session and checks graceful cleanup. There is no general product auto-consent switch, no human/legal assent and no implication that the runtime has not executed before the WPF dialog. Automated verification does not establish native installer lifecycle; the later scoped manual run is recorded below. Future operative recipient/distributor coverage remains a separate gate; see [licensing](licensing.md#windows-terms-implementation-preview).
+
+### Manually tested preview candidate
+
+The owner completed the [other-PC manual protocol](testing.md#other-pc-manual-preview-protocol) on 2026-10-29 against this exact pair. These are **dirty-source nonoperative previews**, not replacements for the historical clean-source baseline's identity or public releases. Subsequent documentation edits do not change the packages.
+
+| Field | Recorded value |
+| --- | --- |
+| Source parent / state | `66e8d9955f294feaaec4f4c79e479793c86924d5` / `WorkingTreeDirty=true` |
+| Portable ZIP SHA-256 | `5791165eb64d903a891884a9d3ed891672b5528e113e7fd323078adc3f4559d4` |
+| Setup SHA-256 | `8cb8ac08a48d0a56d8b0d1e420f001ac040fba11ff5e5ceb1239001bc41d198a` |
+| Canonical preview profile SHA-256 | `a7f3a765f0ea0f29e0593027172ab0c837de8758ecf1e24da92b918b1b4fcf13` |
+| Package integrity | **447 payloads / 32 legal documents / 9 dependency bindings**, verified during packaging; this is distinct from the later snapshots' installed apphost comparison |
+| Manual scope | Windows 11 Home 25H2 / 26200.8246; A0–A6 and B0–B4 user-reported UI behavior plus reviewed snapshots/silent summaries; install/first-use, portable sharing, same-version repair, retained-data uninstall/reinstall and negative record/profile/write cases |
+| Still outside this run | Runtime-free environment, different-version upgrade/downgrade, real valid changed-runtime scope, native DPI/text-scale matrix, operative/legal approval and final clean-source/publication-copy acceptance |
+
 ## What verification establishes
 
 The publish verifier checks required application/CLR/WPF/Skia assets, bundled FFmpeg/ffprobe, committed tool checksums, attribution, tool execution and outside-repository startup. It verifies canonical legal-text hashes and exact non-project dependency versions against `licenses/manifest.json`; changed dependencies or missing/altered texts fail. This confirms collection integrity, **not legal completeness**: reports explicitly retain the [open licensing gates](licensing.md). It positively observes the launched PID's exclusive production-session lease and verifies removal of that exact session after normal close; an absent cache alone is not cleanup proof.
@@ -86,6 +110,8 @@ pwsh -NoProfile -File scripts/Verify-PublishPackage.ps1
 Helper-only regressions are documented in [testing.md](testing.md#run-the-automated-checks).
 
 ## Current local controlled-tool candidate
+
+These are the last **clean-source baseline** artifacts, predating the [nonoperative working-tree preview](#windows-native-terms-preview). New preview builds do not inherit their clean-source identity or native acceptance; their detailed run identities remain in local evidence.
 
 On 2026-10-28, a fresh independent checkout of **`e43fadad905deafeb636be1e9a7aec830984f918`** passed source-only build, exact controlled-tool initialization, full Release tests/helpers, formatting and packaging. Both new candidates record **`WorkingTreeDirty=false`**. Later documentation edits do not relabel their source or payloads; this private verification clone is not a sanitized public-history copy.
 
@@ -207,7 +233,7 @@ Compiler signature/version validation and payload checks do not establish native
 
 ### Verification status
 
-Earlier installer checks cover first install, non-admin HKCU registration, shortcut defaults/opt-in, running-app update/uninstall refusal, same-version repair, native uninstall/data retention and reinstall. Native application smoke checks cover image/PNG and silent-video/MP4 rendering/export. The previous installed icon candidate separately passed same-version update, complete installed payload comparison, retained settings/exports and native Rose startup. The [previous paired licensing Setup](#previous-paired-candidate) has not been installed; its About/notices checks are automated WPF fixtures, not native acceptance. Neither the initial controlled-tool Setup nor the current clean-source Setup was installed or run. None of these checks proves a different-version upgrade.
+Earlier installer checks cover first install, non-admin HKCU registration, shortcut defaults/opt-in, running-app update/uninstall refusal, same-version repair, native uninstall/data retention and reinstall. Native application smoke checks cover image/PNG and silent-video/MP4 rendering/export. The previous installed icon candidate separately passed same-version update, complete installed payload comparison, retained settings/exports and native Rose startup. The [previous paired licensing Setup](#previous-paired-candidate) has not been installed; its About/notices checks are automated WPF fixtures, not native acceptance. Neither the initial controlled-tool Setup nor the historical clean-source baseline Setup was installed or run. The later [preview pair](#manually-tested-preview-candidate) has its own owner-run lifecycle evidence. None of these checks proves a different-version upgrade.
 
 The user reported **1.0.0 / Rose** colors/logos, Save & Close, full restart and About all OK, then explicitly confirmed the corrected desktop icon after the earlier icon Setup was applied. Record these as **USER-REPORTED PASS**, distinct from agent-native inspection and read-only Shell icon extraction; no new measured DPI matrix is implied.
 

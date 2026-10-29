@@ -1,5 +1,6 @@
 # Shared structural checks. No publishing, application launch, extraction or recursive deletion.
 . (Join-Path $PSScriptRoot 'PackageLegal.Helpers.ps1')
+. (Join-Path $PSScriptRoot 'NativeTerms.Helpers.ps1')
 function Get-RequiredPackagePaths {
     return @(
         'GlyphFrame.App.exe', 'GlyphFrame.App.dll', 'GlyphFrame.App.deps.json', 'GlyphFrame.App.runtimeconfig.json',
@@ -8,7 +9,8 @@ function Get-RequiredPackagePaths {
         'PresentationFramework.dll', 'PresentationCore.dll', 'WindowsBase.dll',
         'PresentationNative_cor3.dll', 'wpfgfx_cor3.dll', 'vcruntime140_cor3.dll',
         'D3DCompiler_47_cor3.dll', 'PenImc_cor3.dll', 'libSkiaSharp.dll', 'SkiaSharp.dll',
-        'LICENSE', 'licenses/manifest.json', 'THIRD_PARTY_NOTICES.md', 'Tools/ffmpeg/ffmpeg.exe', 'Tools/ffmpeg/ffprobe.exe',
+        'LICENSE', 'licenses/manifest.json', 'licenses/WindowsNative/profile.json', 'licenses/WindowsNative/COMPONENT-TERMS.txt',
+        'THIRD_PARTY_NOTICES.md', 'Tools/ffmpeg/ffmpeg.exe', 'Tools/ffmpeg/ffprobe.exe',
         'Tools/ffmpeg/SHA256SUMS.txt', 'Tools/ffmpeg/LICENSE.txt', 'Tools/ffmpeg/DISTRIBUTION_README.txt'
     )
 }
@@ -85,7 +87,7 @@ function Assert-PortableContentPath([string]$Path, [switch]$AllowSymbols) {
     }
     $name = $Path.Split('/')[-1]
     if ($name -match '(?i)opencv|opencvsharp' -or $name -match '^(?i:settings)(?:[.-]|$)' -or
-        $name -eq '.session.lease' -or $name -match '\.(?i:cs|xaml|csproj|sln|suo|user|log|trx|tmp|partial|part|zip|png|jpe?g|bmp|webp|mp4|mov|mkv|avi)$' -or
+        $name -in @('.session.lease','native-terms-acknowledgement.txt') -or $name -match '\.(?i:cs|xaml|csproj|sln|suo|user|log|trx|tmp|partial|part|zip|png|jpe?g|bmp|webp|mp4|mov|mkv|avi)$' -or
         (-not $AllowSymbols -and $name -match '\.(?i:pdb)$')) {
         throw "Development or application-data file is forbidden: $Path"
     }
@@ -96,7 +98,7 @@ function Assert-PortableFilePath([string]$Path, [switch]$AllowSymbols) {
     Assert-PortableContentPath $Path -AllowSymbols:$AllowSymbols
     if ($Path -cne 'LICENSE' -and $Path -notmatch '\.(?i:dll|exe|json|txt|dat|config|md)$' -and
         -not ($AllowSymbols -and $Path -match '\.(?i:pdb)$')) { throw "Unexpected distributed file type: $Path" }
-    if ($Path -match '\.(?i:json)$' -and $Path -cnotin @('GlyphFrame.App.deps.json', 'GlyphFrame.App.runtimeconfig.json', 'licenses/manifest.json')) {
+    if ($Path -match '\.(?i:json)$' -and $Path -cnotin @('GlyphFrame.App.deps.json', 'GlyphFrame.App.runtimeconfig.json', 'licenses/manifest.json','licenses/WindowsNative/profile.json')) {
         throw "Unexpected JSON (potential user or verification data): $Path"
     }
 }

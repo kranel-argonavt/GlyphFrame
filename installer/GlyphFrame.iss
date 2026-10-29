@@ -6,6 +6,15 @@
 #ifndef PayloadFiles
   #error PayloadFiles must be generated from the verified portable manifest
 #endif
+#ifndef NativeTermsFile
+  #error NativeTermsFile must contain the verified nonoperative draft and full Microsoft references
+#endif
+#ifndef NativeTermsBundle
+  #error NativeTermsBundle must identify the verified implementation-preview profile
+#endif
+#ifndef NativeNoticesFile
+  #error NativeNoticesFile must contain the verified local notices
+#endif
 
 [Setup]
 AppId={{{#ProductId}}
@@ -42,6 +51,14 @@ Uninstallable=yes
 UninstallFilesDir={app}
 AllowNoIcons=no
 ShowLanguageDialog=no
+LicenseFile={#NativeTermsFile}
+
+[Messages]
+WizardLicense=Microsoft component review - local preview
+LicenseLabel=Nonoperative implementation preview. This is not a legal agreement or public release.
+LicenseLabel3=Review the draft and complete Microsoft references below. This acknowledgement is for local verification only; other components retain their separate rights.
+LicenseAccepted=I &acknowledge reviewing this nonoperative draft for local verification
+LicenseNotAccepted=I &do not acknowledge this preview
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -50,6 +67,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Files]
+; Optional inert viewer; temporary only, never a user-data or installed acceptance file.
+Source: "{#NativeNoticesFile}"; Flags: dontcopy
 #include PayloadFiles
 
 [Icons]
@@ -60,6 +79,8 @@ Name: "{userdesktop}\GlyphFrame"; Filename: "{app}\GlyphFrame.App.exe"; WorkingD
 Filename: "{app}\GlyphFrame.App.exe"; Description: "Launch GlyphFrame"; Flags: nowait postinstall skipifsilent unchecked
 
 [Code]
+#include "NativeTerms.iss"
+
 function InstallationMutex(Param: String): String;
 begin
   Result := 'Global\GlyphFrame.Installation.' +
@@ -80,6 +101,8 @@ begin
     else if StrToVersion('{#ProductVersion}.0', NextVersion) and (PreviousVersion > NextVersion) then
       Result := 'A newer GlyphFrame version is installed. Downgrades are not supported.';
   end;
+  if Result = '' then
+    Result := PrepareNativeTermsAcknowledgement();
 end;
 
 function InitializeUninstall(): Boolean;
