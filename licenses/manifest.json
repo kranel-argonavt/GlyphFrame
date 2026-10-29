@@ -3,7 +3,7 @@
   "PublicDistributionApproved": false,
   "HashNormalization": "UTF-8 without BOM; CRLF normalized to LF",
   "OpenIssues": [
-    "Controlled FFmpeg 9.0-glyphframe.2 is integrated locally with exact tool/source/patch/material hashes and retained notices. Final Corresponding Source delivery/hosting, application/GPL scope and public binary distribution approval remain open. Earlier vendor binaries remain in private historical objects pending a separately sanitized publication copy.",
+    "Controlled FFmpeg 9.0-glyphframe.2 is integrated locally with exact tool/source/patch/material hashes and retained notices. Final Corresponding Source delivery/hosting, application/GPL scope and public binary distribution approval remain open. Earlier vendor binaries remain only in the private original history; the separate publication copy has completed history sanitization and fresh-checkout verification.",
     "Windows-native component terms 1.0 were adopted by the owner for the exact reviewed scope. Affected Setup/portable acceptance and final publication-copy evidence remain required; adoption does not approve public distribution or remove Publisher obligations."
   ],
   "Components": [
