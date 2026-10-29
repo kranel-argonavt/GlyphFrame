@@ -59,15 +59,51 @@ On 2026-10-29, **delivery revision 2** added the maintained [standalone source/r
 
 The same review reproduced and fixed a current-export dependency regression: structural portable helpers no longer import application-native acknowledgement tooling. Only the installer/publish verifier and native-terms tests import it explicitly. A standalone helper fixture fails before the fix and passes afterward without bundling application runtime/terms tooling into FFmpeg build sources. This fixes future exporter dependency closure; it does not change the already frozen 27-file archive.
 
+## Adopted Windows component terms 1.0
+
+The owner adopted [the exact edition 1.0](licensing.md#prepared-release-edition-10) on 2026-10-29. Setup and self-contained portable now require a fresh affirmative choice for `ComponentTermsAcceptance`, not the old `ImplementationPreview` purpose. Profile identity is `f4820a7d22acdb0d6dfc5d34ec8f83cc97a4999e818301f343060730334eea7a`; two runtime versions, five exact DLLs and three reference texts are unchanged. Framework-dependent developer builds with none of those bundled DLLs do not use this gate.
+
+Setup shows the complete terms/references before installation, with an initially negative choice and optional inert notices. Only explicit agreement followed by an Install attempt may persist the record, after running-app/downgrade guards. New/unaccepted silent scope refuses. The app starts at complete terms with an unchecked choice; Decline/Escape/close exits without media work. Missing/mixed/altered scope blocks startup. Failed record persistence cannot start the workspace and remains retryable; no failure message claims a legal decision was impossible.
+
+The bounded four-line local protocol remains separate from Settings: header `GlyphFrame.NativeTermsAcknowledgement.1`, `Purpose=ComponentTermsAcceptance`, `Bundle=<canonical profile SHA-256>` and `AcknowledgedUtc=<UTC yyyy-MM-ddTHH:mm:ss.fffZ>`. Writers atomically replace an owned sibling temporary file. Old preview records do not match, and decline leaves an existing record unchanged. This user-writable convenience state is not authenticated proof of consent. Settings and uninstall do not grant or erase it; records never belong in distributed payloads.
+
+**Automated package verification stops after pending terms and window-close decline.** It checks integrity/tools, absence of acceptance/cache and normal exit, but never writes acceptance of actual operative terms. Reports use `PackageIntegrityAndUnacceptedStartupOnly`, leave session observation/cleanup null and mark workspace/startup/session checks **NOT TESTED — human acceptance required**. A successful provisional package report is not full acceptance or public approval. Positive unit tests use inert synthetic terms/components only. Existing preview/native results below retain their original identities; affected acceptance checks on the new packages remain separate.
+
+### Private edition-1.0 candidate
+
+The 2026-10-29 pair was built from private parent `6d443a0` with **uncommitted working-tree changes**. It is not clean-source or publication-copy acceptance and was not installed by the agent. Both formats retain exactly the same 447 payload files and adopted scope; the installed application, ordinary settings and acknowledgement were unchanged around packaging.
+
+| Item | Evidence |
+| --- | --- |
+| Application / target | 1.0.0 / Windows x64 / self-contained |
+| Portable ZIP SHA-256 | `02389d19b8c1f6e84c4411a756e8b2c8ad44e4d2fdeba0485466b85fb4aacea2` |
+| Unsigned Setup SHA-256 | `4e4dfaf3402afdf56b9b73d225f1c66b73bc589e9f61ab618b0cf1218889f962` |
+| Integrity | 447 payloads / 32 legal texts / 9 dependencies; all archive bytes checked |
+| Terms state | Version 1.0 / `ComponentTermsAcceptance`; no synthetic operative record created |
+| Script-observed startup | Responsive terms window; close declined normally, with no acknowledgement/cache |
+| Owner-reported follow-up | Terms/viewers, refusal routes, explicit portable acceptance/restart, image/video render/export and Setup terms/Cancel: USER-REPORTED PASS |
+| Not covered | New Setup installation lifecycle/interoperability and silent behavior, instrumented session/lease cleanup and final release acceptance |
+
+Automated results and the completed [owner-reported short retest](testing.md#owner-reported-edition-10-retest) are recorded separately. The owner identified `cfc94837 / ZIP 02389d19` and reported no problems or skipped checklist items. This confirms the requested first-use/restart/render/export and Setup-page/Cancel checks, not installation or record interoperability. Existing preview/clean-PC evidence retains its original scope; no wholesale repeat is implied.
+
+### Corrected profile-validation candidate
+
+The precommit parity correction produced another private pair on parent `6d443a0` with **WorkingTreeDirty=true**. It verifies the same 447 payloads / 32 legal texts / nine dependencies, unchanged edition/profile/controlled-tool identities and responsive valid pending/decline without acceptance/cache. The unsigned Setup was compiled, not installed. This pair does not inherit the owner's `cfc94837` native report as new-byte acceptance.
+
+- Portable ZIP SHA-256: `d4fdd99170be7b61eb5a588ec53f384fe85146b8c57128db8a482a2df01788f1`.
+- Setup SHA-256: `672085947e70ad073a8a8cab67900eb30fc25bd33556b99913af9dbcaba28c00`.
+
+A separate run-owned copy with a malformed, hash-rebound schema was rejected by the typed packaging reader. Scripted observation confirmed the application's distinct verification-failure window; the pending-state classifier rejected it, and window-close exited zero without acknowledgement/cache. That observation is not a visual/physical-DPI or affirmative-acceptance test. The published ZIP/Setup, earlier packages and legitimate user records were not modified. See the [parity follow-up](testing.md#profile-validation-parity-follow-up).
+
 ## Windows-native terms preview
 
-The current implementation is **ImplementationPreview**, not an operative agreement or cleared release. It retains the unchanged nonoperative 0.2 draft, complete Microsoft reference texts and all other indexed notices. `licenses/WindowsNative/profile.json`, itself hash-bound by the legal manifest, identifies the reviewed text, two included runtime versions and five exact covered DLL bytes. A changed runtime/document scope requires a new identity; absent, partial, mixed or modified scope blocks self-contained startup before media work. Framework-dependent developer builds with none of those bundled DLLs do not use this bundle-specific gate.
+The earlier implementation used **ImplementationPreview**, not an operative agreement or cleared release. The following preview evidence is historical; the current edition and protocol are specified above. Its old profile bound nonoperative draft 0.2, full reference texts, two runtime versions and five covered DLL identities.
 
-Setup shows the complete draft/references before installation, with an initially negative choice and an optional local notices viewer. Only an explicit acknowledged Install attempt can persist new state, after the running-app/downgrade guards. Reading or cancelling earlier writes no acknowledgement. A new/unacknowledged silent scope refuses. The application first-use screen uses the same independent record and skips only an identical current profile; Decline/Escape/close exits. Persistence errors remain failures with retry/decline, not success. The installer/app never accept a Publisher indemnity on the owner's behalf.
+In that preview, Setup showed complete draft/references before installation with an initially negative choice and optional local notices. An explicit acknowledged Install attempt persisted separate preview state after running-app/downgrade guards. Reading/cancelling wrote nothing; new unacknowledged silent scope refused. The first-use app shared its identity and independent record. These prior tests did not accept a Publisher indemnity or later operative terms.
 
-The local `%LocalAppData%\GlyphFrame\native-terms-acknowledgement.txt` protocol is four UTF-8 ASCII lines: versioned header, `Purpose=ImplementationPreview`, `Bundle=<canonical profile SHA-256>`, and `AcknowledgedUtc=<UTC yyyy-MM-ddTHH:mm:ss.fffZ>`. Readers bound input to 1 KiB; writes use an owned sibling temporary file and atomic replacement. It is user-writable convenience state, not tamper-proof identity or legal evidence. Settings Reset/Save/Cancel and uninstall do not grant or erase this separate choice. No acknowledgement belongs in a packaged payload. A future operative purpose/scope must not reuse preview records.
+The historical record used `Purpose=ImplementationPreview` with the same bounded four-line/UTC/atomic-write structure. It was user-writable convenience state, not legal proof, independent of Settings and uninstall. The current operative purpose explicitly rejects that record, even for a matching-looking identity.
 
-Package verification now first observes a fresh pending preview, no media cache/record, and normal decline. It then creates an explicitly labeled **synthetic nonoperative fixture only in that run's marked disposable data root**, relaunches, positively observes the production session and checks graceful cleanup. There is no general product auto-consent switch, no human/legal assent and no implication that the runtime has not executed before the WPF dialog. Automated verification does not establish native installer lifecycle; the later scoped manual run is recorded below. Future operative recipient/distributor coverage remains a separate gate; see [licensing](licensing.md#windows-terms-implementation-preview).
+Historical preview verification observed pending/decline, then used a labeled synthetic nonoperative record in marked disposable data to observe workspace/session cleanup. That writer and accepted-package relaunch have been removed for edition 1.0. Do not copy those prior session successes to a current report or infer human/legal assent. Runtime execution before the WPF gate remains a documented limitation.
 
 ### Manually tested preview candidate
 
@@ -92,7 +128,7 @@ On 2026-10-29, a separate fresh single-commit verification checkout of `9229401c
 | Portable ZIP | `bf7d08443736fcfff14ede554b5cd150e578ceb13e9a207f5a0ea1d90852369b` |
 | Unsigned Setup | `f9735d4b384d36658d86a248a94fe75688b2921c340b66a31cdcb41e981294d8` |
 
-All **447 payloads / 32 legal documents / 9 dependency bindings** passed. Independent original-name extracted startup first observed pending preview/decline without a record/cache, then a separately labeled synthetic nonoperative profile, a positively observed exclusive production session, normal exit zero and exact-session cleanup. Ordinary installed app/tool/settings/record hashes were unchanged. **The new Setup was built, not installed/run**; the owner's previous manual protocol remains bound to its earlier pair. The preview scope stays identical, but five application build outputs differ and 33 text differences are CRLF/LF-only; neither binary identity nor full manual acceptance is transferred. Later source-delivery helper/documentation edits are not part of this clean-source pair.
+All **447 payloads / 32 legal documents / 9 dependency bindings** passed. Independent original-name extracted startup first observed pending preview/decline without a record/cache, then a separately labeled synthetic nonoperative profile, a positively observed exclusive production session, normal exit zero and exact-session cleanup. Ordinary installed app/tool/settings/record hashes were unchanged. **The new Setup was built; the agent did not install/run it**. The owner's previous manual protocol remains bound to its earlier pair; the later [clean-PC confirmation](testing.md#owner-clean-pc-setup-confirmation) does not identify another artifact hash. The preview scope stays identical, but five application build outputs differ and 33 text differences are CRLF/LF-only; neither binary identity nor full manual acceptance is transferred. Later source-delivery helper/documentation edits are not part of this clean-source pair.
 
 ## What verification establishes
 
@@ -253,7 +289,7 @@ Earlier installer checks cover first install, non-admin HKCU registration, short
 
 The user reported **1.0.0 / Rose** colors/logos, Save & Close, full restart and About all OK, then explicitly confirmed the corrected desktop icon after the earlier icon Setup was applied. Record these as **USER-REPORTED PASS**, distinct from agent-native inspection and read-only Shell icon extraction; no new measured DPI matrix is implied.
 
-True version-changing upgrade/downgrade, clean-PC Setup, reputation prompts on downloaded unsigned bytes and the optional post-install launch action remain unverified. No security warning was bypassed. Complete attempt logs and prior candidate identities are retained locally, not repeated in this public guide.
+Clean-PC Setup behavior is **USER-REPORTED PASS** for the owner's completed check, reaffirmed on 2026-10-29; see the [recorded confirmation and artifact limits](testing.md#owner-clean-pc-setup-confirmation). Do not describe that scenario as wholly untested or transfer it to an unidentified newer Setup. True version-changing upgrade/downgrade, a proven prerequisite-free environment, reputation prompts on downloaded unsigned bytes and the optional post-install launch action are not established by that confirmation. No security warning was bypassed. Complete attempt logs and prior candidate identities are retained locally, not repeated in this public guide.
 
 ## Before public distribution
 

@@ -8,7 +8,8 @@ namespace GlyphFrame.App.Services;
 /// <summary>Content identity and deployment scope, not a legal-compliance or authenticity certificate.</summary>
 internal sealed record NativeTermsBundle(string Identity, string Version, string Text, string References, string Notices)
 {
-    internal const string Purpose = "ImplementationPreview";
+    internal const string Purpose = "ComponentTermsAcceptance";
+    internal const string Edition = "1.0";
     internal const string ProfilePath = "licenses/WindowsNative/profile.json";
     internal const string TermsPath = "licenses/WindowsNative/COMPONENT-TERMS.txt";
     internal static readonly string[] ComponentNames =
@@ -39,10 +40,10 @@ internal sealed record NativeTermsBundle(string Identity, string Version, string
         if (p.GetProperty("SchemaVersion").GetInt32() != 1 ||
             p.GetProperty("Purpose").GetString() != Purpose ||
             p.GetProperty("TermsPath").GetString() != TermsPath ||
-            string.IsNullOrWhiteSpace(p.GetProperty("Version").GetString()) ||
+            p.GetProperty("Version").GetString() != Edition ||
             binding.GetProperty("ProfilePath").GetString() != ProfilePath ||
             binding.GetProperty("Purpose").GetString() != Purpose ||
-            binding.GetProperty("OperativeAgreementAdopted").GetBoolean() ||
+            !binding.GetProperty("OperativeAgreementAdopted").GetBoolean() ||
             binding.GetProperty("ProfileTextSha256").GetString() != identity)
         {
             throw new InvalidDataException("Unreviewed Microsoft component profile.");
@@ -72,9 +73,10 @@ internal sealed record NativeTermsBundle(string Identity, string Version, string
         }
         string text = Read(root, TermsPath, 131072);
         if (TextHash(text) != p.GetProperty("TermsTextSha256").GetString() ||
-            !text.Contains("NONOPERATIVE REVIEW DRAFT", StringComparison.Ordinal))
+            !text.Contains("VERSION 1.0 — 29 OCTOBER 2026", StringComparison.Ordinal) ||
+            text.Contains("NONOPERATIVE REVIEW DRAFT", StringComparison.Ordinal))
         {
-            throw new InvalidDataException("Missing or changed implementation-preview terms.");
+            throw new InvalidDataException("Missing or changed Microsoft component terms.");
         }
         JsonElement[] references = p.GetProperty("References").EnumerateArray().ToArray();
         if (references.Length != ReferencePaths.Length) { throw new InvalidDataException("Incomplete reference texts."); }
@@ -89,7 +91,7 @@ internal sealed record NativeTermsBundle(string Identity, string Version, string
             }
             referenceText.AppendLine(relative).AppendLine().AppendLine(reference).AppendLine();
         }
-        // Existing inert-text reader independently verifies every indexed text, including the draft.
+        // Existing inert-text reader independently verifies every indexed text, including the component terms.
         string notices = new ThirdPartyNoticesService(root, (_, _) => { }).ReadDocuments();
         return new(identity, p.GetProperty("Version").GetString() ?? throw new InvalidDataException(),
             text, referenceText.ToString(), notices);

@@ -1,68 +1,96 @@
-# Fixed-scope implementation-preview integrity; never a legal approval or general auto-consent API.
-function Get-NativeTermsProfile([string]$Root) {
-    Assert-PortableDirectoryChain $Root
-    $profilePath = Join-Path $Root 'licenses/WindowsNative/profile.json'
-    $profile = Get-Content -LiteralPath $profilePath -Raw | ConvertFrom-Json
-    $manifest = Get-Content -LiteralPath (Join-Path $Root 'licenses/manifest.json') -Raw | ConvertFrom-Json
-    $hash = Get-LegalTextHash $profilePath
-    if ($profile.SchemaVersion -ne 1 -or $profile.Purpose -cne 'ImplementationPreview' -or
-        $profile.TermsPath -cne 'licenses/WindowsNative/COMPONENT-TERMS.txt' -or
-        $manifest.WindowsNativeTerms.ProfilePath -cne 'licenses/WindowsNative/profile.json' -or
-        $manifest.WindowsNativeTerms.ProfileTextSha256 -cne $hash -or
-        $manifest.WindowsNativeTerms.Purpose -cne 'ImplementationPreview' -or
-        $manifest.WindowsNativeTerms.OperativeAgreementAdopted) { throw 'Unreviewed native-terms implementation profile.' }
-    if ((Get-LegalTextHash (Join-Path $Root $profile.TermsPath)) -cne $profile.TermsTextSha256 -or
-        -not [IO.File]::ReadAllText((Join-Path $Root $profile.TermsPath)).Contains('NONOPERATIVE REVIEW DRAFT')) {
-        throw 'Missing or changed preview terms.'
+# Adopted component-scope integrity; not public approval or an auto-consent API.
+function Read-NativeTermsText([string]$Root, [string]$Relative, [int]$Maximum) {
+    $rootPath = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath($Root))
+    $path = [IO.Path]::GetFullPath((Join-Path $rootPath $Relative))
+    if (-not $path.StartsWith($rootPath + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Component document is outside the package.'
     }
-    $names = @('coreclr.dll','PresentationNative_cor3.dll','vcruntime140_cor3.dll','wpfgfx_cor3.dll','D3DCompiler_47_cor3.dll')
-    if (@($profile.Components).Count -ne 5) { throw 'Incomplete Microsoft component scope.' }
-    foreach ($name in $names) {
-        $entry = @($profile.Components | Where-Object Path -CEQ $name)
-        $file = Join-Path $Root $name
-        if ($entry.Count -ne 1 -or -not [IO.File]::Exists($file) -or
-            [IO.FileInfo]::new($file).Length -ne $entry[0].Length -or
-            (Get-FileHash -LiteralPath $file).Hash.ToLowerInvariant() -cne $entry[0].Sha256) { throw "Unreviewed native component: $name" }
+    Assert-PortableDirectoryChain ([IO.Path]::GetDirectoryName($path))
+    if (([IO.File]::GetAttributes($path) -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+        [IO.FileInfo]::new($path).Length -le 0 -or [IO.FileInfo]::new($path).Length -gt $Maximum) {
+        throw 'Missing, linked or oversized component document.'
     }
-    $references = @('licenses/dotnet/NET-LIBRARY-LICENSE.txt','licenses/WPF/WINDOWS-SDK-LICENSE.txt','licenses/dotnet/WINDOWS-LICENSE-MAPPING.txt')
-    if (@($profile.References).Count -ne 3) { throw 'Incomplete native reference scope.' }
-    foreach ($relative in $references) {
-        $entry = @($profile.References | Where-Object Path -CEQ $relative)
-        if ($entry.Count -ne 1 -or (Get-LegalTextHash (Join-Path $Root $relative)) -cne $entry[0].TextSha256) { throw "Changed native reference: $relative" }
-    }
-    $runtime = Get-Content -LiteralPath (Join-Path $Root 'GlyphFrame.App.runtimeconfig.json') -Raw | ConvertFrom-Json
-    if (@($runtime.runtimeOptions.includedFrameworks).Count -ne 2) { throw 'Unreviewed runtime scope.' }
-    foreach ($name in @('Microsoft.NETCore.App','Microsoft.WindowsDesktop.App')) {
-        $entry = @($runtime.runtimeOptions.includedFrameworks | Where-Object name -CEQ $name)
-        if ($entry.Count -ne 1 -or $entry[0].version -cne $profile.RuntimeFrameworks.$name) { throw 'Runtime version changed since terms scope review.' }
-    }
-    return [pscustomobject]@{ Identity=$hash; Purpose='ImplementationPreview'; Version=$profile.Version; TermsPath=$profile.TermsPath; Profile=$profile; OperativeAgreement=$false }
+    return [IO.File]::ReadAllText($path, [Text.UTF8Encoding]::new($false, $true))
 }
 
-function New-IsolatedNativeTermsPreviewFixture([string]$PackageRoot, [string]$DataRoot) {
-    # Synthetic state only for the existing marked verifier's disposable root. Never ordinary user data.
-    $local = [IO.Path]::GetFullPath([Environment]::GetFolderPath('LocalApplicationData'))
-    $normal = Join-Path $local 'GlyphFrame'
-    $data = [IO.Path]::GetFullPath($DataRoot)
-    $marker = Join-Path $data '.glyphframe-package-verification'
-    if (-not [IO.Path]::IsPathFullyQualified($DataRoot) -or $data -ieq $local -or $data -ieq $normal -or
-        $data.StartsWith($normal + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or
-        -not [IO.File]::Exists($marker) -or [IO.File]::ReadAllText($marker) -cnotmatch '^[0-9a-f]{32}$') {
-        throw 'Synthetic preview fixture requires a marked isolated package-verification profile.'
+function Get-NativeTermsTextHash([string]$Text) {
+    return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData(
+        [Text.Encoding]::UTF8.GetBytes($Text.Replace("`r`n", "`n")))).ToLowerInvariant()
+}
+
+function Get-NativeTermsProfile([string]$Root) {
+    # Match NativeTermsBundle.Load: do not use PowerShell coercion to validate JSON types.
+    $ErrorActionPreference = 'Stop'
+    Assert-PortableDirectoryChain $Root
+    $profileText = Read-NativeTermsText $Root 'licenses/WindowsNative/profile.json' 65536
+    $documents = [Collections.Generic.List[System.Text.Json.JsonDocument]]::new()
+    try {
+        $profileDocument = [System.Text.Json.JsonDocument]::Parse($profileText)
+        $documents.Add($profileDocument)
+        $manifestDocument = [System.Text.Json.JsonDocument]::Parse((Read-NativeTermsText $Root 'licenses/manifest.json' 262144))
+        $documents.Add($manifestDocument)
+        $runtimeDocument = [System.Text.Json.JsonDocument]::Parse((Read-NativeTermsText $Root 'GlyphFrame.App.runtimeconfig.json' 65536))
+        $documents.Add($runtimeDocument)
+        $profile = $profileDocument.RootElement
+        $binding = $manifestDocument.RootElement.GetProperty('WindowsNativeTerms')
+        $hash = Get-NativeTermsTextHash $profileText
+        if ($profile.GetProperty('SchemaVersion').GetInt32() -ne 1 -or
+            $profile.GetProperty('Purpose').GetString() -cne 'ComponentTermsAcceptance' -or
+            $profile.GetProperty('Version').GetString() -cne '1.0' -or
+            $profile.GetProperty('TermsPath').GetString() -cne 'licenses/WindowsNative/COMPONENT-TERMS.txt' -or
+            $binding.GetProperty('ProfilePath').GetString() -cne 'licenses/WindowsNative/profile.json' -or
+            $binding.GetProperty('ProfileTextSha256').GetString() -cne $hash -or
+            $binding.GetProperty('Purpose').GetString() -cne 'ComponentTermsAcceptance' -or
+            -not $binding.GetProperty('OperativeAgreementAdopted').GetBoolean()) {
+            throw 'Unreviewed adopted native-terms profile.'
+        }
+        $frameworks = $profile.GetProperty('RuntimeFrameworks')
+        $actualFrameworks = @($runtimeDocument.RootElement.GetProperty('runtimeOptions').GetProperty('includedFrameworks').EnumerateArray())
+        if (@($frameworks.EnumerateObject()).Count -ne 2 -or $actualFrameworks.Count -ne 2) { throw 'Unreviewed runtime scope.' }
+        foreach ($name in @('Microsoft.NETCore.App','Microsoft.WindowsDesktop.App')) {
+            $version = $frameworks.GetProperty($name).GetString()
+            $entry = @($actualFrameworks | Where-Object {
+                $_.GetProperty('name').GetString() -ceq $name -and $_.GetProperty('version').GetString() -ceq $version
+            })
+            if ($entry.Count -ne 1) { throw 'Runtime version changed since terms scope review.' }
+        }
+        $components = @($profile.GetProperty('Components').EnumerateArray())
+        if ($components.Count -ne 5) { throw 'Incomplete Microsoft component scope.' }
+        foreach ($name in @('coreclr.dll','PresentationNative_cor3.dll','vcruntime140_cor3.dll','wpfgfx_cor3.dll','D3DCompiler_47_cor3.dll')) {
+            $entry = @($components | Where-Object { $_.GetProperty('Path').GetString() -ceq $name })
+            if ($entry.Count -ne 1) { throw "Missing or duplicate native component: $name" }
+            $file = Join-Path $Root $name
+            if (([IO.File]::GetAttributes($file) -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+                [IO.FileInfo]::new($file).Length -ne $entry[0].GetProperty('Length').GetInt64() -or
+                (Get-FileHash -LiteralPath $file).Hash.ToLowerInvariant() -cne $entry[0].GetProperty('Sha256').GetString()) {
+                throw "Unreviewed native component: $name"
+            }
+        }
+        $terms = Read-NativeTermsText $Root 'licenses/WindowsNative/COMPONENT-TERMS.txt' 131072
+        if ((Get-NativeTermsTextHash $terms) -cne $profile.GetProperty('TermsTextSha256').GetString() -or
+            -not $terms.Contains('VERSION 1.0 — 29 OCTOBER 2026') -or $terms.Contains('NONOPERATIVE REVIEW DRAFT')) {
+            throw 'Missing or changed adopted component terms.'
+        }
+        $references = @($profile.GetProperty('References').EnumerateArray())
+        if ($references.Count -ne 3) { throw 'Incomplete native reference scope.' }
+        foreach ($relative in @('licenses/dotnet/NET-LIBRARY-LICENSE.txt','licenses/WPF/WINDOWS-SDK-LICENSE.txt','licenses/dotnet/WINDOWS-LICENSE-MAPPING.txt')) {
+            $entry = @($references | Where-Object { $_.GetProperty('Path').GetString() -ceq $relative })
+            $text = Read-NativeTermsText $Root $relative 262144
+            if ($entry.Count -ne 1 -or (Get-NativeTermsTextHash $text) -cne $entry[0].GetProperty('TextSha256').GetString()) {
+                throw "Changed native reference: $relative"
+            }
+        }
+        # Keep the callers' existing plain-object contract, not disposed JsonElement values.
+        return [pscustomobject]@{ Identity=$hash; Purpose='ComponentTermsAcceptance'; Version='1.0';
+            TermsPath='licenses/WindowsNative/COMPONENT-TERMS.txt'; Profile=($profileText | ConvertFrom-Json); OperativeAgreement=$true }
     }
-    Assert-PortableDirectoryChain $data
-    $scope = Get-NativeTermsProfile $PackageRoot
-    if ($scope.Purpose -cne 'ImplementationPreview' -or $scope.OperativeAgreement) { throw 'No synthetic operative agreement is permitted.' }
-    $folder = Join-Path $data 'GlyphFrame'
-    Assert-PortableDirectoryChain $folder
-    [IO.Directory]::CreateDirectory($folder) | Out-Null
-    $path = Join-Path $folder 'native-terms-acknowledgement.txt'
-    if ([IO.File]::Exists($path)) { throw 'Do not overwrite a prior acknowledgement fixture.' }
-    $time = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'",[Globalization.CultureInfo]::InvariantCulture)
-    $text = "GlyphFrame.NativeTermsAcknowledgement.1`nPurpose=ImplementationPreview`nBundle=$($scope.Identity)`nAcknowledgedUtc=$time`n"
-    $stream = [IO.FileStream]::new($path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
-    try { $bytes=[Text.Encoding]::UTF8.GetBytes($text); $stream.Write($bytes); $stream.Flush($true) } finally { $stream.Dispose() }
-    return [pscustomobject]@{ Kind='Synthetic nonoperative preview fixture, NOT human or legal assent'; Path=$path; Bundle=$scope.Identity; Purpose=$scope.Purpose }
+    finally { foreach ($document in $documents) { $document.Dispose() } }
+}
+
+function Assert-NativeTermsPendingState([string]$WindowTitle, [bool]$AcknowledgementPresent, [bool]$MediaCachePresent) {
+    if ($WindowTitle -cne 'Microsoft component terms — GlyphFrame' -or $AcknowledgementPresent -or $MediaCachePresent) {
+        throw 'Fresh package did not remain at the valid, unaccepted component-terms gate before media work.'
+    }
 }
 
 function Write-InstallerNativeTermsDocument([string]$Root, [string]$Output) {

@@ -48,6 +48,29 @@ The 2026-10-29 source-delivery follow-up on parent `9229401` with helper/documen
 
 Tests use synthetic media, not personal downloads. [Fixture provenance](../tests/GlyphFrame.Tests/TestInfrastructure/MediaFixtures.md) distinguishes metadata-only/playable samples and reproduction. Tiny clips test contracts, not production-scale throughput or stress performance.
 
+## Adopted component-terms 1.0 verification
+
+The owner explicitly adopted the [exact edition 1.0](licensing.md#prepared-release-edition-10) on 2026-10-29. The initial edition-1.0 private working-tree verification on parent `6d443a0` passed **1,321 Release tests** (488 domain/integration + 833 app/UI), including **33 focused native-terms cases**, plus **162 helpers** (37 controlled + 18 source + 25 legal + 20 portable + 30 installer + 15 session + 17 native-terms). Formatting and the forced zero-warning/error rebuild passed. All eight substantive sections and the reviewed runtime/reference scope are unchanged.
+
+Positive protocol tests use inert synthetic components/terms, not acceptance of the actual package. Regressions cover rejected old preview purposes, changed editions/scopes, unadopted manifests, draft substitution, decline preservation, persistence failures and unchecked compiled dialogs. A constrained-height/enlarged-text failure led to an explicit readable terms minimum; an old draft-label assertion and a renamed Windows-native open-issue label were corrected. The initial restricted .NET attempt could not complete; the unrestricted reruns passed. Full attempts remain in local diagnostics, not as extra public journals.
+
+The current package verifier cannot synthesize acceptance. For the [private edition-1.0 pair](packaging.md#private-edition-10-candidate), package/tool integrity and responsive fresh pending/decline passed, without acknowledgement/cache. The owner's subsequent scoped retest is recorded below, separately from automation. Instrumented session/lease cleanup, installed/portable operative-record interoperability and the new Setup's installation lifecycle are not established by that retest. Earlier clean-PC and preview checks retain their original scope. No public distribution approval follows from these results.
+
+### Owner-reported edition-1.0 retest
+
+The owner identified **`cfc94837 / ZIP 02389d19`**, matching the recorded private edition-1.0 pair, and reported all five requested checks **USER-REPORTED PASS**, with no problems or omitted checklist items: readable terms/reference viewers; Decline/Escape/title-close; explicit agreement and restart without a repeated prompt; image/video render and export; and the supplied Setup's terms page and Cancel before Install.
+
+This closes the requested short manual retest within that scope. It is a trusted owner report, not agent-observed native interaction, an independent full-hash download verification or authenticated proof of acceptance. No screenshots/state snapshots, new Windows/build/DPI details or instrumented lease evidence were supplied for this run. The requested isolated-profile workflow was provided; actual record bytes were not independently captured. Automated verifier reports remain unchanged: they did not create operative agreement.
+
+**Not exercised by this checklist:** installing/updating/uninstalling the new Setup, installed/portable record sharing or operative silent-mode behavior. The Setup check stopped at Cancel, not Install. Do not reopen every earlier functional test merely because these affected checks are now complete; current public-delivery/history gates remain separate.
+
+
+### Profile-validation parity follow-up
+
+Precommit review reproduced three malformed but hash-rebound profiles accepted by PowerShell and rejected by the application: string schema, numeric edition and an extra profile framework. The helper now uses the same typed `System.Text.Json` getters, exact framework/collection shape and bounded strict-UTF-8 text reading as the native reader, rather than PowerShell coercion. Six malformed-profile cases are covered in both C# and helper tests. An invalid-scope dialog has a distinct failure title; the verifier's tested pending-state assertion rejects that title, unrelated windows, existing acknowledgement and media state. It never accepts the actual terms.
+
+After an expected red helper regression, **1,327 Release tests** passed (488 domain/integration + 839 app/UI), including **39 focused native-terms cases**, plus **175 helpers** (37 controlled + 18 source + 25 legal + 20 portable + 30 installer + 15 session + 30 native-terms). The three original probes now reject all malformed inputs; formatting, zero-warning/error forced rebuild and document/hash checks passed. The unchanged `cfc94837` payload also passed the stricter checker. The [corrected private pair](packaging.md#corrected-profile-validation-candidate) passed 447-payload packaging and valid pending/decline. A separate malformed copy showed the expected failure title and was rejected by the pending classifier, then closed with exit zero and no acknowledgement/cache; this was script-observed, not visual/native DPI acceptance. These results do not retest every native workflow or replace the owner's separately recorded package identity. Terms/profile hashes and all substantive clauses remain unchanged; no synthetic operative acknowledgement or public approval is created.
+
 ## Windows-native preview verification
 
 The later implementation-preview work is separate from the clean-source baseline below. On private parent `66e8d99` with uncommitted changes, **1,315 Release tests** passed (488 domain/integration + 827 app/UI); 27 cover the new bundle/record/compiled-dialog paths. Initial restricted testhost connection failures were followed by an unrestricted run that exposed and corrected exception handling/test expectations. WPF fixtures cover unchecked/default/invalid-scope behavior, write failure/decline and constrained-height/enlarged-text reachability; these are not native DPI acceptance.
@@ -70,6 +93,10 @@ On 2026-10-29, the owner completed **A0–A6 and B0–B4** using the [exact work
 | B4: invalid profile in a separate portable copy | Owner confirmed disabled affirmative controls/no workspace for the damaged copy and normal original/installed startup. Final shared-state hashes remained unchanged. Damaged-copy contents/UI were not independently captured. |
 
 All final observations show zero media-session directories. This does not independently prove exclusive-lease ownership or process cleanup; earlier positively observed lease checks retain their separate scope. The foreign zero-hash record and invalid profile are negative fixtures, not a real valid changed-runtime upgrade. Raw reports, backups and diagnostics remain local; no acknowledgement/settings file or test kit belongs in Git. These results do not close operative terms, Publisher obligations, the DPI/OS matrix or a future clean-source/publication-copy release check.
+
+### Owner clean-PC Setup confirmation
+
+On 2026-10-29, the owner explicitly confirmed having performed the clean-PC Setup check successfully, with behavior consistent with the earlier completed protocol. Record this as **USER-REPORTED PASS**, not as a wholly untested scenario. The existing hash-bound A/B evidence above remains valid within its original scope. The additional confirmation did not identify another Setup checksum, Windows build or prerequisite inventory, so it is not assigned to a different package or used to certify a runtime-free machine. No repeat of the completed checklist is required merely because screenshots or agent-native interaction were not supplied. A later materially changed/final package still needs its own appropriate artifact binding.
 
 ## Recorded verification snapshot
 

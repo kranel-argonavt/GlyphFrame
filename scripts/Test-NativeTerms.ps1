@@ -31,49 +31,101 @@ function Reset-Fixture {
         Write-Fixture $relative "Synthetic reference: $relative"
         @{Path=$relative;TextSha256=(Get-LegalTextHash (Join-Path $payload $relative))}
     })
-    Write-Fixture 'licenses/WindowsNative/COMPONENT-TERMS.txt' 'NONOPERATIVE REVIEW DRAFT - synthetic helper fixture only'
-    $profile = @{SchemaVersion=1;Purpose='ImplementationPreview';Version='synthetic';TermsPath='licenses/WindowsNative/COMPONENT-TERMS.txt';
+    Write-Fixture 'licenses/WindowsNative/COMPONENT-TERMS.txt' 'VERSION 1.0 — 29 OCTOBER 2026; SYNTHETIC TEST TERMS ONLY - no vendor agreement'
+    $profile = @{SchemaVersion=1;Purpose='ComponentTermsAcceptance';Version='1.0';TermsPath='licenses/WindowsNative/COMPONENT-TERMS.txt';
         TermsTextSha256=(Get-LegalTextHash (Join-Path $payload 'licenses/WindowsNative/COMPONENT-TERMS.txt'));
         RuntimeFrameworks=@{'Microsoft.NETCore.App'='10.0.12';'Microsoft.WindowsDesktop.App'='10.0.12'};Components=$components;References=$references}
     Write-Fixture 'licenses/WindowsNative/profile.json' ($profile | ConvertTo-Json -Depth 8)
     Write-Fixture 'licenses/manifest.json' (@{WindowsNativeTerms=@{ProfilePath='licenses/WindowsNative/profile.json';
-        ProfileTextSha256=(Get-LegalTextHash (Join-Path $payload 'licenses/WindowsNative/profile.json'));Purpose='ImplementationPreview';OperativeAgreementAdopted=$false}} | ConvertTo-Json -Depth 5)
+        ProfileTextSha256=(Get-LegalTextHash (Join-Path $payload 'licenses/WindowsNative/profile.json'));Purpose='ComponentTermsAcceptance';OperativeAgreementAdopted=$true}} | ConvertTo-Json -Depth 5)
     Write-Fixture 'GlyphFrame.App.runtimeconfig.json' '{"runtimeOptions":{"includedFrameworks":[{"name":"Microsoft.NETCore.App","version":"10.0.12"},{"name":"Microsoft.WindowsDesktop.App","version":"10.0.12"}]}}'
 }
 try {
     Reset-Fixture
-    Run-Check 'Complete synthetic scope has a stable nonoperative profile identity' {
+    Run-Check 'Complete synthetic scope has a stable adopted-protocol identity, not vendor assent' {
         $scope=Get-NativeTermsProfile $payload
-        Assert-Check ($scope.Purpose -ceq 'ImplementationPreview' -and -not $scope.OperativeAgreement -and $scope.Identity -cmatch '^[0-9a-f]{64}$') 'Incorrect scope.'
+        Assert-Check ($scope.Purpose -ceq 'ComponentTermsAcceptance' -and $scope.OperativeAgreement -and $scope.Identity -cmatch '^[0-9a-f]{64}$') 'Incorrect scope.'
     }
     foreach ($relative in @('coreclr.dll','licenses/WindowsNative/profile.json','licenses/WindowsNative/COMPONENT-TERMS.txt','licenses/WPF/WINDOWS-SDK-LICENSE.txt','GlyphFrame.App.runtimeconfig.json')) {
         Run-Check "Changed scope rejected: $relative" {
             Write-Fixture $relative 'changed'; Assert-Throws { Get-NativeTermsProfile $payload }; Reset-Fixture
         }
     }
-    Run-Check 'Synthetic fixture refuses unmarked and normal profile roots before writing' {
-        Assert-Throws { New-IsolatedNativeTermsPreviewFixture $payload (Join-Path $root 'unmarked') }
-        $local=[Environment]::GetFolderPath('LocalApplicationData')
-        Assert-Throws { New-IsolatedNativeTermsPreviewFixture $payload $local }
-        Assert-Throws { New-IsolatedNativeTermsPreviewFixture $payload (Join-Path $local 'GlyphFrame') }
+    Run-Check 'Old preview-purpose profile is rejected even when rebound' {
+        $path=Join-Path $payload 'licenses/WindowsNative/profile.json'
+        [IO.File]::WriteAllText($path,([IO.File]::ReadAllText($path).Replace('ComponentTermsAcceptance','ImplementationPreview')))
+        $manifest=Get-Content (Join-Path $payload 'licenses/manifest.json') -Raw | ConvertFrom-Json
+        $manifest.WindowsNativeTerms.ProfileTextSha256=Get-LegalTextHash $path
+        Write-Fixture 'licenses/manifest.json' ($manifest | ConvertTo-Json -Depth 5)
+        Assert-Throws {Get-NativeTermsProfile $payload}; Reset-Fixture
     }
-    Run-Check 'Marked isolated synthetic record uses the shared four-line UTC protocol' {
-        $data=Join-Path $root 'marked-data'
-        [IO.Directory]::CreateDirectory($data) | Out-Null
-        [IO.File]::WriteAllText((Join-Path $data '.glyphframe-package-verification'),$run)
-        $result=New-IsolatedNativeTermsPreviewFixture $payload $data
-        $lines=[IO.File]::ReadAllLines($result.Path)
-        Assert-Check ($lines.Count -eq 4 -and $lines[0] -ceq 'GlyphFrame.NativeTermsAcknowledgement.1' -and
-            $lines[1] -ceq 'Purpose=ImplementationPreview' -and $lines[2] -ceq "Bundle=$((Get-NativeTermsProfile $payload).Identity)" -and
-            $lines[3] -cmatch '^AcknowledgedUtc=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$' -and $result.Kind.Contains('NOT human or legal assent')) 'Record protocol mismatch.'
-        Assert-Throws { New-IsolatedNativeTermsPreviewFixture $payload $data }
-        Assert-Check (-not [IO.Directory]::Exists((Join-Path $data 'GlyphFrame/Cache'))) 'Synthetic state started media work.'
+    Run-Check 'Unadopted manifest is rejected' {
+        $path=Join-Path $payload 'licenses/manifest.json'
+        [IO.File]::WriteAllText($path,([IO.File]::ReadAllText($path).Replace('true','false')))
+        Assert-Throws {Get-NativeTermsProfile $payload}; Reset-Fixture
     }
-    Run-Check 'Installer review text contains the complete draft and all three inert references' {
+    Run-Check 'Unapproved edition is rejected even with matching text and rebound profile' {
+        $path=Join-Path $payload 'licenses/WindowsNative/profile.json'
+        $profile=Get-Content $path -Raw | ConvertFrom-Json
+        $profile.Version='0.2'
+        Write-Fixture 'licenses/WindowsNative/profile.json' ($profile | ConvertTo-Json -Depth 8)
+        $manifest=Get-Content (Join-Path $payload 'licenses/manifest.json') -Raw | ConvertFrom-Json
+        $manifest.WindowsNativeTerms.ProfileTextSha256=Get-LegalTextHash $path
+        Write-Fixture 'licenses/manifest.json' ($manifest | ConvertTo-Json -Depth 5)
+        Assert-Throws {Get-NativeTermsProfile $payload}; Reset-Fixture
+    }
+    foreach ($invalidFlag in @('true','false',1,$null)) {
+        Run-Check "Adoption flag must be a real JSON boolean, not '$invalidFlag'" {
+            $manifest=Get-Content (Join-Path $payload 'licenses/manifest.json') -Raw | ConvertFrom-Json
+            $manifest.WindowsNativeTerms.OperativeAgreementAdopted=$invalidFlag
+            Write-Fixture 'licenses/manifest.json' ($manifest | ConvertTo-Json -Depth 5)
+            Assert-Throws {Get-NativeTermsProfile $payload}; Reset-Fixture
+        }
+    }
+    foreach ($damage in @('schema-string','schema-array','edition-number','edition-array','extra-profile-framework','component-length-string')) {
+        Run-Check "Malformed rebound profile is rejected: $damage" {
+            $path=Join-Path $payload 'licenses/WindowsNative/profile.json'
+            $profile=Get-Content $path -Raw | ConvertFrom-Json
+            switch($damage) {
+                'schema-string' {$profile.SchemaVersion='1'}
+                'schema-array' {$profile.SchemaVersion=@(1)}
+                'edition-number' {$profile.Version=1.0}
+                'edition-array' {$profile.Version=@('1.0')}
+                'extra-profile-framework' {$profile.RuntimeFrameworks | Add-Member -NotePropertyName 'Unexpected.Framework' -NotePropertyValue '10.0.12'}
+                'component-length-string' {$profile.Components[0].Length=$profile.Components[0].Length.ToString()}
+            }
+            Write-Fixture 'licenses/WindowsNative/profile.json' ($profile | ConvertTo-Json -Depth 8)
+            $manifest=Get-Content (Join-Path $payload 'licenses/manifest.json') -Raw | ConvertFrom-Json
+            $manifest.WindowsNativeTerms.ProfileTextSha256=Get-LegalTextHash $path
+            Write-Fixture 'licenses/manifest.json' ($manifest | ConvertTo-Json -Depth 5)
+            Assert-Throws {Get-NativeTermsProfile $payload}; Reset-Fixture
+        }
+    }
+    Run-Check 'A rebound draft cannot masquerade as adopted terms' {
+        Write-Fixture 'licenses/WindowsNative/COMPONENT-TERMS.txt' 'NONOPERATIVE REVIEW DRAFT'
+        $path=Join-Path $payload 'licenses/WindowsNative/profile.json'
+        $profile=Get-Content $path -Raw | ConvertFrom-Json
+        $profile.TermsTextSha256=Get-LegalTextHash (Join-Path $payload $profile.TermsPath)
+        Write-Fixture 'licenses/WindowsNative/profile.json' ($profile | ConvertTo-Json -Depth 8)
+        $manifest=Get-Content (Join-Path $payload 'licenses/manifest.json') -Raw | ConvertFrom-Json
+        $manifest.WindowsNativeTerms.ProfileTextSha256=Get-LegalTextHash $path
+        Write-Fixture 'licenses/manifest.json' ($manifest | ConvertTo-Json -Depth 5)
+        Assert-Throws {Get-NativeTermsProfile $payload}; Reset-Fixture
+    }
+    Run-Check 'Packaging cannot synthesize acceptance of a real component-terms bundle' {
+        Assert-Check ($null -eq (Get-Command New-IsolatedNativeTermsPreviewFixture -ErrorAction SilentlyContinue)) 'Old acknowledgement writer still exported.'
+        $verifier=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Verify-PublishPackage.ps1'))
+        Assert-Check (-not $verifier.Contains('New-IsolatedNativeTermsPreviewFixture') -and
+            $verifier.Contains("NativeTermsHumanOrLegalAssent = 'NOT CREATED; no synthetic acceptance of adopted terms'") -and
+            $verifier.Contains("VerificationScope = 'PackageIntegrityAndUnacceptedStartupOnly'") -and
+            $verifier.Contains('Assert-NativeTermsPendingState -WindowTitle $application.MainWindowTitle') -and
+            $verifier.Contains('SessionObservation = $null') -and $verifier.Contains('SessionCleanup = $null')) 'Verifier invents acceptance or overstates workspace coverage.'
+    }
+    Run-Check 'Installer review text contains the complete inert terms and all three inert references' {
         $output=Join-Path $root 'review.txt'
         $scope=Write-InstallerNativeTermsDocument $payload $output
         $text=[IO.File]::ReadAllText($output)
-        Assert-Check ($text.Contains('NONOPERATIVE REVIEW DRAFT') -and [regex]::Matches($text,'Synthetic reference:').Count -eq 3) 'Incomplete document.'
+        Assert-Check ($text.Contains('SYNTHETIC TEST TERMS ONLY') -and [regex]::Matches($text,'Synthetic reference:').Count -eq 3) 'Incomplete document.'
         Assert-Check ($scope.Identity -ceq (Get-NativeTermsProfile $payload).Identity) 'Scope drift.'
         Assert-Throws { Write-InstallerNativeTermsDocument $payload $output }
     }
@@ -81,7 +133,28 @@ try {
         Assert-Throws { Assert-PortableContentPath 'native-terms-acknowledgement.txt' }
         Assert-PortableContentPath 'licenses/WindowsNative/profile.json'
     }
-    Write-Host "Native terms helper checks passed: $passed; failed: 0. Synthetic preview only."
+    Run-Check 'Pending valid terms without record/cache are observable, not accepted' {
+        Assert-NativeTermsPendingState 'Microsoft component terms — GlyphFrame' $false $false
+    }
+    foreach ($title in @('Microsoft component verification failed — GlyphFrame','GlyphFrame','')) {
+        Run-Check "Invalid or unrelated window cannot pass the pending gate: '$title'" {
+            Assert-Throws {Assert-NativeTermsPendingState $title $false $false}
+        }
+    }
+    Run-Check 'An existing acknowledgement cannot pass fresh pending verification' {
+        Assert-Throws {Assert-NativeTermsPendingState 'Microsoft component terms — GlyphFrame' $true $false}
+    }
+    Run-Check 'A media cache cannot pass fresh pending verification' {
+        Assert-Throws {Assert-NativeTermsPendingState 'Microsoft component terms — GlyphFrame' $false $true}
+    }
+    Run-Check 'Native text reader rejects oversize, invalid UTF-8 and package escape' {
+        Write-Fixture 'probe.txt' 'bounded synthetic text'
+        Assert-Throws {Read-NativeTermsText $payload 'probe.txt' 3}
+        [IO.File]::WriteAllBytes((Join-Path $payload 'probe.txt'),[byte[]]@(255))
+        Assert-Throws {Read-NativeTermsText $payload 'probe.txt' 16}
+        Assert-Throws {Read-NativeTermsText $payload '../outside.txt' 16}
+    }
+    Write-Host "Native terms helper checks passed: $passed; failed: 0. Inert fixtures only; no real acceptance created."
 }
 finally {
     $resolved=[IO.Path]::GetFullPath($root)

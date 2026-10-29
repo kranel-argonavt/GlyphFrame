@@ -95,9 +95,9 @@ try {
         Assert-Throws {Assert-ExecutableShellIcon (Join-Path $repo 'README.md') (Join-Path $repo 'src/GlyphFrame.App/Assets/GlyphFrame.ico')}
     }
     $termsPolicy=[IO.File]::ReadAllText((Join-Path $repo 'installer/NativeTerms.iss'))
-    Run-Check 'Verified full preview terms and optional inert notices precede installation' {
+    Run-Check 'Verified full adopted component terms and optional inert notices precede installation' {
         Assert-Check ($policy.Contains('LicenseFile={#NativeTermsFile}') -and $policy.Contains('#include "NativeTerms.iss"') -and
-            $policy.Contains('nonoperative draft') -and $termsPolicy.Contains('WizardForm.LicenseAcceptedRadio.Checked := False')) 'Terms page or unchecked choice missing.'
+            $policy.Contains('I &agree to the Microsoft component terms (version 1.0)') -and $termsPolicy.Contains('WizardForm.LicenseAcceptedRadio.Checked := False')) 'Terms page or unchecked choice missing.'
     }
     Run-Check 'Unacknowledged silent scope is refused and new state is written only at Install attempt' {
         Assert-Check ($termsPolicy.Contains('not WizardSilent or HasCurrentNativeTermsAcknowledgement()') -and
@@ -105,8 +105,8 @@ try {
             ($termsPolicy.Split('function PrepareNativeTermsAcknowledgement(): String;')[0] -notmatch 'SaveStringToFile\(') -and
             $policy.IndexOf('PreviousVersion > NextVersion') -lt $policy.IndexOf('Result := PrepareNativeTermsAcknowledgement()')) 'Silent or write-timing policy missing.'
     }
-    Run-Check 'Installer and portable share a bounded UTC preview record with atomic replacement' {
-        Assert-Check ($termsPolicy.Contains('Purpose=ImplementationPreview') -and $termsPolicy.Contains('GlyphFrame.NativeTermsAcknowledgement.1') -and
+    Run-Check 'Installer and portable share a bounded UTC acceptance record with atomic replacement' {
+        Assert-Check ($termsPolicy.Contains('Purpose=ComponentTermsAcceptance') -and $termsPolicy.Contains('GlyphFrame.NativeTermsAcknowledgement.1') -and
             $termsPolicy.Contains('Size > 1024') -and $termsPolicy.Contains('NativeGetSystemTime(Time)') -and
             $termsPolicy.Contains('NativeMoveFileEx(Temporary, Path, 9)') -and -not $termsPolicy.Contains('SaveSetting')) 'Protocol mismatch.'
     }

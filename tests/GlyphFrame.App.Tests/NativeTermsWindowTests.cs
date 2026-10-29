@@ -23,6 +23,10 @@ public sealed class NativeTermsWindowTests
         Button decline = (Button)window.FindName("DeclineButton");
         Assert.NotEqual(true, choice.IsChecked); Assert.False(proceed.IsEnabled); Assert.True(decline.IsCancel);
         Assert.Equal(bundle.Text, ((TextBox)window.FindName("TermsText")).Text);
+        Assert.Equal("Microsoft component terms — GlyphFrame", window.Title);
+        Assert.Contains("version 1.0", ((TextBlock)choice.Content).Text);
+        Assert.Equal("Agree & Continue", proceed.Content);
+        Assert.DoesNotContain("nonoperative", ((TextBlock)choice.Content).Text, StringComparison.OrdinalIgnoreCase);
         window.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
         {
             proceed.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Assert.Equal(0, writes);
@@ -54,7 +58,8 @@ public sealed class NativeTermsWindowTests
             foreach (Control control in InputSettingsPolishTests.Descendants(window).OfType<Control>()) { control.FontSize = textSize; }
             InputSettingsPolishTests.Settle(window);
             TextBox terms = (TextBox)window.FindName("TermsText");
-            Assert.True(terms.IsReadOnly); Assert.True(terms.ActualHeight >= 140);
+            Assert.True(terms.IsReadOnly);
+            Assert.True(terms.ActualHeight >= 140, $"Readable viewport height: {terms.ActualHeight:R}; required minimum: {terms.MinHeight:R}");
             ScrollViewer viewport = (ScrollViewer)window.FindName("RootViewport");
             Button decline = (Button)window.FindName("DeclineButton");
             decline.BringIntoView(); InputSettingsPolishTests.Settle(window);
@@ -72,6 +77,7 @@ public sealed class NativeTermsWindowTests
         NativeTermsWindow window = new(null, "Synthetic invalid scope", () => throw new Exception("Must never save"), resourceHost.Resources);
         try
         {
+            Assert.Equal("Microsoft component verification failed — GlyphFrame", window.Title);
             Assert.False(((CheckBox)window.FindName("Acknowledgement")).IsEnabled);
             Assert.False(((Button)window.FindName("ContinueButton")).IsEnabled);
             Assert.False(((Button)window.FindName("ReferencesButton")).IsEnabled);

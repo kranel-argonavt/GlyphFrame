@@ -4,7 +4,7 @@
   "HashNormalization": "UTF-8 without BOM; CRLF normalized to LF",
   "OpenIssues": [
     "Controlled FFmpeg 9.0-glyphframe.2 is integrated locally with exact tool/source/patch/material hashes and retained notices. Final Corresponding Source delivery/hosting, application/GPL scope and public binary distribution approval remain open. Earlier vendor binaries remain in private historical objects pending a separately sanitized publication copy.",
-    "Windows-native .NET Library / Windows SDK end-user and distributor protective-term requirements need a reviewed fulfillment mechanism for Setup and portable; retaining vendor texts alone is not fulfillment."
+    "Windows-native component terms 1.0 were adopted by the owner for the exact reviewed scope. Affected Setup/portable acceptance and final publication-copy evidence remain required; adoption does not approve public distribution or remove Publisher obligations."
   ],
   "Components": [
     {
@@ -90,8 +90,8 @@
   "Files": [
     {
       "Path": "licenses/WindowsNative/COMPONENT-TERMS.txt",
-      "TextSha256": "a5765bc2fd69b95edb19c381d30bcfb45ee62bd918bed82ad29c2735f8dd3c95",
-      "Source": "Original GlyphFrame nonoperative component-terms draft 0.2; implementation preview only, not an adopted agreement"
+      "TextSha256": "cf0eb47839fef2fb5cab56b1f17f731a6611da7cde94e7cd19314457eb77ad5c",
+      "Source": "Original GlyphFrame Microsoft component terms 1.0; adopted by the owner on 2026-10-29, not public-distribution approval"
     },
     {
       "Path": "licenses/CommunityToolkit.Mvvm/LICENSE.txt",
@@ -161,7 +161,7 @@
     },
     {
       "Path": "THIRD_PARTY_NOTICES.md",
-      "TextSha256": "95597aa2617dc8d060a11613c7c5af257be26308cfb272f4990493edcdbf34e0",
+      "TextSha256": "291b15e654610cfa82829c0957dce5f359f8dee21c416ea386297d33707a61e3",
       "UpstreamByteSha256": null,
       "Source": "GlyphFrame dependency attribution index"
     },
@@ -179,7 +179,7 @@
     },
     {
       "Path": "licenses/README.md",
-      "TextSha256": "afc452aa0904c1bd287230422e8c94bae5e119361e51c2071dfba855f9ab2fb0",
+      "TextSha256": "22c522a858b2bd6d178cd6043bcc89ba3084b2bd3a6b3e4bd9cf7bb6d4c43327",
       "UpstreamByteSha256": null,
       "Source": "GlyphFrame license inventory policy"
     },
@@ -287,9 +287,9 @@
   ],
   "WindowsNativeTerms": {
     "ProfilePath": "licenses/WindowsNative/profile.json",
-    "ProfileTextSha256": "a7f3a765f0ea0f29e0593027172ab0c837de8758ecf1e24da92b918b1b4fcf13",
-    "Purpose": "ImplementationPreview",
-    "OperativeAgreementAdopted": false
+    "ProfileTextSha256": "f4820a7d22acdb0d6dfc5d34ec8f83cc97a4999e818301f343060730334eea7a",
+    "Purpose": "ComponentTermsAcceptance",
+    "OperativeAgreementAdopted": true
   },
   "OwnershipEvidence": {
     "Status": "USER-REPORTED confirmed for current project-specific visuals; not independently investigated",

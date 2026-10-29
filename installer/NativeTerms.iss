@@ -1,5 +1,5 @@
-{ Nonoperative preview only. The record is user-writable convenience state, not legal proof.
-  No command-line/environment/INF acceptance. Never reusable for an operative agreement. }
+{ Adopted component terms 1.0. The record is user-writable convenience state, not legal proof.
+  No command-line/environment/INF acceptance. Old implementation-preview records do not match. }
 type
   TNativeSystemTime = record
     Year, Month, DayOfWeek, Day, Hour, Minute, Second, Milliseconds: Word;
@@ -71,7 +71,7 @@ begin
   if not LoadStringsFromFile(Path, Lines) then Exit;
   if GetArrayLength(Lines) <> 4 then Exit;
   Result := (Lines[0] = 'GlyphFrame.NativeTermsAcknowledgement.1') and
-    (Lines[1] = 'Purpose=ImplementationPreview') and
+    (Lines[1] = 'Purpose=ComponentTermsAcceptance') and
     (Lines[2] = 'Bundle={#NativeTermsBundle}') and
     (Copy(Lines[3], 1, 16) = 'AcknowledgedUtc=') and
     NativeTermsTimeValid(Copy(Lines[3], 17, 24)) and (Length(Lines[3]) = 40);
@@ -81,7 +81,7 @@ function InitializeSetup(): Boolean;
 begin
   Result := not WizardSilent or HasCurrentNativeTermsAcknowledgement();
   if not Result then
-    Log('Refused unattended new/unacknowledged Microsoft component preview scope. No files or acknowledgement installed.');
+    Log('Refused unattended new/unacknowledged Microsoft component terms scope. No files or acknowledgement installed.');
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
@@ -150,11 +150,11 @@ begin
   Result := '';
   if HasCurrentNativeTermsAcknowledgement() then Exit;
   if WizardSilent then begin
-    Result := 'A new Microsoft component preview requires an explicit interactive acknowledgement.';
+    Result := 'New Microsoft component terms require explicit interactive agreement.';
     Exit;
   end;
   if not WizardForm.LicenseAcceptedRadio.Checked then begin
-    Result := 'Review the nonoperative draft and explicitly acknowledge it, or cancel Setup.';
+    Result := 'Review and explicitly agree to the Microsoft component terms, or cancel Setup.';
     Exit;
   end;
   Path := NativeTermsRecordPath();
@@ -165,7 +165,7 @@ begin
     if not ForceDirectories(ExtractFileDir(Path)) then RaiseException('Application data is not writable.');
     NativeGetSystemTime(Time);
     RecordText := 'GlyphFrame.NativeTermsAcknowledgement.1' + #13#10 +
-      'Purpose=ImplementationPreview' + #13#10 + 'Bundle={#NativeTermsBundle}' + #13#10 +
+      'Purpose=ComponentTermsAcceptance' + #13#10 + 'Bundle={#NativeTermsBundle}' + #13#10 +
       'AcknowledgedUtc=' + Format('%.4d-%.2d-%.2dT%.2d:%.2d:%.2d.%.3dZ', [Time.Year, Time.Month, Time.Day, Time.Hour, Time.Minute, Time.Second, Time.Milliseconds]) + #13#10;
     Buffer := StringOfChar(#0, 260);
     if NativeGetTempFileName(ExtractFileDir(Path), 'GFT', 0, Buffer) = 0 then
@@ -176,7 +176,7 @@ begin
     Temporary := '';
     if not HasCurrentNativeTermsAcknowledgement() then RaiseException('Acknowledgement verification failed.');
   except
-    Result := 'The preview acknowledgement could not be saved. Installation has not started. Check application-data access and retry, or cancel. ' + GetExceptionMessage();
+    Result := 'The local acceptance record could not be saved. Installation has not started. Check application-data access and retry, or cancel. ' + GetExceptionMessage();
   end;
   if Temporary <> '' then DeleteFile(Temporary);
 end;

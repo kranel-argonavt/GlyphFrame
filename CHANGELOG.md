@@ -6,7 +6,7 @@ This file summarizes user-visible work. It is not a release/tag history or a rep
 
 ### Added
 
-- Nonoperative Microsoft-component terms implementation preview: hash-bound runtime/document scope, full local text viewers, independent atomic acknowledgement, before-install Setup review and first-use self-contained startup gate. New unacknowledged silent scope is refused; no operative agreement or public approval is inferred.
+- Owner-adopted Microsoft component terms 1.0 for the five identified bundled DLLs, with full local references, independent atomic acceptance state and before-install/first-use gates. Old preview records are rejected; new unaccepted silent scope refuses. Packaging cannot synthesize operative acceptance; independent MIT/GPL rights and public-distribution gates remain unchanged.
 - Local image/video conversion to colored symbol art with a shared glyph-based rendering pipeline.
 - Separate Render → Review → Export workflows, retained image results and managed full-video review artifacts.
 - PNG/JPEG image export and byte-copy publication of accepted H.264 MP4 output, with Keep/Remove Audio.

@@ -33,12 +33,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve .NET SDK version.' }
     $checks.Add('Source commit, dirty-tree state and SDK recorded')
 
-    $step = 'Fresh publish and startup/session verification'
+    $step = 'Fresh publish and unaccepted-startup verification'
     # Reuse the independently runnable verifier; no second publish or bin/ copy.
     & (Join-Path $PSScriptRoot 'Verify-PublishPackage.ps1') -RunId $runId | Out-Host
     $verification = Get-Content -LiteralPath $verificationReport -Raw | ConvertFrom-Json
     if (-not $verification.Success) { throw 'Publish verifier did not report success.' }
-    $checks.Add('Fresh self-contained folder publish passed existing structural/tool/startup/session checks')
+    $checks.Add('Fresh publish passed package/tool integrity and unaccepted-startup checks; workspace/session checks require human acceptance')
 
     $step = 'Version and portable staging'
     $assemblyPath = Join-Path $verification.PublishDirectory 'GlyphFrame.App.dll'

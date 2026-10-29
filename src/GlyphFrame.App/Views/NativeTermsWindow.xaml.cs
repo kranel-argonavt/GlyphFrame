@@ -16,6 +16,7 @@ public partial class NativeTermsWindow : Window
         _save = save;
         if (resources is not null) { Resources = resources; }
         InitializeComponent();
+        if (bundle is null) { Title = "Microsoft component verification failed — GlyphFrame"; }
         TermsText.Text = bundle?.Text ?? error ?? "The complete terms are unavailable.";
         ReferencesButton.IsEnabled = bundle is not null;
         NoticesButton.IsEnabled = bundle is not null;
@@ -39,10 +40,11 @@ public partial class NativeTermsWindow : Window
 
     private void ContentSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (HeaderPanel is null || ActionArea is null || ContentLayout is null) { return; }
+        if (HeaderPanel is null || ActionArea is null || ContentLayout is null || TermsText is null) { return; }
         // Keep a readable terms viewport; on a small work area scroll the entire dialog instead of clipping actions.
         ContentLayout.MinHeight = Math.Max(400, HeaderPanel.ActualHeight + HeaderPanel.Margin.Top +
-            HeaderPanel.Margin.Bottom + ActionArea.ActualHeight + 152);
+            HeaderPanel.Margin.Bottom + ActionArea.ActualHeight + TermsText.MinHeight +
+            TermsText.Margin.Top + TermsText.Margin.Bottom);
     }
 
     private void Continue_Click(object sender, RoutedEventArgs e)
@@ -55,7 +57,7 @@ public partial class NativeTermsWindow : Window
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or SecurityException)
         {
-            Feedback.Text = "The draft acknowledgement could not be saved. Nothing was recorded as successful. Check access to application data and retry, or choose Decline & Exit.";
+            Feedback.Text = "The local acceptance record could not be saved. The workspace has not started. Check access to application data and retry, or choose Decline & Exit.";
             Feedback.Visibility = Visibility.Visible;
             ContinueButton.Focus();
         }

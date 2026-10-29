@@ -4,7 +4,7 @@ using System.Text;
 
 namespace GlyphFrame.App.Services;
 
-/// <summary>A separate local preview-choice record, never a legal identity or Settings preference.</summary>
+/// <summary>A separate local acceptance record, never authenticated legal proof or a Settings preference.</summary>
 internal sealed class NativeTermsAcknowledgementStore(string applicationDataDirectory)
 {
     internal const string FileName = "native-terms-acknowledgement.txt";

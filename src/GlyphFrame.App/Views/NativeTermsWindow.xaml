@@ -15,14 +15,14 @@
         <StackPanel x:Name="HeaderPanel" Margin="22,18,22,12" SizeChanged="ContentSizeChanged">
             <TextBlock FontSize="20" FontWeight="SemiBold" Text="Microsoft component terms" TextWrapping="Wrap" />
             <TextBlock Margin="0,8,0,0" Foreground="{StaticResource WarningBrush}" TextWrapping="Wrap"
-                       Text="Local implementation preview — nonoperative draft, not a legal agreement." />
+                       Text="Microsoft component terms — version 1.0. Review before continuing." />
             <TextBlock Margin="0,6,0,0" Foreground="{StaticResource SecondaryTextBrush}" TextWrapping="Wrap"
-                       Text="This review concerns five bundled Microsoft components. Original MIT code, FFmpeg and other components retain their separate rights. GPL sources do not require this acknowledgement." />
+                       Text="This review concerns five bundled Microsoft components. Original MIT code, FFmpeg and other components retain their separate rights. GPL sources do not require this agreement." />
         </StackPanel>
         <TextBox x:Name="TermsText" Grid.Row="1" Margin="22,0,22,12" Padding="12"
-                 AutomationProperties.Name="Complete draft Microsoft component terms"
+                 AutomationProperties.Name="Complete Microsoft component terms, version 1.0"
                  IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                 HorizontalScrollBarVisibility="Disabled" Height="Auto" />
+                 HorizontalScrollBarVisibility="Disabled" Height="Auto" MinHeight="140" />
         <Border x:Name="ActionArea" Grid.Row="2" Padding="22,12" SizeChanged="ContentSizeChanged" Background="{StaticResource CardBackgroundBrush}"
                 BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
             <StackPanel>
@@ -33,8 +33,8 @@
                             Margin="0,0,0,4" Padding="8,4" Click="Notices_Click" />
                 </WrapPanel>
                 <CheckBox x:Name="Acknowledgement" Margin="0,0,0,10" Checked="ChoiceChanged" Unchecked="ChoiceChanged"
-                          AutomationProperties.Name="Acknowledge nonoperative draft for local verification">
-                    <TextBlock Text="I acknowledge reviewing this nonoperative draft for local verification only."
+                          AutomationProperties.Name="Agree to Microsoft component terms, version 1.0">
+                    <TextBlock Text="I agree to the Microsoft component terms (version 1.0)."
                                TextWrapping="Wrap" />
                 </CheckBox>
                 <TextBlock x:Name="Feedback" Margin="0,0,0,8" TextWrapping="Wrap" Visibility="Collapsed"
@@ -42,7 +42,7 @@
                 <WrapPanel HorizontalAlignment="Right">
                     <Button x:Name="DeclineButton" Content="Decline &amp; Exit" IsCancel="True" MinWidth="130"
                             Height="Auto" MinHeight="{StaticResource ControlHeight}" Margin="0,0,8,4" Click="Decline_Click" />
-                    <Button x:Name="ContinueButton" Content="Acknowledge &amp; Continue" IsEnabled="False" MinWidth="170"
+                    <Button x:Name="ContinueButton" Content="Agree &amp; Continue" IsEnabled="False" MinWidth="170"
                             Height="Auto" MinHeight="{StaticResource ControlHeight}" Margin="0,0,0,4"
                             Style="{StaticResource PrimaryButtonStyle}" Click="Continue_Click" />
                 </WrapPanel>

@@ -22,10 +22,7 @@ $outsideDirectory = Join-Path ([IO.Path]::GetTempPath()) "GlyphFrame.PackageVeri
 $checks = [Collections.Generic.List[string]]::new()
 $application = $null
 $failure = $null
-$sessionObservation = $null
-$sessionCleanup = $null
-$previewFixture = $null
-$freshPreview = $false
+$freshTermsPendingAndDeclined = $false
 
 Assert-PortableDirectoryChain ([IO.Path]::GetDirectoryName($runRoot))
 if ([IO.Directory]::Exists($runRoot) -or [IO.File]::Exists($runRoot)) {
@@ -170,49 +167,18 @@ try {
     }
     if (-not $application.Responding) { throw 'Published app is not responding.' }
     $checks.Add('Published app created a responsive window and survived bounded startup observation outside repository')
-    if ($application.MainWindowTitle -cne 'Microsoft component terms — GlyphFrame' -or
-        [IO.File]::Exists((Join-Path $dataRoot 'GlyphFrame/native-terms-acknowledgement.txt')) -or
-        [IO.Directory]::Exists((Join-Path $dataRoot 'GlyphFrame/Cache'))) {
-        throw 'Fresh package did not remain at the unacknowledged preview gate before media work.'
-    }
+    Assert-NativeTermsPendingState -WindowTitle $application.MainWindowTitle `
+        -AcknowledgementPresent ([IO.File]::Exists((Join-Path $dataRoot 'GlyphFrame/native-terms-acknowledgement.txt'))) `
+        -MediaCachePresent ([IO.Directory]::Exists((Join-Path $dataRoot 'GlyphFrame/Cache')))
     if (-not $application.CloseMainWindow() -or -not $application.WaitForExit(15000) -or $application.ExitCode -ne 0) {
-        throw 'Declining the fresh preview did not exit normally.'
+        throw 'Declining the fresh terms did not exit normally.'
     }
     if ([IO.File]::Exists((Join-Path $dataRoot 'GlyphFrame/native-terms-acknowledgement.txt')) -or
         [IO.Directory]::Exists((Join-Path $dataRoot 'GlyphFrame/Cache'))) { throw 'Decline created acknowledgement or media state.' }
-    $freshPreview = $true
-    $checks.Add('Fresh nonoperative preview blocked media work; window-close decline exited without acknowledgement/cache')
-    $application.Dispose()
-    $application = $null
-    $previewFixture = New-IsolatedNativeTermsPreviewFixture -PackageRoot $publishRoot -DataRoot $dataRoot
-    $application = [Diagnostics.Process]::Start($start)
-    if (-not $application.WaitForInputIdle(15000)) { throw 'Synthetic preview-acknowledged app did not become input-idle.' }
-    $deadline = [DateTime]::UtcNow.AddSeconds(15)
-    do {
-        $application.Refresh()
-        if ($application.HasExited) { throw 'Synthetic preview-acknowledged app exited before creating its workspace.' }
-        if ($application.MainWindowHandle -ne [IntPtr]::Zero) { break }
-        Start-Sleep -Milliseconds 100
-    } while ([DateTime]::UtcNow -lt $deadline)
-    if ($application.MainWindowHandle -eq [IntPtr]::Zero -or $application.WaitForExit($StartupObservationSeconds * 1000)) {
-        throw 'Synthetic preview-acknowledged workspace did not survive startup observation.'
-    }
-    $sessionObservation = Wait-PackageActiveSession -DataRoot $dataRoot -ApplicationProcessId $application.Id `
-        -IsApplicationRunning { -not $application.HasExited }
-    if (-not $application.Responding -or $application.MainWindowTitle -ceq 'Microsoft component terms — GlyphFrame') {
-        throw 'Synthetic nonoperative fixture did not enter a responsive workspace.'
-    }
-    $checks.Add('Isolation verified: production session observed under this run data root with an actively held exclusive lease')
-    if (-not $application.CloseMainWindow() -or -not $application.WaitForExit(15000)) {
-        throw 'Published app did not shut down gracefully within 15 seconds.'
-    }
-    if ($application.ExitCode -ne 0) { throw "Published app shutdown failed ($($application.ExitCode))." }
-    $checks.Add('Only the verifier-owned process closed gracefully; exit code zero')
-    $sessionCleanup = Get-PackageSessionCleanupEvidence $dataRoot $sessionObservation.SessionDirectory
-    if (-not $sessionCleanup.Success) {
-        throw 'Observed isolated session or other session directories remain after shutdown.'
-    }
-    $checks.Add('Cleanup verified: observed session removed and zero session directories remain under isolated cache root')
+    $freshTermsPendingAndDeclined = $true
+    $checks.Add('Fresh component terms blocked media work; window-close decline exited without acceptance/cache')
+    # Deliberately stop here. Never synthesize acceptance of the adopted real-package terms.
+    # Positive workspace/session and UI checks require a separately authorized human decision.
 }
 catch { $failure = $_.Exception.Message }
 finally {
@@ -229,7 +195,7 @@ finally {
     # Delete only this generated, verified empty working directory; never recurse into unexpected content.
     $expectedTemporaryRoot = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetTempPath()) 'GlyphFrame.PackageVerification'))
     $resolvedOutside = [IO.Path]::GetFullPath($outsideDirectory)
-    if ($null -ne $sessionCleanup -and $sessionCleanup.Success -and
+    if ($freshTermsPendingAndDeclined -and
         $resolvedOutside -eq (Join-Path $expectedTemporaryRoot $runId) -and [IO.Directory]::Exists($resolvedOutside)) {
         try { [IO.Directory]::Delete($resolvedOutside, $false) }
         catch [IO.IOException] {
@@ -244,14 +210,15 @@ finally {
         ArtifactPathBudget = $pathPlan
         InteractiveLaunchCommand = $launchCommand
         DataRetention = 'Marked temporary data retained for inspection/interactive retesting; verify session cleanup before deleting this run-owned root. Failure working directory also retained.'
-        SessionObservation = $sessionObservation
-        SessionCleanup = $sessionCleanup
-        FreshPreviewPendingAndDeclined = $freshPreview
-        SyntheticPreviewFixture = $previewFixture
-        NativeTermsHumanOrLegalAssent = 'NOT CREATED; implementation preview only'
+        VerificationScope = 'PackageIntegrityAndUnacceptedStartupOnly'
+        SessionObservation = $null
+        SessionCleanup = $null
+        FreshTermsPendingAndDeclined = $freshTermsPendingAndDeclined
+        WorkspaceStartupAndSessionCleanup = 'NOT TESTED; requires separate human acceptance'
+        NativeTermsHumanOrLegalAssent = 'NOT CREATED; no synthetic acceptance of adopted terms'
         Checks = $checks.ToArray()
         InteractiveStartupSettingsRenderExport = 'NOT TESTED by this automated script'
-        CleanWindowsWithoutInstalledDotnet = 'PENDING Phase 15'
+        CleanWindowsWithoutInstalledDotnet = 'NOT TESTED by this automated script'
     }
     $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runRoot 'report.json') -Encoding utf8
 }

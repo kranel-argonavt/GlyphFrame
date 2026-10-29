@@ -7,10 +7,10 @@
   #error PayloadFiles must be generated from the verified portable manifest
 #endif
 #ifndef NativeTermsFile
-  #error NativeTermsFile must contain the verified nonoperative draft and full Microsoft references
+  #error NativeTermsFile must contain the verified adopted component terms and full Microsoft references
 #endif
 #ifndef NativeTermsBundle
-  #error NativeTermsBundle must identify the verified implementation-preview profile
+  #error NativeTermsBundle must identify the verified adopted component profile
 #endif
 #ifndef NativeNoticesFile
   #error NativeNoticesFile must contain the verified local notices
@@ -54,11 +54,11 @@ ShowLanguageDialog=no
 LicenseFile={#NativeTermsFile}
 
 [Messages]
-WizardLicense=Microsoft component review - local preview
-LicenseLabel=Nonoperative implementation preview. This is not a legal agreement or public release.
-LicenseLabel3=Review the draft and complete Microsoft references below. This acknowledgement is for local verification only; other components retain their separate rights.
-LicenseAccepted=I &acknowledge reviewing this nonoperative draft for local verification
-LicenseNotAccepted=I &do not acknowledge this preview
+WizardLicense=Microsoft component terms
+LicenseLabel=Microsoft component terms - version 1.0.
+LicenseLabel3=Review the complete component terms and Microsoft reference texts below. These terms cover five Microsoft components only; other software retains its separate licenses.
+LicenseAccepted=I &agree to the Microsoft component terms (version 1.0)
+LicenseNotAccepted=I &do not agree to these component terms
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
