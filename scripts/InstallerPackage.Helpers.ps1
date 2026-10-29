@@ -1,5 +1,6 @@
 # Installer policy and manifest helpers. No compiler download, publishing or installation.
 . (Join-Path $PSScriptRoot 'PortablePackage.Helpers.ps1')
+. (Join-Path $PSScriptRoot 'NativeTerms.Helpers.ps1')
 . (Join-Path $PSScriptRoot 'ShellIcon.Helpers.ps1')
 . (Join-Path $PSScriptRoot 'LocalTools.Helpers.ps1')
 

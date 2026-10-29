@@ -13,6 +13,18 @@ function Run-Check([string]$Name,[scriptblock]$Action) { & $Action; $script:pass
 function Fresh-Lock { return Get-Content -LiteralPath (Join-Path $PSScriptRoot 'ffmpeg/sources.lock.json') -Raw | ConvertFrom-Json }
 function Check-Lock($Lock) { $path=Join-Path $root 'lock.json'; $Lock | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $path -Encoding utf8NoBOM; Get-ControlledSourceLock $path | Out-Null }
 try {
+    Run-Check 'Standalone build-material helpers load without application-native terms tooling' {
+        $standalone=Join-Path $root 'standalone-helpers'
+        [void][IO.Directory]::CreateDirectory($standalone)
+        foreach ($name in @('ControlledFfmpeg.Helpers.ps1','PortablePackage.Helpers.ps1','PackageLegal.Helpers.ps1')) {
+            Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $standalone $name)
+        }
+        Push-Location -LiteralPath $standalone
+        try {
+            & pwsh -NoProfile -Command '$ErrorActionPreference="Stop"; . ./ControlledFfmpeg.Helpers.ps1; foreach($name in @("Get-ControlledSourceLock","Assert-PortableRelativePath","Get-LegalTextHash")){if(-not(Get-Command $name -ErrorAction SilentlyContinue)){throw "Standalone helper missing"}}; if(Get-Command New-IsolatedNativeTermsPreviewFixture -ErrorAction SilentlyContinue){throw "Unrelated application-native fixture leaked into tool sources"}'
+            Assert-Check ($LASTEXITCODE -eq 0) 'Standalone source helper dependency closure failed.'
+        } finally { Pop-Location }
+    }
     Run-Check 'Reviewed profile contains four pinned inputs, one explicit patch and no approval' {
         $lock=Get-ControlledSourceLock (Join-Path $PSScriptRoot 'ffmpeg/sources.lock.json')
         Assert-Check ($lock.Artifacts.Count -eq 4 -and $lock.Patches.Count -eq 1 -and -not $lock.PublicDistributionApproved -and -not $lock.CorrespondingSourceApproved) 'Wrong source-lock state.'

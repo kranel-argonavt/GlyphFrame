@@ -1,6 +1,5 @@
 # Shared structural checks. No publishing, application launch, extraction or recursive deletion.
 . (Join-Path $PSScriptRoot 'PackageLegal.Helpers.ps1')
-. (Join-Path $PSScriptRoot 'NativeTerms.Helpers.ps1')
 function Get-RequiredPackagePaths {
     return @(
         'GlyphFrame.App.exe', 'GlyphFrame.App.dll', 'GlyphFrame.App.deps.json', 'GlyphFrame.App.runtimeconfig.json',

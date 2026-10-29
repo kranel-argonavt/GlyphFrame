@@ -4,6 +4,7 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'PortablePackage.Helpers.ps1')
+. (Join-Path $PSScriptRoot 'NativeTerms.Helpers.ps1')
 $parent = Join-Path ([IO.Path]::GetTempPath()) 'GlyphFrame.NativeTermsHelperTests'
 $run = [Guid]::NewGuid().ToString('N')
 $root = New-PortableRunDirectory $parent $run

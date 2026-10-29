@@ -21,6 +21,7 @@ This file summarizes user-visible work. It is not a release/tag history or a rep
 
 ### Refined
 
+- Restored standalone FFmpeg build-helper dependency closure and added a separately hash-bound [source/rebuild companion](docs/ffmpeg-source-guide.md) without changing the frozen source archive, tool bytes or release approvals.
 - Integrated the reviewed controlled FFmpeg `9.0-glyphframe.2` pair for local builds/tests/packages via a separate versioned cache and offline exact-archive initialization, retaining the old vendor cache. Added complete extra runtime/JPEG notices to manifest/About and exact binary/source-material/document package binding; public binary/source delivery remains unapproved.
 - Added an offline controlled-FFmpeg recipe and build-material exporter with pinned inputs/toolchain/runtime objects, full extra notices, fail-closed validation and functional ZIP replay. Retained compiler-warning disposition and source-delivery boundaries without claiming warning-free, bit-identical or legally approved outputs.
 - Corrected two reproduced weighted VVC defects through a pinned one-file downstream patch and declared-interface regressions, then verified corrected binaries through isolated full-suite/native checks and code-bound frame/link-map audits. Local rollout uses exact version/two-hash assertions; historical failed probes and old package identities remain separate evidence.

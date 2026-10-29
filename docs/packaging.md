@@ -41,6 +41,7 @@ The local-only delivery layout groups the **unchanged pinned two-file initialize
 GlyphFrame-ffmpeg-9.0-glyphframe.2-delivery-candidate/
 ├── README.md
 ├── RELEASE-NOTES-DRAFT.md
+├── ffmpeg-source-guide.md
 ├── manifest.json
 ├── SHA256SUMS.txt
 ├── tools/GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip
@@ -53,6 +54,10 @@ The candidate's relative source links work after extraction; they are **not live
 On 2026-10-28, the local candidate passed **18 outer file/hash checks, a separate fresh extraction, 17 checksum entries, all 27 frozen source entries, both exact tool entries, twelve complete notice copies and thirteen relative source/notice links**. Nine additional inert verifier probes exercised malformed/tampered archive rejection. No input executable or compiler was run. The candidate ZIP SHA-256 is `99d2660dc91434daceca2e86c4f36f4aee8defa05d1e81647ab6d90820d4551a`; preparation used private `e43fada` plus documentation edits (`WorkingTreeDirty=true`), without changing inner archive bytes or approval flags. This is delivery assembly/integrity evidence, not a newly compiled or legally approved tool build.
 
 The final release must identify its actual application/tool/source bytes and provide reviewed source directions beside the relevant download. Preserve complete notices with conveyed tools; do not treat a link alone as a replacement for a license copy. Local archive integrity checks establish bytes/layout, not legal clearance. Windows-native runtime terms and other application release gates remain separate from this FFmpeg-only candidate.
+
+On 2026-10-29, **delivery revision 2** added the maintained [standalone source/rebuild companion](ffmpeg-source-guide.md), with corrected offline directions in the outer README/release draft. Its **19 outer files / 18 checksum entries**, fresh extraction, all **27 frozen material entries**, two exact tool entries, twelve full notice copies and **15 offline links** passed verification. Outer ZIP SHA-256: `c1f4717663d5a6c7b10b53d126bca2418fd162bcfe592deabdbab8883b03cabf`. The source ZIP, tool ZIP, active tool pins and approval flags remain unchanged. Assembly used parent `9229401` with uncommitted helper/documentation changes; it is not a clean-source application build, new FFmpeg compilation or approved public download.
+
+The same review reproduced and fixed a current-export dependency regression: structural portable helpers no longer import application-native acknowledgement tooling. Only the installer/publish verifier and native-terms tests import it explicitly. A standalone helper fixture fails before the fix and passes afterward without bundling application runtime/terms tooling into FFmpeg build sources. This fixes future exporter dependency closure; it does not change the already frozen 27-file archive.
 
 ## Windows-native terms preview
 
@@ -77,6 +82,17 @@ The owner completed the [other-PC manual protocol](testing.md#other-pc-manual-pr
 | Package integrity | **447 payloads / 32 legal documents / 9 dependency bindings**, verified during packaging; this is distinct from the later snapshots' installed apphost comparison |
 | Manual scope | Windows 11 Home 25H2 / 26200.8246; A0–A6 and B0–B4 user-reported UI behavior plus reviewed snapshots/silent summaries; install/first-use, portable sharing, same-version repair, retained-data uninstall/reinstall and negative record/profile/write cases |
 | Still outside this run | Runtime-free environment, different-version upgrade/downgrade, real valid changed-runtime scope, native DPI/text-scale matrix, operative/legal approval and final clean-source/publication-copy acceptance |
+
+### Clean-source preview 9229401
+
+On 2026-10-29, a separate fresh single-commit verification checkout of `9229401c109b488143ea2b61430c7647c4a75bb3` passed source-only build before tool initialization, all **1,315 Release tests / 154 helper checks**, zero-warning/error rebuild, formatting and unchanged-source verification of **471 files**. This is not the planned history-preserving publication copy. Both new app packages record `WorkingTreeDirty=false`:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Portable ZIP | `bf7d08443736fcfff14ede554b5cd150e578ceb13e9a207f5a0ea1d90852369b` |
+| Unsigned Setup | `f9735d4b384d36658d86a248a94fe75688b2921c340b66a31cdcb41e981294d8` |
+
+All **447 payloads / 32 legal documents / 9 dependency bindings** passed. Independent original-name extracted startup first observed pending preview/decline without a record/cache, then a separately labeled synthetic nonoperative profile, a positively observed exclusive production session, normal exit zero and exact-session cleanup. Ordinary installed app/tool/settings/record hashes were unchanged. **The new Setup was built, not installed/run**; the owner's previous manual protocol remains bound to its earlier pair. The preview scope stays identical, but five application build outputs differ and 33 text differences are CRLF/LF-only; neither binary identity nor full manual acceptance is transferred. Later source-delivery helper/documentation edits are not part of this clean-source pair.
 
 ## What verification establishes
 
@@ -111,7 +127,7 @@ Helper-only regressions are documented in [testing.md](testing.md#run-the-automa
 
 ## Current local controlled-tool candidate
 
-These are the last **clean-source baseline** artifacts, predating the [nonoperative working-tree preview](#windows-native-terms-preview). New preview builds do not inherit their clean-source identity or native acceptance; their detailed run identities remain in local evidence.
+These are the historical **clean-source baseline** artifacts predating the [nonoperative preview](#windows-native-terms-preview); the later [9229401 pair](#clean-source-preview-9229401) has its own identity above. New builds do not inherit this baseline's clean-source identity or native acceptance.
 
 On 2026-10-28, a fresh independent checkout of **`e43fadad905deafeb636be1e9a7aec830984f918`** passed source-only build, exact controlled-tool initialization, full Release tests/helpers, formatting and packaging. Both new candidates record **`WorkingTreeDirty=false`**. Later documentation edits do not relabel their source or payloads; this private verification clone is not a sanitized public-history copy.
 

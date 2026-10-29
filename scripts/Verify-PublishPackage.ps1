@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'This verifier requires PowerShell 7 on Windows.' }
 . (Join-Path $PSScriptRoot 'PackageVerification.Session.ps1')
 . (Join-Path $PSScriptRoot 'PortablePackage.Helpers.ps1')
+. (Join-Path $PSScriptRoot 'NativeTerms.Helpers.ps1')
 
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $runRoot = Join-Path $repositoryRoot "artifacts/package-verification/$runId"

@@ -31,6 +31,8 @@ pwsh -NoProfile -File scripts/Test-ControlledFfmpeg.ps1
 
 Actual publish/startup checks are a [separate packaging operation](packaging.md). A fresh image-only source build without FFmpeg is not a full-suite pass. Source-export path checks are not exhaustive secret/history or licensing audits.
 
+The 2026-10-29 source-delivery follow-up on parent `9229401` with helper/documentation edits passed **155 helper checks** (37 controlled, 18 source, 25 legal, 20 portable, 30 installer, 15 session, 10 native terms). The added controlled case first reproduced a missing application-native helper in the standalone source dependency chain, then passed after imports were moved to their actual consumers. The frozen archive's own helpers, source/patch locks and six runtime notices were also loaded/validated after extraction without compiling or running an input executable. The [delivery revision 2 checks](packaging.md#controlled-ffmpeg-delivery-candidate) do not rerun the full application suite, prior functional FFmpeg replay or native acceptance. Earlier totals below retain their original artifact scope.
+
 ## Coverage that matters
 
 | Area | Representative assertions |
@@ -70,6 +72,8 @@ On 2026-10-29, the owner completed **A0–A6 and B0–B4** using the [exact work
 All final observations show zero media-session directories. This does not independently prove exclusive-lease ownership or process cleanup; earlier positively observed lease checks retain their separate scope. The foreign zero-hash record and invalid profile are negative fixtures, not a real valid changed-runtime upgrade. Raw reports, backups and diagnostics remain local; no acknowledgement/settings file or test kit belongs in Git. These results do not close operative terms, Publisher obligations, the DPI/OS matrix or a future clean-source/publication-copy release check.
 
 ## Recorded verification snapshot
+
+The subsequent clean-source preview verification of **`9229401`** passed **1,315 Release tests and 154 helpers**, with all 471 checkout files unchanged, a source-only build before explicit tool initialization, zero-warning/error rebuild and formatting/diff checks. Its independently extracted normal-name app passed pending/decline and a separate synthetic nonoperative workspace/observed-lease cleanup check. [Exact new ZIP/Setup identities and limits](packaging.md#clean-source-preview-9229401) are separate from the owner's earlier A/B run and the older baseline below. The later source-delivery follow-up's 155 helpers are a separate run, not additive to those 154.
 
 Historical clean-source baseline as of 2026-10-28. Reading this document executes no checks. That run used a fresh independent checkout of private commit `e43fadad905deafeb636be1e9a7aec830984f918`, with `WorkingTreeDirty=false` throughout build/tests/packages. The full suite, helpers, formatting and packaging were rerun; overlapping precommit results are not additive. Later implementation/documentation work does not relabel these artifacts. This single-commit verification clone is not the planned history-preserving publication copy or a public release.
 
