@@ -33,6 +33,20 @@ Actual publish/startup checks are a [separate packaging operation](packaging.md)
 
 The 2026-10-29 source-delivery follow-up on parent `9229401` with helper/documentation edits passed **155 helper checks** (37 controlled, 18 source, 25 legal, 20 portable, 30 installer, 15 session, 10 native terms). The added controlled case first reproduced a missing application-native helper in the standalone source dependency chain, then passed after imports were moved to their actual consumers. The frozen archive's own helpers, source/patch locks and six runtime notices were also loaded/validated after extraction without compiling or running an input executable. The [delivery revision 2 checks](packaging.md#controlled-ffmpeg-delivery-candidate) do not rerun the full application suite, prior functional FFmpeg replay or native acceptance. Earlier totals below retain their original artifact scope.
 
+## Filtered-history clean-checkout verification
+
+On 2026-10-29, the 49-commit development baseline was preserved in a separate reviewed repository and filtered to `cef9f3e`. Both legacy FFmpeg/ffprobe executable paths were removed from every snapshot, and one exact personal temporary-root prefix was replaced in a historical document version. A bijective commit/parent mapping preserved author/committer identity, dates and message bytes; all expected historical file entries were compared. Current product files, demo media, contracts and component texts stayed unchanged. Only `main` remains, with no remotes, replace/backup refs or unreachable objects in that reviewed baseline.
+
+A new full-history checkout of `cef9f3e`, with no inherited project `bin`, `obj` or tool cache, passed:
+
+- Missing-tool verification rejected the absent pair as expected; a Release build succeeded with the documented image-only guidance and no FFmpeg/ffprobe in application output.
+- Explicit acquisition from the exact local `.2` initializer archive, archive/tool hash checks, and a forced Release rebuild. Both builds had **zero warnings/errors**.
+- **1,327 Release tests**: 488 domain/integration and 839 app/UI, zero failures or skips.
+- **175 inert helper checks**: 20 portable, 15 session, 30 installer, 30 native terms, 25 legal, 18 source preparation and 37 controlled FFmpeg.
+- Formatting, diff checks, unchanged tracked files and a clean working tree. The tested source identity was `cef9f3e`, not the earlier private checkpoint or a later documentation edit.
+
+The host used Windows, .NET SDK **10.0.401**, the existing NuGet cache/configuration and the reviewed local tool archive; this is a fresh source checkout, not a clean-machine or offline-dependency certification. The initial sandboxed clone was blocked by Git/MSYS process permissions before building; a separately located unrestricted retry passed. No application test failure required a code change. Native interaction, installing/updating Setup, operative agreement, new portable/Setup creation and public source availability were not exercised. Historical package identities and their native/user evidence below retain their original scope; they are not relabeled to the filtered commits.
+
 ## Coverage that matters
 
 | Area | Representative assertions |
