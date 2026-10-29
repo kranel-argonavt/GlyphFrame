@@ -24,7 +24,7 @@ GlyphFrame is being prepared for **a public repository with development history 
 
 [![Preview frame from the symbolized puppy video](docs/screenshots/puppy-poster.jpg)](docs/screenshots/puppy-symbolized.mp4)
 
-[Open the 5-second MP4 result](docs/screenshots/puppy-symbolized.mp4) · 1080p / 30 FPS. The video opens on demand; it is not an autoplaying application walkthrough. Source footage: Pixabay, as reported by the project author. See [media provenance and review limits](docs/screenshots/README.md).
+[Open the 5-second MP4 result](docs/screenshots/puppy-symbolized.mp4) · 1080p / 30 FPS. The video opens on demand; it is not an autoplaying application walkthrough. Source footage: [Pixabay, item 371301](https://pixabay.com/videos/ai-generated-puppy-pet-dog-animal-371301/), as identified by the project author. Only the GlyphFrame-symbolized result, prepared for web preview, is provided here; the original clip is not distributed. See [media provenance and owner review](docs/screenshots/README.md).
 
 <details>
 <summary>More screenshots</summary>

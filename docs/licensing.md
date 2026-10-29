@@ -6,7 +6,7 @@ Original GlyphFrame code is licensed under the root [MIT License](../LICENSE), C
 
 The license does not relicense third-party components, their notices, or assets owned by others. The author confirmed that the current project-specific design/branding/reference are the project's own work; see [owner-reported visual provenance](design_reference/README.md). This closes the current-asset provenance question within that reported scope, not ownership of unrelated/future portfolio media. Native shell branding is generated from the in-app geometry; selected system fonts are not bundled.
 
-The portfolio gallery has a separate [media provenance record](screenshots/README.md). Its AI-generated image and owner-reported Pixabay footage must not be conflated with ownership of the application branding or relicensed wholesale under the code's MIT license. Preparing a local transformed-video example does not establish that any standalone redistribution is permitted.
+The portfolio gallery has a separate [media provenance and owner-review record](screenshots/README.md). Its AI-generated image and owner-reported Pixabay footage must not be conflated with ownership of the application branding or relicensed wholesale under the code's MIT license. On 2026-10-29 the owner reported completing their review and chose to retain this specific GlyphFrame-symbolized video result; the original Pixabay clip is not distributed. This closes the previous pending owner-review status; it is not an independent legal determination or a blanket permission for other transformations.
 
 ## Runtime license collection
 
@@ -47,7 +47,7 @@ Delivery decisions, with the runtime-source decision and Microsoft clauses reche
 
 | Scope | Concrete next step | What remains unapproved |
 | --- | --- | --- |
-| Public Git repository/history | Audit a separate history-preserving copy and settle the gallery's remaining media review; retain source/patch notices; do not start a fresh history | Public-history/assets review and owner authorization; this Git storage boundary is not abandonment of ready-to-run Releases |
+| Public Git repository/history | Audit a separate history-preserving copy; retain source/patch notices and the gallery's recorded provenance/owner retention decision; do not start a fresh history | Public-history/content verification and authorization to publish the actual copy; the specific demo's owner-review decision is recorded, not a blanket binary-release approval |
 | Controlled FFmpeg downloads | Proposed online route: direct matching source/build and complete tool/notices assets on the **same versioned GitHub Release page** as Setup/portable, with hashes and source directions beside each binary | Final source completeness/scope and guide review, real repository/tag/asset URLs and availability verification; no automatic upload or written offer |
 | Application/tool boundary | Record the separate CLI-process/file/pipe interface and review component-specific grants; preserve original-code MIT and upstream notices | Aggregate-versus-combined-work conclusion; neither automatic whole-app GPL relicensing nor automatic clearance from using processes |
 | Self-contained Setup and portable | Exact owner-adopted Microsoft component terms 1.0, before-install review and first-use gate, with a new purpose that rejects preview records; independent MIT/GPL rights remain unchanged | Affected native verification on the new bytes, final incorporation/recipient coverage and release approval; the owner's upstream duties are not transferred to users |
