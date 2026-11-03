@@ -104,8 +104,8 @@ function Write-InstallerNativeTermsDocument([string]$Root, [string]$Output) {
     return $scope
 }
 
-function Write-InstallerNativeNoticesDocument([string]$Root, [string]$Output) {
-    $null = Assert-LegalPackage $Root
+function Write-InstallerNativeNoticesDocument([string]$Root, [string]$Output, $ReleaseContext = $null) {
+    $null = Assert-LegalPackage $Root -ReleaseContext $ReleaseContext
     if ([IO.File]::Exists($Output)) { throw 'Refuse to overwrite a generated notices document.' }
     $manifest = Get-Content -LiteralPath (Join-Path $Root 'licenses/manifest.json') -Raw | ConvertFrom-Json
     $text = "Independent component licenses and source information. This viewer does not grant or record acknowledgement.`r`n"

@@ -78,9 +78,24 @@ try {
     [void][IO.Directory]::CreateDirectory($payload)
     foreach($file in Get-ChildItem -LiteralPath $fixture -Recurse -File){$relative=[IO.Path]::GetRelativePath($fixture,$file.FullName);$target=Join-Path $payload $relative;[void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target));[IO.File]::Copy($file.FullName,$target,$false)}
     Run 'Provisional manifest still verifies before projection' {$legal=Assert-LegalPackage $payload;Check ($legal.Mode -ceq 'Provisional')}
+    Run 'Setup notices still render provisional manifests without release context' {
+        $output=Join-Path $root 'provisional-notices.txt'
+        Write-InstallerNativeNoticesDocument $payload $output
+        Check ([IO.File]::ReadAllText($output).Contains('===== LICENSE ====='))
+    }
     Run 'Release projection adds directions/guide without changing source provenance' {Write-ReleasePackageMetadata $payload $context;Check ((Get-LegalTextHash (Join-Path $fixture 'licenses/manifest.json')) -ceq $originalDefinition.LegalManifestTextSha256)}
     Run 'Release projection requires its explicit bound context' {Throws {Assert-LegalPackage $payload}}
     Run 'Release manifest and all legal text hashes verify with context' {$legal=Assert-LegalPackage $payload $context;Check ($legal.Mode -ceq 'Release' -and $legal.DocumentsVerified -eq ($files.Count+2))}
+    Run 'Setup notices require release context and include versioned source documents' {
+        $output=Join-Path $root 'release-notices.txt'
+        Throws {Write-InstallerNativeNoticesDocument $payload $output}
+        Check (-not [IO.File]::Exists($output))
+        Write-InstallerNativeNoticesDocument $payload $output -ReleaseContext $context
+        $notices=[IO.File]::ReadAllText($output)
+        Check ($notices.Contains('===== licenses/FFmpeg/SOURCE-DIRECTIONS.txt ====='))
+        Check ($notices.Contains('===== licenses/FFmpeg/SOURCE-GUIDE.md ====='))
+        Check ($notices.Contains($context.Record.SourceMaterialsUrl))
+    }
     Run 'Generated manifest makes no fabricated public approval claim' {$generated=Get-Content (Join-Path $payload 'licenses/manifest.json') -Raw | ConvertFrom-Json;Check ($generated.SchemaVersion -eq 2 -and -not $generated.PSObject.Properties['PublicDistributionApproved'])}
     Run 'Release metadata cannot be applied twice' {Throws {Write-ReleasePackageMetadata $payload $context}}
     Run 'Tampered release source commit rejected' {

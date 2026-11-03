@@ -36,7 +36,7 @@ try {
     $termsFile = Join-Path $runRoot 'native-component-terms.txt'
     $noticesFile = Join-Path $runRoot 'native-component-notices.txt'
     $termsScope = Write-InstallerNativeTermsDocument $payload.Root $termsFile
-    Write-InstallerNativeNoticesDocument $payload.Root $noticesFile
+    Write-InstallerNativeNoticesDocument $payload.Root $noticesFile -ReleaseContext $releaseContext
     $arguments = @('--quiet-progress', '--no-ide-signtools', '--no-signing', "--output-dir=$runRoot", "--define=ProductVersion=$($payload.Report.PackageVersion)", "--define=PayloadFiles=$include",
         "--define=NativeTermsFile=$termsFile", "--define=NativeNoticesFile=$noticesFile", "--define=NativeTermsBundle=$($termsScope.Identity)", (Join-Path $repo 'installer/GlyphFrame.iss'))
     & $compiler @arguments 2>&1 | Tee-Object -FilePath (Join-Path $runRoot 'compile.log') | Out-Host
