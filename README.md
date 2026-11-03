@@ -8,6 +8,8 @@
 
 **Render → Review → Export.** Choose a character preset, render your media, compare the result with the original and export when ready. Processing stays on your computer, with no uploads or telemetry.
 
+**[Download GlyphFrame 1.0.0 for Windows x64](https://github.com/kranel-argonavt/GlyphFrame/releases/tag/v1.0.0)** — choose Setup or Portable ZIP. Both include the .NET desktop runtime and FFmpeg. The release page includes SHA-256 checksums, matching FFmpeg source, and rebuild instructions.
+
 ![GlyphFrame startup screen with local media selection, character presets and render settings in the Rose theme](docs/screenshots/startup.png)
 
 ## Results
@@ -59,11 +61,9 @@ Source footage: [Pixabay, item 371301](https://pixabay.com/videos/ai-generated-p
 
 Continuous playback depends on Windows media components and codecs. See the [product specification](docs/product-spec.md) for exact behavior, controls and limitations.
 
-## Build and run
+## Build and run from source
 
 **Platform:** Windows 10/11 x64. **Development:** .NET 10 SDK and access to NuGet dependencies; PowerShell 7 for tool setup and packaging scripts.
-
-Self-contained Setup and portable packages are being prepared for [GitHub Releases](https://github.com/kranel-argonavt/GlyphFrame/releases). No binary release is published yet; see [packaging and release status](docs/packaging.md).
 
 From the repository root:
 
@@ -78,7 +78,7 @@ A fresh checkout supports image workflows. **Video processing and the full integ
 <details>
 <summary>Set up video tools and run the full test suite</summary>
 
-Obtain the exact reviewed `9.0-glyphframe.2` tool archive from the maintainer. There is no public tool download configured yet. Replace the example path with the location of your archive:
+Download the [FFmpeg delivery bundle](https://github.com/kranel-argonavt/GlyphFrame/releases/download/v1.0.0/GlyphFrame-ffmpeg-9.0-glyphframe.2-delivery.zip) and extract it. Use the inner `tools/GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip` as the initializer input (not the outer delivery ZIP). Replace the example path with the location of the inner archive:
 
 ```powershell
 pwsh -NoProfile -File scripts/Initialize-LocalTools.ps1 -ArchivePath 'C:\GFInputs\GlyphFrame-ffmpeg-9.0-glyphframe.2-win-x64.zip'
@@ -86,7 +86,7 @@ dotnet build GlyphFrame.sln -c Release --no-restore
 dotnet test GlyphFrame.sln -c Release --no-build --no-restore
 ```
 
-The initializer verifies the archive and executable SHA-256 hashes and prepares an ignored local cache. See [tool setup](Tools/ffmpeg/README.md) for the acquisition contract and [controlled FFmpeg build](scripts/ffmpeg/README.md) for source, patches and rebuild instructions.
+The initializer verifies the archive and executable SHA-256 hashes and prepares an ignored local cache. See the [FFmpeg rebuild guide](https://github.com/kranel-argonavt/GlyphFrame/releases/download/v1.0.0/ffmpeg-source-guide.md) for the matching source and build instructions.
 
 </details>
 
