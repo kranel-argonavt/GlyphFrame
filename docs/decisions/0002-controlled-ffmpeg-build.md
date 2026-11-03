@@ -94,9 +94,9 @@ Current tests and package checks bind actual tool bytes to version, source-mater
 
 Local integration is complete within that scope. Remaining work is explicit:
 
-- Review source delivery/hosting, final application/GPL scope and Windows-native protective terms; retain all notice/source identities.
+- Retain the adopted Windows terms and reviewed component/source mapping; bind actual source hosting and affected final-package checks through the explicit [ReleasePrepared workflow](../packaging.md#explicit-release-preparation). Offline preparation does not certify legal scope or public availability.
 - Retain the completed private clean-source binding and identify artifacts for remaining affected native/final-publication checks. Current unsigned Setup was not installed/run; current clean-PC and other limits remain in [testing](../testing.md#remaining-release-boundaries).
-- Prepare a separately audited [history-preserving publication copy](../portfolio.md#planned-route-preserve-development-history-in-a-reviewed-copy); retain the private baseline/backups and remove historical executables from intended public history.
+- The [history-preserving publication copy](../portfolio.md#planned-route-preserve-development-history-in-a-reviewed-copy) is now public; cleanup is complete and private baseline/backups remain private. Do not repeat filtering or relabel old package identities.
 - Obtain owner authorization before tagging, uploading or publishing.
 
 The experimental builder itself does not activate tools and still rejects true `WarningReviewComplete`, `CorrespondingSourceApproved` and `PublicDistributionApproved` flags. Scoped engineering success and local integration do not silently approve complete Corresponding Source, every warning or public distribution.

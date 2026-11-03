@@ -1,0 +1,9 @@
+{
+  "SchemaVersion": 1,
+  "Repository": "https://github.com/kranel-argonavt/GlyphFrame",
+  "Version": "1.0.0",
+  "Tag": "v1.0.0",
+  "LegalManifestTextSha256": "9ab7c70c486368b9bbf851d743275acfb841b4956a4fa3ec06875edc6ccec118",
+  "GuideTextSha256": "38aba912117ef737b7d3a3bc7d9bd4c1626bb061d91a5685bf2ef2d74361f2fc",
+  "DeliveryArchiveSha256": "c1f4717663d5a6c7b10b53d126bca2418fd162bcfe592deabdbab8883b03cabf"
+}

@@ -42,7 +42,13 @@ public sealed class ThirdPartyNoticesService
         // Only local inert text, with no URL fetching or arbitrary manifest-directed file access.
         string manifestPath = ResolveDocument("licenses/manifest.json", manifest: true);
         using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
-        if (manifest.RootElement.GetProperty("SchemaVersion").GetInt32() != 1)
+        int schema = manifest.RootElement.GetProperty("SchemaVersion").GetInt32();
+        if (schema is not 1 and not 2 || schema == 2 &&
+            (!manifest.RootElement.TryGetProperty("ReleasePreparation", out JsonElement release)
+                || release.ValueKind != JsonValueKind.Object
+                || !release.TryGetProperty("State", out JsonElement state)
+                || state.ValueKind != JsonValueKind.String || state.GetString() != "ReleasePrepared"
+                || manifest.RootElement.TryGetProperty("PublicDistributionApproved", out _)))
         {
             throw new InvalidDataException("Unsupported legal manifest.");
         }

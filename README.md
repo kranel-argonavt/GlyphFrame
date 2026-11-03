@@ -63,7 +63,7 @@ Continuous playback depends on Windows media components and codecs. See the [pro
 
 **Platform:** Windows 10/11 x64. **Development:** .NET 10 SDK and access to NuGet dependencies; PowerShell 7 for tool setup and packaging scripts.
 
-Self-contained Setup and portable packages are planned for GitHub Releases. Public downloads are not available yet; see [packaging and release status](docs/packaging.md).
+Self-contained Setup and portable packages are being prepared for [GitHub Releases](https://github.com/kranel-argonavt/GlyphFrame/releases). No binary release is published yet; see [packaging and release status](docs/packaging.md).
 
 From the repository root:
 

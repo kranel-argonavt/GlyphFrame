@@ -1,10 +1,13 @@
 # Local unsigned per-user Setup, from exactly the verified portable payload. No install/upload.
 [CmdletBinding()]
-param([string]$CompilerPath, [string]$PortablePackageDirectory)
+param([string]$CompilerPath, [string]$PortablePackageDirectory,
+    [ValidateSet('Provisional','Release')][string]$PackagingMode = 'Provisional',
+    [string]$ReleaseDefinitionPath, [string]$FfmpegDeliveryArchivePath)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows -or $PSVersionTable.PSVersion.Major -lt 7) { throw 'PowerShell 7 on Windows is required.' }
 . (Join-Path $PSScriptRoot 'InstallerPackage.Helpers.ps1')
+Assert-ReleasePackagingArguments $PackagingMode $ReleaseDefinitionPath $FfmpegDeliveryArchivePath
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $compiler = Get-InstallerCompiler $CompilerPath
 $runId = [Guid]::NewGuid().ToString('N')
@@ -12,16 +15,22 @@ $runRoot = New-PortableRunDirectory (Join-Path $repo 'artifacts/installer-packag
 $success = $false
 $failure = $null
 $payload = $null
+$releaseContext = $null
 $setup = $null
 $hash = $null
 $initialHead = (& git -C $repo rev-parse HEAD)
 $initialStatus = @(& git -C $repo status --porcelain=v1 --untracked-files=all)
 try {
+    if($PackagingMode -ceq 'Release') {
+        if($initialStatus.Count){throw 'Release mode requires a clean committed working tree.'}
+        $releaseContext=Get-ReleasePackageContext $repo $ReleaseDefinitionPath $FfmpegDeliveryArchivePath $initialHead
+        Assert-ReleaseTrackedInputs $repo $releaseContext
+    }
     if (-not $PortablePackageDirectory) {
-        & (Join-Path $PSScriptRoot 'Build-PortablePackage.ps1') -RunId $runId | Out-Host
+        & (Join-Path $PSScriptRoot 'Build-PortablePackage.ps1') -RunId $runId -PackagingMode $PackagingMode -ReleaseDefinitionPath $ReleaseDefinitionPath -FfmpegDeliveryArchivePath $FfmpegDeliveryArchivePath | Out-Host
         $PortablePackageDirectory = Join-Path $repo "artifacts/portable-packages/$runId"
     }
-    $payload = Get-VerifiedInstallerPayload $PortablePackageDirectory
+    $payload = Get-VerifiedInstallerPayload $PortablePackageDirectory -PackagingMode $PackagingMode -ReleaseContext $releaseContext
     $include = Join-Path $runRoot 'payload-files.iss'
     Write-InstallerFileList $payload.Root $payload.Files $include
     $termsFile = Join-Path $runRoot 'native-component-terms.txt'
@@ -42,11 +51,16 @@ try {
     Assert-InstallerPayloadMatchesManifest @(Get-PortablePayload $payload.Root) $payload.Files
     if ((Get-NativeTermsProfile $payload.Root).Identity -cne $termsScope.Identity) { throw 'Terms scope changed during compilation.' }
     $hash = Write-PortableChecksum $setup ($setup + '.sha256')
+    if($releaseContext) {
+        $finalHead=(& git -C $repo rev-parse HEAD | Out-String).Trim()
+        $finalStatus=@(& git -C $repo status --porcelain=v1 --untracked-files=all)
+        if($LASTEXITCODE -ne 0 -or $finalHead -cne $initialHead -or $finalStatus.Count){throw 'Release source changed during Setup compilation.'}
+    }
     $success = $true
 }
 catch { $failure = $_.Exception.ToString() }
 finally {
-    @{ Success=$success; Failure=$failure; SourceCommit=$initialHead; WorkingTreeDirty=($initialStatus.Count -ne 0); WorkingTreeStatus=$initialStatus;
+    @{ PackagingMode=$PackagingMode; ReleasePreparation=if($releaseContext){$releaseContext.Record}else{$null}; Success=$success; Failure=$failure; SourceCommit=$initialHead; WorkingTreeDirty=($initialStatus.Count -ne 0); WorkingTreeStatus=$initialStatus;
        Compiler=$compiler; CompilerVersion=(& $compiler '--version' | Out-String).Trim();
        Publisher='Nazar Khozin (kranel-argonavt)'; PublisherUrl='https://github.com/kranel-argonavt'; AppId='9A07BED0-6720-4A06-8C95-317B14C580A0';
        Architecture='x64 Windows only'; Language='English'; InstallMode='Per-user, no elevation requested'; Signed=$false;

@@ -3,6 +3,7 @@
 . (Join-Path $PSScriptRoot 'NativeTerms.Helpers.ps1')
 . (Join-Path $PSScriptRoot 'ShellIcon.Helpers.ps1')
 . (Join-Path $PSScriptRoot 'LocalTools.Helpers.ps1')
+. (Join-Path $PSScriptRoot 'ReleasePackage.Helpers.ps1')
 
 function Get-InstallerCompiler([string]$Path) {
     $candidates = if ($Path) { @($Path) } else {
@@ -34,10 +35,17 @@ function Get-InstallerPackageIdentity([string]$PackageDirectory) {
     return [pscustomobject]@{ Root=$root; Report=$report }
 }
 
-function Get-VerifiedInstallerPayload([string]$PackageDirectory) {
+function Get-VerifiedInstallerPayload([string]$PackageDirectory, [string]$PackagingMode = 'Provisional', $ReleaseContext = $null) {
     $identity = Get-InstallerPackageIdentity $PackageDirectory
     $root = $identity.Root
     $report = $identity.Report
+    $recordedMode=if($report.PSObject.Properties['PackagingMode']){$report.PackagingMode}else{'Provisional'}
+    if($recordedMode -cne $PackagingMode){throw 'Portable/Setup packaging modes differ.'}
+    if($PackagingMode -ceq 'Release' -and ($null -eq $ReleaseContext -or $report.WorkingTreeDirty -isnot [bool] -or
+        $report.WorkingTreeDirty -or $report.SourceCommit -cne $ReleaseContext.Record.SourceCommit -or
+        ($report.ReleasePreparation | ConvertTo-Json -Depth 10 -Compress) -cne ($ReleaseContext.Record | ConvertTo-Json -Depth 10 -Compress))) {
+        throw 'Release payload provenance/context mismatch.'
+    }
     $payloadRoot = Join-Path $root "GlyphFrame-$($report.PackageVersion)-win-x64"
     $expectedZip = Join-Path $root "GlyphFrame-$($report.PackageVersion)-win-x64-portable.zip"
     if ([IO.Path]::GetFullPath($report.ZipPath) -ine $expectedZip -or
@@ -46,7 +54,7 @@ function Get-VerifiedInstallerPayload([string]$PackageDirectory) {
     $actual = @(Get-PortablePayload $payloadRoot)
     Assert-InstallerPayloadMatchesManifest $actual $manifest
     Assert-PackageRequiredFiles $payloadRoot
-    $legal = Assert-LegalPackage $payloadRoot
+    $legal = Assert-LegalPackage $payloadRoot -ReleaseContext $ReleaseContext
     $nativeTerms = Get-NativeTermsProfile $payloadRoot
     $null = Assert-ControlledToolLegalBinding $payloadRoot (Get-LocalToolPins (Join-Path $PSScriptRoot '../Tools/ffmpeg/SHA256SUMS.txt'))
     Assert-ExecutableShellIcon (Join-Path $payloadRoot 'GlyphFrame.App.exe') (Join-Path $PSScriptRoot '../src/GlyphFrame.App/Assets/GlyphFrame.ico')

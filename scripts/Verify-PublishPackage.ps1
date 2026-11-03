@@ -2,7 +2,9 @@
 [CmdletBinding()]
 param(
     [ValidateRange(1, 30)][int]$StartupObservationSeconds = 3,
-    [ValidatePattern('^[0-9a-f]{32}$')][string]$RunId = [Guid]::NewGuid().ToString('N')
+    [ValidatePattern('^[0-9a-f]{32}$')][string]$RunId = [Guid]::NewGuid().ToString('N'),
+    [ValidateSet('Provisional','Release')][string]$PackagingMode = 'Provisional',
+    [string]$ReleaseDefinitionPath, [string]$FfmpegDeliveryArchivePath
 )
 
 Set-StrictMode -Version Latest
@@ -11,6 +13,8 @@ if (-not $IsWindows) { throw 'This verifier requires PowerShell 7 on Windows.' }
 . (Join-Path $PSScriptRoot 'PackageVerification.Session.ps1')
 . (Join-Path $PSScriptRoot 'PortablePackage.Helpers.ps1')
 . (Join-Path $PSScriptRoot 'NativeTerms.Helpers.ps1')
+. (Join-Path $PSScriptRoot 'ReleasePackage.Helpers.ps1')
+Assert-ReleasePackagingArguments $PackagingMode $ReleaseDefinitionPath $FfmpegDeliveryArchivePath
 
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $runRoot = Join-Path $repositoryRoot "artifacts/package-verification/$runId"
@@ -23,11 +27,13 @@ $checks = [Collections.Generic.List[string]]::new()
 $application = $null
 $failure = $null
 $freshTermsPendingAndDeclined = $false
+$releaseContext = $null
 
 Assert-PortableDirectoryChain ([IO.Path]::GetDirectoryName($runRoot))
 if ([IO.Directory]::Exists($runRoot) -or [IO.File]::Exists($runRoot)) {
     throw 'Verification output already exists; refuse to reuse or overwrite a previous run.'
 }
+[void][IO.Directory]::CreateDirectory($runRoot)
 
 function Require-File([string]$RelativePath) {
     $file = Join-Path $publishRoot $RelativePath
@@ -67,6 +73,14 @@ function Verify-Tool([string]$RelativePath) {
 }
 
 try {
+    if ($PackagingMode -ceq 'Release') {
+        $head=(& git -C $repositoryRoot rev-parse HEAD | Out-String).Trim()
+        if($LASTEXITCODE -ne 0){throw 'Cannot resolve release source.'}
+        $status=@(& git -C $repositoryRoot status --porcelain=v1 --untracked-files=all)
+        if($LASTEXITCODE -ne 0 -or $status.Count){throw 'Release mode requires a clean committed working tree.'}
+        $releaseContext=Get-ReleasePackageContext $repositoryRoot $ReleaseDefinitionPath $FfmpegDeliveryArchivePath $head
+        Assert-ReleaseTrackedInputs $repositoryRoot $releaseContext
+    }
     . (Join-Path $PSScriptRoot 'LocalTools.Helpers.ps1')
     $toolPins = Get-LocalToolPins (Join-Path $repositoryRoot 'Tools/ffmpeg/SHA256SUMS.txt')
     if (-not (Test-LocalTools (Join-Path $repositoryRoot 'artifacts/local-runtime/controlled-9.0-glyphframe.2/Tools/ffmpeg') $toolPins)) {
@@ -98,7 +112,11 @@ try {
         (Get-FileHash -LiteralPath (Require-File 'licenses/manifest.json')).Hash) {
         throw 'Published legal manifest differs from repository manifest.'
     }
-    $legal = Assert-LegalPackage $publishRoot
+    if($releaseContext) {
+        if((Get-PortablePackageVersion (Join-Path $publishRoot 'GlyphFrame.App.dll')) -cne $releaseContext.Record.Version){throw 'Release definition/application version mismatch.'}
+        Write-ReleasePackageMetadata $publishRoot $releaseContext
+    }
+    $legal = Assert-LegalPackage $publishRoot -ReleaseContext $releaseContext
     $nativeTerms = Get-NativeTermsProfile $publishRoot
     $controlledLegal = Assert-ControlledToolLegalBinding $publishRoot $toolPins
     $checks.Add("Controlled tool bytes/version/source-material identity and $($controlledLegal.DocumentsVerified) required notices verified; source hosting/public approval remain open")
@@ -210,6 +228,8 @@ finally {
         ArtifactPathBudget = $pathPlan
         InteractiveLaunchCommand = $launchCommand
         DataRetention = 'Marked temporary data retained for inspection/interactive retesting; verify session cleanup before deleting this run-owned root. Failure working directory also retained.'
+        PackagingMode = $PackagingMode
+        ReleasePreparation = if($releaseContext){$releaseContext.Record}else{$null}
         VerificationScope = 'PackageIntegrityAndUnacceptedStartupOnly'
         SessionObservation = $null
         SessionCleanup = $null

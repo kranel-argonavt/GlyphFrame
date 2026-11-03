@@ -1,10 +1,16 @@
 # Phase 15A: one fresh verified publish, then a verified portable ZIP. No release/upload.
 [CmdletBinding()]
-param([ValidatePattern('^[0-9a-f]{32}$')][string]$RunId = [Guid]::NewGuid().ToString('N'))
+param(
+    [ValidatePattern('^[0-9a-f]{32}$')][string]$RunId = [Guid]::NewGuid().ToString('N'),
+    [ValidateSet('Provisional','Release')][string]$PackagingMode = 'Provisional',
+    [string]$ReleaseDefinitionPath, [string]$FfmpegDeliveryArchivePath
+)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows -or $PSVersionTable.PSVersion.Major -lt 7) { throw 'PowerShell 7 on Windows is required.' }
 . (Join-Path $PSScriptRoot 'PortablePackage.Helpers.ps1')
+. (Join-Path $PSScriptRoot 'ReleasePackage.Helpers.ps1')
+Assert-ReleasePackagingArguments $PackagingMode $ReleaseDefinitionPath $FfmpegDeliveryArchivePath
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $runRoot = New-PortableRunDirectory (Join-Path $repositoryRoot 'artifacts/portable-packages') $runId
 $checks = [Collections.Generic.List[string]]::new()
@@ -24,18 +30,25 @@ $sourceStatus = @()
 $sdkVersion = $null
 $excludedSymbols = @()
 $legal = $null
+$releaseContext = $null
+$releaseAssets = $null
 try {
     $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD | Out-String).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source commit.' }
     $sourceStatus = @(& git -C $repositoryRoot status --porcelain=v1 --untracked-files=all)
     if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve working-tree state.' }
+    if ($PackagingMode -ceq 'Release') {
+        if ($sourceStatus.Count -ne 0) { throw 'Release mode requires a clean committed working tree.' }
+        $releaseContext=Get-ReleasePackageContext $repositoryRoot $ReleaseDefinitionPath $FfmpegDeliveryArchivePath $sourceCommit
+        Assert-ReleaseTrackedInputs $repositoryRoot $releaseContext
+    }
     $sdkVersion = (& dotnet --version | Out-String).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve .NET SDK version.' }
     $checks.Add('Source commit, dirty-tree state and SDK recorded')
 
     $step = 'Fresh publish and unaccepted-startup verification'
     # Reuse the independently runnable verifier; no second publish or bin/ copy.
-    & (Join-Path $PSScriptRoot 'Verify-PublishPackage.ps1') -RunId $runId | Out-Host
+    & (Join-Path $PSScriptRoot 'Verify-PublishPackage.ps1') -RunId $runId -PackagingMode $PackagingMode -ReleaseDefinitionPath $ReleaseDefinitionPath -FfmpegDeliveryArchivePath $FfmpegDeliveryArchivePath | Out-Host
     $verification = Get-Content -LiteralPath $verificationReport -Raw | ConvertFrom-Json
     if (-not $verification.Success) { throw 'Publish verifier did not report success.' }
     $checks.Add('Fresh publish passed package/tool integrity and unaccepted-startup checks; workspace/session checks require human acceptance')
@@ -57,10 +70,12 @@ try {
             throw "Published file changed during staging: $($file.Path)"
         }
     }
-    $readme = Get-Content -LiteralPath (Join-Path $repositoryRoot 'docs/Portable_README.md') -Raw
-    [IO.File]::WriteAllText((Join-Path $payloadRoot 'README.md'), $readme.Replace('{{VERSION}}', $version), [Text.UTF8Encoding]::new($false))
+    $template=if($releaseContext){'docs/Release_README.md'}else{'docs/Portable_README.md'}
+    $readme = (Get-Content -LiteralPath (Join-Path $repositoryRoot $template) -Raw).Replace('{{VERSION}}',$version)
+    if($releaseContext) { $readme=$readme.Replace('{{RELEASE_URL}}',($releaseContext.Record.Repository+'/releases/tag/'+$releaseContext.Record.Tag)) }
+    [IO.File]::WriteAllText((Join-Path $payloadRoot 'README.md'), $readme, [Text.UTF8Encoding]::new($false))
     Assert-PackageRequiredFiles $payloadRoot
-    $legal = Assert-LegalPackage $payloadRoot
+    $legal = Assert-LegalPackage $payloadRoot -ReleaseContext $releaseContext
     . (Join-Path $PSScriptRoot 'LocalTools.Helpers.ps1')
     $null = Assert-ControlledToolLegalBinding $payloadRoot (Get-LocalToolPins (Join-Path $repositoryRoot 'Tools/ffmpeg/SHA256SUMS.txt'))
     $payload = @(Get-PortablePayload $payloadRoot)
@@ -84,12 +99,22 @@ try {
     $checksumPath = $archivePath + '.sha256'
     $hash = Write-PortableChecksum $archivePath $checksumPath
     $checks.Add('Completed ZIP SHA-256 checksum written')
+    if($releaseContext) {
+        $releaseAssets=Write-ReleaseCompanionAssets $runRoot $releaseContext
+        $finalHead=(& git -C $repositoryRoot rev-parse HEAD | Out-String).Trim()
+        $finalStatus=@(& git -C $repositoryRoot status --porcelain=v1 --untracked-files=all)
+        if($LASTEXITCODE -ne 0 -or $finalHead -cne $sourceCommit -or $finalStatus.Count) { throw 'Release source changed during packaging.' }
+    }
     $step = 'Completed'
     $completed = $true
 }
 catch { $failure = $_.Exception.Message }
 finally {
     $report = New-PortablePackagingReport $completed $failure $step $checks.ToArray()
+    $report['PackagingMode'] = $PackagingMode
+    $report['ReleasePreparation'] = if($releaseContext){$releaseContext.Record}else{$null}
+    $report['ReleaseCompanionAssets'] = $releaseAssets
+    $report['Publication'] = 'NOT PERFORMED; offline build cannot authorize or verify hosting'
     $report['PackageVersion'] = $version
     $report['VersionSource'] = 'Published GlyphFrame.App assembly Major.Minor.Build, matching AboutDialogService'
     $report['AssemblyVersion'] = $assemblyVersion

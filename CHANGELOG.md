@@ -6,6 +6,8 @@ This file summarizes user-visible work. It is not a release/tag history or a rep
 
 ### Added
 
+- Explicit clean-source ReleasePrepared packaging with versioned FFmpeg source directions, unchanged companion assets/checksums and schema-2 offline notices; provisional defaults and separate owner publication approval remain intact.
+
 - Owner-adopted Microsoft component terms 1.0 for the five identified bundled DLLs, with full local references, independent atomic acceptance state and before-install/first-use gates. Old preview records are rejected; new unaccepted silent scope refuses. Packaging cannot synthesize operative acceptance; independent MIT/GPL rights and public-distribution gates remain unchanged.
 - Local image/video conversion to colored symbol art with a shared glyph-based rendering pipeline.
 - Separate Render → Review → Export workflows, retained image results and managed full-video review artifacts.

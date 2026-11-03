@@ -46,13 +46,16 @@ function Assert-ControlledToolLegalBinding([string]$Root, $Pins) {
     return [pscustomobject]@{Version=$tool.Version;DocumentsVerified=$required.Count;SourceDelivery='Local material identity only; public hosting/distribution approval remains open'}
 }
 
-function Assert-LegalPackage([string]$Root) {
+function Assert-LegalPackage([string]$Root, $ReleaseContext = $null) {
     Assert-PortableDirectoryChain $Root
     $manifestPath = Join-Path $Root 'licenses/manifest.json'
     Assert-PortableDirectoryChain ([IO.Path]::GetDirectoryName($manifestPath))
     if (([IO.File]::GetAttributes($manifestPath) -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Linked legal manifest is forbidden.' }
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    if ($manifest.SchemaVersion -ne 1 -or $manifest.PublicDistributionApproved -isnot [bool] -or
+    if ($null -ne $ReleaseContext) {
+        if (-not (Get-Command Assert-ReleaseManifest -ErrorAction SilentlyContinue)) { throw 'Release validation must be explicitly imported.' }
+        Assert-ReleaseManifest $manifest $ReleaseContext
+    } elseif ($manifest.SchemaVersion -ne 1 -or $manifest.PublicDistributionApproved -isnot [bool] -or
         $manifest.PublicDistributionApproved -or @($manifest.OpenIssues).Count -eq 0) {
         throw 'Expected a version-1 provisional legal manifest with explicit unresolved distribution issues.'
     }
@@ -87,5 +90,9 @@ function Assert-LegalPackage([string]$Root) {
             throw "Dependency changed without legal review: $($library.Key)"
         }
     }
-    return [pscustomobject]@{ Status='INCOMPLETE: public distribution not approved'; DocumentsVerified=$seen.Count; DependenciesBound=$keys.Count; OpenIssues=@($manifest.OpenIssues) }
+    if ($null -ne $ReleaseContext) {
+        return [pscustomobject]@{Status='ReleasePrepared; publication and online availability not asserted'; Mode='Release'; DocumentsVerified=$seen.Count;
+            DependenciesBound=$keys.Count; ReleasePreparation=$manifest.ReleasePreparation; OpenIssues=@('Actual anonymous hosting and affected native acceptance/publication decision remain separate')}
+    }
+    return [pscustomobject]@{ Status='INCOMPLETE: public distribution not approved'; Mode='Provisional'; DocumentsVerified=$seen.Count; DependenciesBound=$keys.Count; OpenIssues=@($manifest.OpenIssues) }
 }

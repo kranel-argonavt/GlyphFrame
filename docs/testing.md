@@ -27,11 +27,22 @@ pwsh -NoProfile -File scripts/Test-NativeTerms.ps1
 pwsh -NoProfile -File scripts/Test-PackageLegal.ps1
 pwsh -NoProfile -File scripts/Test-SourcePreparation.ps1
 pwsh -NoProfile -File scripts/Test-ControlledFfmpeg.ps1
+pwsh -NoProfile -File scripts/Test-ReleasePackage.ps1
 ```
 
 Actual publish/startup checks are a [separate packaging operation](packaging.md). A fresh image-only source build without FFmpeg is not a full-suite pass. Source-export path checks are not exhaustive secret/history or licensing audits.
 
 The 2026-10-29 source-delivery follow-up on parent `9229401` with helper/documentation edits passed **155 helper checks** (37 controlled, 18 source, 25 legal, 20 portable, 30 installer, 15 session, 10 native terms). The added controlled case first reproduced a missing application-native helper in the standalone source dependency chain, then passed after imports were moved to their actual consumers. The frozen archive's own helpers, source/patch locks and six runtime notices were also loaded/validated after extraction without compiling or running an input executable. The [delivery revision 2 checks](packaging.md#controlled-ffmpeg-delivery-candidate) do not rerun the full application suite, prior functional FFmpeg replay or native acceptance. Earlier totals below retain their original artifact scope.
+
+## Release-preparation verification
+
+On 2026-10-30, the working tree based on public parent **e1c4f8e** passed Release build with **zero warnings/errors**, **1,324 xUnit tests** (476 core/integration and 848 app/WPF, no skips), formatting and diff checks. This includes nine new notices-schema cases. Counts are a current dirty-tree run, not relabeling the filtered baseline or an already published release.
+
+The helper suite separately covers provisional behavior plus explicit release definitions, source/archive/guide hashes, schema-2 projection, source directions, mode/source mismatch, clean/committed-input requirements and unchanged companion staging. The release helper uses inert fixtures and creates no agreement, app launch or upload.
+
+A data-only probe also verified the actual current 32 legal texts projected to 34 package documents, nine existing dependency bindings, twelve controlled-tool documents and the unchanged adopted Windows profile against retained runtime files. It is not a new application package or new-byte native acceptance. The versioned destination v1.0.0 is planned, not a created tag or verified public source URL.
+
+No fresh Setup/portable or native/clean-PC replay was produced for this implementation step. Release mode deliberately rejects the uncommitted working tree. After checkpointing, build from the selected clean revision and perform the affected package/hosting checks in the [release workflow](packaging.md#explicit-release-preparation).
 
 ## Filtered-history clean-checkout verification
 
